@@ -1,0 +1,35 @@
+# Von VoltPanel generiert für {{ .Name }} — nicht von Hand bearbeiten.
+# Erzeugt: {{ .GeneratedAt }}
+
+[Unit]
+Description=VoltPanel App {{ .Name }}
+After=network.target
+
+[Service]
+Type=simple
+User={{ .User }}
+Group={{ .User }}
+WorkingDirectory={{ .WorkingDir }}
+ExecStart={{ .ExecStart }}
+Restart=always
+RestartSec=5
+StandardOutput=append:{{ .LogPath }}
+StandardError=append:{{ .LogPath }}
+{{- range .Env }}
+Environment={{ . }}
+{{- end }}
+
+# Die App läuft als eigener User und darf ausschließlich in ihr eigenes
+# Verzeichnis schreiben. Ein übernommener Prozess kommt so nicht ans System.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths={{ .WorkingDir }}
+
+[Install]
+WantedBy=multi-user.target

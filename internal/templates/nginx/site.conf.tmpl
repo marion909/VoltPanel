@@ -1,0 +1,148 @@
+# Von VoltPanel generiert für {{ .Site.Domain }} — nicht von Hand bearbeiten.
+# Änderungen werden beim nächsten Schreiben überschrieben.
+# Erzeugt: {{ .GeneratedAt }}
+
+{{- if .Site.SSLEnabled }}
+{{- if .Site.ForceHTTPS }}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .ServerNames }};
+
+    # ACME-Prüfpfad muss auch bei erzwungenem HTTPS über Port 80 erreichbar bleiben,
+    # sonst schlägt jede HTTP-01-Erneuerung fehl.
+    location ^~ /.well-known/acme-challenge/ {
+        root {{ .ACMEWebroot }};
+        default_type "text/plain";
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{{- end }}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ .ServerNames }};
+
+    ssl_certificate     {{ .CertPath }};
+    ssl_certificate_key {{ .KeyPath }};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_tickets off;
+    ssl_stapling        on;
+    ssl_stapling_verify on;
+{{- if .Site.HSTS }}
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+{{- end }}
+{{- else }}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .ServerNames }};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{ .ACMEWebroot }};
+        default_type "text/plain";
+    }
+{{- end }}
+
+    root {{ .WebRoot }};
+    index index.html index.htm{{ if eq .Site.Type "php" }} index.php{{ end }};
+
+    access_log {{ .LogDir }}/{{ .Site.Domain }}.access.log;
+    error_log  {{ .LogDir }}/{{ .Site.Domain }}.error.log warn;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size {{ .MaxBodySize }};
+
+    charset utf-8;
+    server_tokens off;
+
+    # Punktdateien bleiben verborgen; .well-known ist die notwendige Ausnahme.
+    location ~ /\.(?!well-known).* {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+{{- range .DenyIPs }}
+    deny {{ . }};
+{{- end }}
+{{- if .AllowIPs }}
+{{- range .AllowIPs }}
+    allow {{ . }};
+{{- end }}
+    deny all;
+{{- end }}
+{{- if .BasicAuthFile }}
+
+    auth_basic           "{{ .Site.Domain }}";
+    auth_basic_user_file {{ .BasicAuthFile }};
+{{- end }}
+{{- range .Redirects }}
+
+    location = {{ .From }} {
+        return {{ .Code }} {{ .To }};
+    }
+{{- end }}
+
+{{- if eq .Site.Type "proxy" }}
+
+    location / {
+        proxy_pass {{ .Site.ProxyTarget }};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        $connection_upgrade;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+    }
+{{- else if eq .Site.Type "php" }}
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        # Nur existierende Dateien an FPM geben — verhindert, dass hochgeladene
+        # Bilder über pfad-getrickste URLs als PHP ausgeführt werden.
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:{{ .SocketPath }};
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO       $fastcgi_path_info;
+        fastcgi_param HTTPS           $https if_not_empty;
+        fastcgi_read_timeout {{ .FastCGITimeout }}s;
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 8 16k;
+    }
+{{- else }}
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{{- end }}
+
+    location ~* \.(?:css|js|jpg|jpeg|png|gif|ico|svg|webp|avif|woff2?|ttf|eot)$ {
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, immutable";
+    }
+{{- range .ExtraLines }}
+    {{ . }}
+{{- end }}
+}

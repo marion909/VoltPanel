@@ -1,0 +1,54 @@
+; Von VoltPanel generiert für {{ .Site.Domain }} — nicht von Hand bearbeiten.
+; Erzeugt: {{ .GeneratedAt }}
+
+[{{ .Pool.PoolName }}]
+user  = {{ .Site.SystemUser }}
+group = {{ .Site.SystemUser }}
+
+listen       = {{ .Pool.SocketPath }}
+listen.owner = www-data
+listen.group = www-data
+listen.mode  = 0660
+
+pm = {{ .Pool.PM }}
+pm.max_children      = {{ .Pool.MaxChildren }}
+pm.start_servers     = {{ .StartServers }}
+pm.min_spare_servers = {{ .MinSpare }}
+pm.max_spare_servers = {{ .MaxSpare }}
+pm.process_idle_timeout = 30s
+pm.max_requests = 500
+
+; Ein abgestürzter Pool darf nicht die anderen Sites mitnehmen.
+catch_workers_output = yes
+decorate_workers_output = no
+php_admin_value[error_log] = {{ .LogDir }}/{{ .Site.Domain }}.php-error.log
+php_admin_flag[log_errors] = on
+php_admin_flag[display_errors] = off
+
+; Isolation: open_basedir sperrt den Pool auf sein eigenes Verzeichnis ein.
+; Ohne das könnte jede Site die Configs und Daten aller anderen lesen.
+php_admin_value[open_basedir]      = {{ .OpenBasedir }}
+php_admin_value[upload_tmp_dir]    = {{ .Site.RootPath }}/tmp
+php_admin_value[sys_temp_dir]      = {{ .Site.RootPath }}/tmp
+php_admin_value[session.save_path] = {{ .Site.RootPath }}/tmp/sessions
+
+php_admin_value[disable_functions] = {{ .DisableFunctions }}
+
+php_value[memory_limit]        = {{ .Pool.MemoryLimit }}
+php_value[max_execution_time]  = {{ .Pool.MaxExecutionTime }}
+php_value[upload_max_filesize] = {{ .Pool.UploadMaxFilesize }}
+php_value[post_max_size]       = {{ .Pool.UploadMaxFilesize }}
+php_value[date.timezone]       = {{ .Timezone }}
+
+php_admin_flag[expose_php] = off
+php_admin_value[cgi.fix_pathinfo] = 0
+
+env[HOSTNAME] = $HOSTNAME
+env[PATH]     = /usr/local/bin:/usr/bin:/bin
+env[TMP]      = {{ .Site.RootPath }}/tmp
+env[TMPDIR]   = {{ .Site.RootPath }}/tmp
+{{- if .Pool.ExtraINI }}
+
+; Zusätzliche Einstellungen aus dem Panel
+{{ .Pool.ExtraINI }}
+{{- end }}

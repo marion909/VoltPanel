@@ -244,3 +244,7 @@ Realistisch nebenberuflich: **M2 nach ~4 Monaten, M3 nach ~7, v1.0 in 12–24 Mo
 3. `install.sh` + Agent/Web-Trennung als Skelett bauen.
 4. Nginx- und PHP-FPM-Templates schreiben und von Hand gegen eine Test-VM verifizieren.
 5. Erst danach mit dem UI beginnen.
+
+Domain: voltpanel.dev
+Github: https://github.com/marion909/VoltPanel
+NPM: https://www.npmjs.com/settings/marion808/staged-packages

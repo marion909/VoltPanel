@@ -1,0 +1,26 @@
+# Von VoltPanel generiert. Wird nach /etc/nginx/conf.d/volt-shared.conf gelegt
+# und gilt für alle Vhosts.
+
+# Wird von jedem Reverse-Proxy-Vhost gebraucht: ohne diese Map schlägt ein
+# WebSocket-Upgrade fehl, weil $connection_upgrade undefiniert wäre.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# Standardserver: Anfragen an unbekannte Hostnamen laufen ins Leere, statt bei
+# der alphabetisch ersten Site zu landen.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{ .ACMEWebroot }};
+        default_type "text/plain";
+    }
+
+    location / {
+        return 444;
+    }
+}
