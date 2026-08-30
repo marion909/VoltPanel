@@ -1,13 +1,21 @@
 # Build-Artefakte
-/dist/
+# Die Muster sind an die Wurzel gebunden (/volt statt volt) — sonst würden sie
+# auch die Verzeichnisse cmd/volt/ und cmd/volt-agent/ ausschließen.
 /bin/
-volt
-volt-agent
+/dist/
+/volt
+/volt-agent
+coverage.out
+coverage.html
 
 # Frontend
 /web/node_modules/
 /web/dist/
-/internal/web/dist/
+
+# Das gebaute Frontend ist ein Build-Artefakt; .gitkeep hält das Verzeichnis
+# für embed.FS am Leben, damit `go build` auch ohne Node durchläuft.
+/internal/webui/dist/*
+!/internal/webui/dist/.gitkeep
 
 # Lokale Entwicklung
 *.db

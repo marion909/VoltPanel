@@ -1,0 +1,12 @@
+[Unit]
+Description=VoltPanel Backup
+After=volt-agent.service
+
+[Service]
+Type=oneshot
+User=volt
+Group=volt
+ExecStart=/usr/local/bin/volt backup create
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=volt-backup

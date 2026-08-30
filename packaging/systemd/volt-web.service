@@ -1,0 +1,42 @@
+[Unit]
+Description=VoltPanel Web (Panel-Oberfläche und API)
+Documentation=https://github.com/marion909/VoltPanel
+After=network.target volt-agent.service
+Wants=volt-agent.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/volt serve
+Restart=always
+RestartSec=3
+
+# Unprivilegiert: ein Fehler im Web-Teil darf kein Root bedeuten. Alles
+# Privilegierte läuft über den Socket beim Agent.
+User=volt
+Group=volt
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
+ReadWritePaths=/var/lib/volt /var/log/volt /var/backups/volt
+ReadOnlyPaths=/etc/volt
+
+# Das Panel hört auf einem hohen Port; es braucht keine privilegierten Ports.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=volt-web
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,124 @@
+// Command volt ist die CLI und zugleich der Webserver des Panels.
+//
+// Es läuft unprivilegiert als Benutzer "volt"; alles, was root braucht, geht
+// über den Socket an volt-agent.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+
+	"github.com/marion909/voltpanel/internal/agent"
+	"github.com/marion909/voltpanel/internal/authn"
+	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/store"
+	"github.com/marion909/voltpanel/internal/version"
+	"github.com/spf13/cobra"
+)
+
+// app bündelt die Abhängigkeiten der Unterbefehle. Store und Agent werden erst
+// beim ersten Zugriff geöffnet — `volt --version` soll keine Datenbank brauchen.
+type app struct {
+	configPath string
+	logLevel   string
+
+	cfg     *config.Config
+	store   *store.Store
+	agent   *agent.Client
+	secrets *authn.SecretBox
+	log     *slog.Logger
+}
+
+func main() {
+	a := &app{}
+	root := &cobra.Command{
+		Use:   "volt",
+		Short: "VoltPanel — selbst gehostetes Linux Hosting Control Panel",
+		Long: "VoltPanel verwaltet Websites, PHP, Datenbanken und Zertifikate auf\n" +
+			"einem Linux-Server. Ein Binary, ein Befehl zum Installieren, einer zum Updaten.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Version:       version.Full(),
+	}
+	root.SetVersionTemplate("{{.Version}}\n")
+	root.PersistentFlags().StringVar(&a.configPath, "config", "", "Pfad zur Konfiguration")
+	root.PersistentFlags().StringVar(&a.logLevel, "log-level", "info", "debug | info | warn | error")
+
+	root.AddCommand(
+		a.serveCmd(),
+		a.statusCmd(),
+		a.doctorCmd(),
+		a.updateCmd(),
+		a.restartCmd(),
+		a.setupCmd(),
+		a.userCmd(),
+		a.siteCmd(),
+		a.certCmd(),
+		a.backupCmd(),
+	)
+
+	if err := root.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "fehler:", err)
+		os.Exit(1)
+	}
+}
+
+// init öffnet Konfiguration, Datenbank, Schlüssel und Agent-Verbindung.
+func (a *app) init(migrate bool) error {
+	if a.cfg != nil {
+		return nil
+	}
+
+	var lvl slog.Level
+	if err := lvl.UnmarshalText([]byte(a.logLevel)); err != nil {
+		lvl = slog.LevelInfo
+	}
+	a.log = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
+
+	cfg, err := config.Load(a.configPath)
+	if err != nil {
+		return err
+	}
+	a.cfg = cfg
+
+	if a.store, err = store.Open(cfg.DBPath); err != nil {
+		return err
+	}
+	if migrate {
+		from, to, err := a.store.Migrate(context.Background())
+		if err != nil {
+			return err
+		}
+		if from != to {
+			a.log.Info("schema migriert", "von", from, "auf", to)
+		}
+	}
+
+	if a.secrets, err = authn.LoadSecretBox(cfg.SecretKeyPath); err != nil {
+		return err
+	}
+	a.agent = agent.NewClient(cfg.SocketPath)
+	return nil
+}
+
+func (a *app) close() {
+	if a.agent != nil {
+		_ = a.agent.Close()
+	}
+	if a.store != nil {
+		_ = a.store.Close()
+	}
+}
+
+// withApp verdrahtet Initialisierung und Aufräumen um einen Unterbefehl.
+func (a *app) withApp(migrate bool, fn func(cmd *cobra.Command, args []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := a.init(migrate); err != nil {
+			return err
+		}
+		defer a.close()
+		return fn(cmd, args)
+	}
+}

@@ -147,6 +147,10 @@ func (s *Server) setupRoutes() {
 
 // mountFrontend liefert das eingebettete SPA aus. Unbekannte Pfade bekommen
 // index.html, damit der Vue-Router auch beim direkten Aufruf einer Unterseite greift.
+//
+// Die Dateien gehen bewusst direkt über http.ServeContent raus statt über einen
+// http.FileServer: der kanonisiert "/index.html" per 301 auf "./" und dreht sich
+// dabei mit unserem Fallback im Kreis.
 func (s *Server) mountFrontend(g *echo.Group) {
 	fsys, err := webui.FS()
 	if err != nil {
@@ -156,28 +160,9 @@ func (s *Server) mountFrontend(g *echo.Group) {
 	if !webui.Built() {
 		s.log.Warn("kein gebautes frontend eingebettet — das panel liefert nur die api aus")
 	}
-	fileServer := http.FileServer(fsys)
 
 	g.GET("/*", func(c echo.Context) error {
-		upath := c.Param("*")
-		if upath == "" {
-			upath = "index.html"
-		}
-
-		if f, err := fsys.Open("/" + upath); err == nil {
-			f.Close()
-			// Gehashte Assets sind unveränderlich; index.html darf nie im Cache
-			// festhängen, sonst zeigt der Browser nach einem Update die alte App.
-			if upath == "index.html" {
-				c.Response().Header().Set("Cache-Control", "no-cache, must-revalidate")
-			} else {
-				c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-			}
-			req := c.Request().Clone(c.Request().Context())
-			req.URL.Path = "/" + upath
-			fileServer.ServeHTTP(c.Response(), req)
-			return nil
-		}
+		upath := strings.TrimPrefix(c.Param("*"), "/")
 
 		// Kein SPA-Fallback für API-Pfade: ein Tippfehler in einer Route soll
 		// als 404 auffallen und nicht stillschweigend HTML zurückgeben.
@@ -185,18 +170,49 @@ func (s *Server) mountFrontend(g *echo.Group) {
 			return echo.NewHTTPError(http.StatusNotFound, "unbekannter endpunkt")
 		}
 
-		index, err := fsys.Open("/index.html")
-		if err != nil {
+		if upath != "" {
+			if err := serveAsset(c, fsys, upath); err == nil {
+				return nil
+			}
+			// Dasselbe für Assets: eine fehlende .js-Datei als HTML auszuliefern
+			// erzeugt im Browser einen Syntaxfehler statt eines klaren 404.
+			if strings.HasPrefix(upath, "assets/") {
+				return echo.NewHTTPError(http.StatusNotFound, "datei nicht gefunden")
+			}
+		}
+		// Unbekannter Pfad oder Wurzel: die App entscheidet, was sie anzeigt.
+		if err := serveAsset(c, fsys, "index.html"); err != nil {
 			return echo.NewHTTPError(http.StatusNotFound, "frontend nicht verfügbar")
 		}
-		defer index.Close()
-
-		c.Response().Header().Set("Cache-Control", "no-cache, must-revalidate")
-		req := c.Request().Clone(c.Request().Context())
-		req.URL.Path = "/index.html"
-		fileServer.ServeHTTP(c.Response(), req)
 		return nil
 	})
+}
+
+// serveAsset schreibt eine Datei aus dem eingebetteten Dateisystem in die
+// Antwort. Verzeichnisse gelten als "nicht gefunden", damit der Aufrufer auf
+// index.html zurückfällt.
+func serveAsset(c echo.Context, fsys http.FileSystem, name string) error {
+	f, err := fsys.Open("/" + name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		return errors.New("kein auslieferbares objekt")
+	}
+
+	// Gehashte Assets sind unveränderlich; index.html darf nie im Cache
+	// festhängen, sonst zeigt der Browser nach einem Update die alte App.
+	if name == "index.html" {
+		c.Response().Header().Set("Cache-Control", "no-cache, must-revalidate")
+	} else {
+		c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
+
+	http.ServeContent(c.Response(), c.Request(), info.Name(), info.ModTime(), f)
+	return nil
 }
 
 // Start bindet den Listener und bedient Anfragen bis zum Context-Ende.

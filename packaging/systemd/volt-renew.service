@@ -1,0 +1,13 @@
+[Unit]
+Description=VoltPanel Zertifikatserneuerung
+After=network-online.target volt-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=volt
+Group=volt
+ExecStart=/usr/local/bin/volt cert renew --all
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=volt-renew

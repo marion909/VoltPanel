@@ -1,0 +1,38 @@
+[Unit]
+Description=VoltPanel Agent (privilegierte Operationen)
+Documentation=https://github.com/marion909/VoltPanel
+After=network.target
+Before=volt-web.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/volt-agent --peer-user volt
+Restart=always
+RestartSec=3
+
+# Der Agent braucht root — das ist sein Zweck. Alles, was er darüber hinaus
+# nicht braucht, wird ihm hier weggenommen.
+User=root
+RuntimeDirectory=volt
+RuntimeDirectoryMode=0755
+
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+# Der Agent verwaltet Nginx, PHP und Sites — genau diese Pfade darf er schreiben.
+ProtectSystem=full
+ReadWritePaths=/etc/nginx /etc/php /var/www /var/lib/volt /var/log/volt /etc/volt /var/backups/volt
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=volt-agent
+
+[Install]
+WantedBy=multi-user.target

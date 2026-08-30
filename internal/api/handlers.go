@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/core"
 	"github.com/marion909/voltpanel/internal/store"
@@ -433,6 +434,9 @@ func storeError(err error) error {
 	switch {
 	case err == nil:
 		return nil
+	case isAgentFailure(err):
+		// Ein nicht laufender oder ablehnender Agent ist kein Eingabefehler.
+		return agentError(err)
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrForbidden):
 		return echo.NewHTTPError(http.StatusNotFound, "nicht gefunden")
 	case errors.Is(err, store.ErrConflict):
@@ -448,9 +452,23 @@ func storeError(err error) error {
 	return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 }
 
+// isAgentFailure erkennt Fehler, die aus der Agent-Verbindung stammen — auch
+// wenn sie unterwegs mit fmt.Errorf umhüllt wurden.
+func isAgentFailure(err error) bool {
+	var unavailable *agent.UnavailableError
+	var opErr *agent.OpError
+	return errors.As(err, &unavailable) || errors.As(err, &opErr)
+}
+
 func agentError(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	var unavailable *agent.UnavailableError
+	if errors.As(err, &unavailable) {
+		return echo.NewHTTPError(http.StatusServiceUnavailable,
+			"der volt-agent läuft nicht — systemaktionen sind derzeit nicht möglich")
 	}
 	return echo.NewHTTPError(http.StatusBadGateway, "agent: "+err.Error())
 }

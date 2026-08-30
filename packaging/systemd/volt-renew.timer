@@ -1,0 +1,13 @@
+[Unit]
+Description=Erneuert VoltPanel-Zertifikate zweimal täglich
+
+[Timer]
+# Zweimal täglich, wie von Let's Encrypt empfohlen. RandomizedDelaySec
+# verteilt die Last: sonst schlagen alle VoltPanel-Installationen der Welt
+# zur selben Minute beim ACME-Server auf.
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=3h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

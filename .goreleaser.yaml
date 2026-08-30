@@ -1,0 +1,119 @@
+# GoReleaser baut die statischen Binaries für die Release-Kanäle.
+#
+# Das Frontend muss vorher gebaut sein (make web) — es wird über embed.FS
+# aus internal/webui/dist mit ins Binary genommen.
+version: 2
+
+project_name: voltpanel
+
+before:
+  hooks:
+    - go mod tidy
+    - ./scripts/build-web.sh
+
+builds:
+  - id: volt
+    main: ./cmd/volt
+    binary: volt
+    env:
+      # Ohne cgo bleibt das Binary statisch — das ist die Grundlage dafür,
+      # dass die Installation aus einer einzigen Datei besteht.
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/marion909/voltpanel/internal/version.Version={{.Version}}
+      - -X github.com/marion909/voltpanel/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/marion909/voltpanel/internal/version.Date={{.Date}}
+      - -X github.com/marion909/voltpanel/internal/version.Channel={{ if .Prerelease }}beta{{ else }}stable{{ end }}
+
+  - id: volt-agent
+    main: ./cmd/volt-agent
+    binary: volt-agent
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/marion909/voltpanel/internal/version.Version={{.Version}}
+      - -X github.com/marion909/voltpanel/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/marion909/voltpanel/internal/version.Date={{.Date}}
+      - -X github.com/marion909/voltpanel/internal/version.Channel={{ if .Prerelease }}beta{{ else }}stable{{ end }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - src: packaging/install.sh
+        dst: install.sh
+      - src: packaging/systemd/*
+        dst: systemd
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# Die Releases werden signiert; install.sh und `volt update` prüfen die
+# Prüfsumme vor der Installation.
+signs:
+  - artifacts: checksum
+    cmd: cosign
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    output: true
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Neu
+      regexp: '^feat'
+      order: 0
+    - title: Behoben
+      regexp: '^fix'
+      order: 1
+    - title: Sicherheit
+      regexp: '^sec'
+      order: 2
+    - title: Sonstiges
+      order: 99
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+release:
+  github:
+    owner: marion909
+    name: VoltPanel
+  # Beta-Tags (v1.2.0-beta.1) landen im beta-Kanal, nicht bei den Nutzern
+  # des stabilen Kanals.
+  prerelease: auto
+  footer: |
+    ## Installation
+
+    ```bash
+    bash <(curl -fsSL https://get.voltpanel.dev/install.sh)
+    ```
+
+    ## Update
+
+    ```bash
+    volt update
+    ```

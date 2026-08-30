@@ -132,7 +132,7 @@ func (c *Client) connectLocked() error {
 
 	conn, err := net.DialTimeout("unix", c.socketPath, 5*time.Second)
 	if err != nil {
-		return fmt.Errorf("agent unter %s nicht erreichbar: %w", c.socketPath, err)
+		return &UnavailableError{Socket: c.socketPath, Err: err}
 	}
 	if err := conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
 		conn.Close()
@@ -275,6 +275,20 @@ type actorKey struct{}
 func WithActor(ctx context.Context, actor string) context.Context {
 	return context.WithValue(ctx, actorKey{}, actor)
 }
+
+// UnavailableError heißt: der Agent läuft nicht. Das ist ein Zustand des
+// Servers, kein Fehler des Aufrufers — die API muss daraus 503 machen und
+// nicht 400, sonst sucht der Betreiber den Fehler in seiner Eingabe.
+type UnavailableError struct {
+	Socket string
+	Err    error
+}
+
+func (e *UnavailableError) Error() string {
+	return fmt.Sprintf("agent unter %s nicht erreichbar: %v", e.Socket, e.Err)
+}
+
+func (e *UnavailableError) Unwrap() error { return e.Err }
 
 // transportErr markiert Fehler der Verbindung selbst — nur die werden wiederholt.
 type transportErr struct{ err error }
