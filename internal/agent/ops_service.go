@@ -1,0 +1,145 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/marion909/voltpanel/internal/version"
+)
+
+const (
+	shortTimeout = 15 * time.Second
+	longTimeout  = 120 * time.Second
+)
+
+// newRegistry ist die Whitelist des Agents: exakt diese Operationen existieren.
+// Alles andere beantwortet dispatch() mit "unbekannte operation".
+func (s *Server) newRegistry() map[Op]Handler {
+	return map[Op]Handler{
+		OpPing:        s.opPing,
+		OpSystemInfo:  s.opSystemInfo,
+		OpServiceList: s.opServiceList,
+
+		OpServiceStatus:  s.opServiceStatus,
+		OpServiceStart:   s.serviceAction("start"),
+		OpServiceStop:    s.serviceAction("stop"),
+		OpServiceRestart: s.serviceAction("restart"),
+		OpServiceReload:  s.serviceAction("reload"),
+		OpServiceEnable:  s.serviceAction("enable"),
+		OpServiceDisable: s.serviceAction("disable"),
+
+		OpNginxWriteVhost:  s.opNginxWriteVhost,
+		OpNginxRemoveVhost: s.opNginxRemoveVhost,
+		OpNginxTest:        s.opNginxTest,
+		OpNginxReload:      s.opNginxReload,
+
+		OpPHPWritePool:  s.opPHPWritePool,
+		OpPHPRemovePool: s.opPHPRemovePool,
+		OpPHPReload:     s.opPHPReload,
+		OpPHPVersions:   s.opPHPVersions,
+
+		OpUserCreate: s.opUserCreate,
+		OpUserDelete: s.opUserDelete,
+		OpUserExists: s.opUserExists,
+
+		OpFileWrite:   s.opFileWrite,
+		OpFileRead:    s.opFileRead,
+		OpFileRemove:  s.opFileRemove,
+		OpFileMkdir:   s.opFileMkdir,
+		OpFileChown:   s.opFileChown,
+		OpFileList:    s.opFileList,
+		OpFileTailLog: s.opFileTailLog,
+
+		OpCertInstall: s.opCertInstall,
+	}
+}
+
+func (s *Server) opPing(context.Context, json.RawMessage) (any, error) {
+	return TextResult{Text: "pong " + version.Version}, nil
+}
+
+func (s *Server) opServiceStatus(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[ServiceParams](raw, OpServiceStatus)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkService(p.Name); err != nil {
+		return nil, err
+	}
+	return s.serviceStatus(ctx, p.Name), nil
+}
+
+// serviceStatus fragt systemd ab. Ein nicht installierter Dienst ist kein
+// Fehler — das Dashboard zeigt ihn dann einfach als "nicht installiert".
+func (s *Server) serviceStatus(ctx context.Context, name string) ServiceStatus {
+	st := ServiceStatus{Name: name}
+
+	// `show` liefert alles in einem Aufruf und schlägt bei unbekannten Units
+	// nicht fehl, anders als `status`.
+	out, err := run(ctx, shortTimeout, "systemctl", "show", name,
+		"--property=LoadState,ActiveState,SubState,UnitFileState,Description", "--no-pager")
+	if err != nil {
+		return st
+	}
+
+	for _, line := range strings.Split(out, "\n") {
+		key, val, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case "LoadState":
+			st.Installed = val == "loaded"
+		case "ActiveState":
+			st.Active = val == "active"
+		case "SubState":
+			st.SubState = val
+		case "UnitFileState":
+			st.Enabled = val == "enabled" || val == "enabled-runtime"
+		case "Description":
+			st.Description = val
+		}
+	}
+	return st
+}
+
+// serviceAction erzeugt den Handler für start/stop/restart/… Alle teilen sich
+// dieselbe Validierung, damit keine Variante versehentlich ohne auskommt.
+func (s *Server) serviceAction(action string) Handler {
+	return func(ctx context.Context, raw json.RawMessage) (any, error) {
+		p, err := decode[ServiceParams](raw, Op("service."+action))
+		if err != nil {
+			return nil, err
+		}
+		if err := checkService(p.Name); err != nil {
+			return nil, err
+		}
+		if _, err := run(ctx, longTimeout, "systemctl", action, p.Name); err != nil {
+			return nil, err
+		}
+		return s.serviceStatus(ctx, p.Name), nil
+	}
+}
+
+// opServiceList gibt den Zustand aller verwaltbaren Dienste zurück — die Basis
+// für die Software-Kacheln im Dashboard.
+func (s *Server) opServiceList(ctx context.Context, _ json.RawMessage) (any, error) {
+	names := make([]string, 0, len(allowedServices))
+	for n := range allowedServices {
+		names = append(names, n)
+	}
+	for _, v := range detectPHPVersions(s.phpDir) {
+		names = append(names, "php"+v+"-fpm")
+	}
+
+	out := make([]ServiceStatus, 0, len(names))
+	for _, n := range names {
+		st := s.serviceStatus(ctx, n)
+		if st.Installed {
+			out = append(out, st)
+		}
+	}
+	return out, nil
+}

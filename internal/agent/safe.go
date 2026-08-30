@@ -1,0 +1,205 @@
+package agent
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+)
+
+// Regeln für alles, was aus dem Web-Prozess kommt. Whitelist, nie Blacklist:
+// nur was passt, geht durch.
+var (
+	reUsername    = regexp.MustCompile(`^[a-z_][a-z0-9_-]{1,31}$`)
+	reServiceName = regexp.MustCompile(`^[a-zA-Z0-9@._-]{1,64}$`)
+	rePHPVersion  = regexp.MustCompile(`^[578]\.[0-9]$`)
+	rePoolName    = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{1,63}$`)
+	reDomain      = regexp.MustCompile(`^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+)
+
+// allowedServices begrenzt, welche systemd-Units der Agent überhaupt anfassen
+// darf. Ohne diese Liste wäre `service.stop` mit dem Namen "ssh" ein Weg, sich
+// vom Server auszusperren — oder Schlimmeres.
+var allowedServices = map[string]bool{
+	"nginx": true, "mariadb": true, "mysql": true, "redis-server": true,
+	"pure-ftpd": true, "fail2ban": true, "docker": true, "cron": true,
+	"postfix": true, "dovecot": true, "rspamd": true, "opendkim": true,
+	"volt-web": true,
+}
+
+// allowedBinaries: absolute Pfade, damit kein manipulierter PATH greift.
+var allowedBinaries = map[string]string{
+	"systemctl": "/usr/bin/systemctl",
+	"nginx":     "/usr/sbin/nginx",
+	"useradd":   "/usr/sbin/useradd",
+	"userdel":   "/usr/sbin/userdel",
+	"id":        "/usr/bin/id",
+	"chown":     "/usr/bin/chown",
+}
+
+var (
+	errBadInput = errors.New("ungültige eingabe")
+	errNotAllow = errors.New("nicht erlaubt")
+)
+
+// isPHPService erlaubt zusätzlich php8.3-fpm & Co., ohne jede Version einzeln
+// in allowedServices pflegen zu müssen.
+var rePHPService = regexp.MustCompile(`^php[578]\.[0-9]-fpm$`)
+
+func checkService(name string) error {
+	if !reServiceName.MatchString(name) {
+		return fmt.Errorf("%w: dienstname %q", errBadInput, name)
+	}
+	base := strings.TrimSuffix(name, ".service")
+	if allowedServices[base] || rePHPService.MatchString(base) {
+		return nil
+	}
+	return fmt.Errorf("%w: dienst %q steht nicht auf der whitelist", errNotAllow, base)
+}
+
+func checkUsername(u string) error {
+	if !reUsername.MatchString(u) {
+		return fmt.Errorf("%w: benutzername %q", errBadInput, u)
+	}
+	// Systemkonten sind tabu — ein Panel-User darf nie "root" heißen oder
+	// einen bestehenden Dienstaccount überschreiben.
+	switch u {
+	case "root", "daemon", "bin", "sys", "www-data", "nobody", "volt", "volt-agent",
+		"sshd", "mysql", "systemd-network", "systemd-resolve":
+		return fmt.Errorf("%w: %q ist ein reservierter systembenutzer", errNotAllow, u)
+	}
+	return nil
+}
+
+func checkPHPVersion(v string) error {
+	if !rePHPVersion.MatchString(v) {
+		return fmt.Errorf("%w: php-version %q", errBadInput, v)
+	}
+	return nil
+}
+
+func checkPoolName(n string) error {
+	if !rePoolName.MatchString(n) {
+		return fmt.Errorf("%w: poolname %q", errBadInput, n)
+	}
+	return nil
+}
+
+func checkDomain(d string) error {
+	if len(d) > 253 || !reDomain.MatchString(strings.ToLower(d)) {
+		return fmt.Errorf("%w: domain %q", errBadInput, d)
+	}
+	return nil
+}
+
+// run führt ein Kommando aus — mit explizitem argv, ohne Shell.
+//
+// Es gibt hier bewusst keine Variante, die einen String an sh übergibt. Damit
+// existiert im gesamten Root-Daemon kein Pfad, auf dem eine Command Injection
+// möglich wäre: Argumente sind immer separate argv-Einträge, nie Text, den ein
+// Interpreter noch einmal zerlegt.
+func run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+	bin, ok := allowedBinaries[name]
+	if !ok {
+		return "", fmt.Errorf("%w: binary %q", errNotAllow, name)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, args...)
+	// Minimales, festes Environment. Nichts wird vom aufrufenden Prozess geerbt.
+	cmd.Env = []string{
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+		"LC_ALL=C",
+	}
+
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if ctx.Err() == context.DeadlineExceeded {
+		return text, fmt.Errorf("%s: zeitüberschreitung nach %s", name, timeout)
+	}
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return text, fmt.Errorf("%s beendet mit code %d: %s", name, ee.ExitCode(), truncate(text, 400))
+		}
+		return text, fmt.Errorf("%s: %w", name, err)
+	}
+	return text, nil
+}
+
+// jail sperrt einen Pfad in eine erlaubte Wurzel ein.
+//
+// Der Symlink wird aufgelöst, bevor geprüft wird — sonst zeigt
+// /var/www/example.at/link auf /etc/shadow und die Prüfung auf das Präfix
+// hätte nichts gemerkt. Existiert der Pfad noch nicht (Anlegen einer Datei),
+// wird das erste existierende Elternverzeichnis aufgelöst und der Rest daran
+// gehängt.
+func jail(path string, roots []string) (string, error) {
+	if path == "" || !filepath.IsAbs(path) {
+		return "", fmt.Errorf("%w: pfad %q muss absolut sein", errBadInput, path)
+	}
+	if strings.ContainsRune(path, 0) {
+		return "", fmt.Errorf("%w: pfad enthält ein nullbyte", errBadInput)
+	}
+
+	clean := filepath.Clean(path)
+	resolved, err := resolveExisting(clean)
+	if err != nil {
+		return "", err
+	}
+
+	for _, root := range roots {
+		realRoot, err := filepath.EvalSymlinks(filepath.Clean(root))
+		if err != nil {
+			// Wurzel existiert auf diesem System nicht — dann kann sie auch
+			// nichts erlauben.
+			continue
+		}
+		if resolved == realRoot || strings.HasPrefix(resolved, realRoot+string(filepath.Separator)) {
+			return resolved, nil
+		}
+	}
+	return "", fmt.Errorf("%w: pfad %q liegt außerhalb der erlaubten verzeichnisse", errNotAllow, path)
+}
+
+// resolveExisting löst so viel vom Pfad auf, wie schon existiert.
+func resolveExisting(path string) (string, error) {
+	var missing []string
+	cur := path
+
+	for {
+		real, err := filepath.EvalSymlinks(cur)
+		if err == nil {
+			// Die noch nicht existierenden Segmente wieder anhängen. Sie können
+			// selbst keine Symlinks sein, weil es sie noch nicht gibt.
+			for i := len(missing) - 1; i >= 0; i-- {
+				real = filepath.Join(real, missing[i])
+			}
+			return real, nil
+		}
+
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return "", fmt.Errorf("%w: pfad %q nicht auflösbar", errBadInput, path)
+		}
+		base := filepath.Base(cur)
+		if base == ".." {
+			return "", fmt.Errorf("%w: pfad %q enthält nicht auflösbares ..", errBadInput, path)
+		}
+		missing = append(missing, base)
+		cur = parent
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}

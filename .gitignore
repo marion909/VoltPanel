@@ -1,0 +1,18 @@
+# Build-Artefakte
+/dist/
+/bin/
+volt
+volt-agent
+
+# Frontend
+/web/node_modules/
+/web/dist/
+/internal/web/dist/
+
+# Lokale Entwicklung
+*.db
+*.db-wal
+*.db-shm
+/.env
+/tmp/
+.DS_Store
