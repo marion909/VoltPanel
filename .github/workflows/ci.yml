@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test und Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Formatierung prüfen
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then
+            echo "Nicht formatiert:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Tests mit Race-Detector
+        run: go test -race ./...
+
+      - name: install.sh auf Syntaxfehler prüfen
+        run: bash -n packaging/install.sh
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck packaging/install.sh scripts/build-web.sh
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: ./scripts/build-web.sh
+
+      - name: Bundle-Größe berichten
+        run: du -sh internal/webui/dist && ls -la internal/webui/dist/assets
+
+  build:
+    name: Build linux/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    needs: [test, frontend]
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - run: ./scripts/build-web.sh
+
+      - name: Binaries bauen
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build -trimpath -ldflags "-s -w" -o volt ./cmd/volt
+          go build -trimpath -ldflags "-s -w" -o volt-agent ./cmd/volt-agent
+
+      - name: Statisches Binary sicherstellen
+        # Eine dynamisch gelinkte Datei würde die Installation aus einem
+        # einzigen Binary hinfällig machen.
+        run: |
+          if file volt | grep -q "dynamically linked"; then
+            echo "volt ist dynamisch gelinkt"; file volt; exit 1
+          fi
+          file volt volt-agent
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voltpanel-linux-${{ matrix.arch }}
+          path: |
+            volt
+            volt-agent
+          retention-days: 7
