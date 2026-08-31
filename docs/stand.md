@@ -125,8 +125,6 @@ Härtungsphase stehen vollständig aus.
 
 ## Bekannte Einschränkungen
 
-- Ein Update über die Oberfläche tauscht die Programme, aber nicht die
-  systemd-Units. Ändert sich eine Unit, führt der Weg über `install.sh`.
 - Die Release-Signatur wird über cosign erzeugt, aber weder von `install.sh`
   noch von `volt update` geprüft. Dort wirkt bisher nur der SHA-256-Vergleich
   gegen `latest.json`.

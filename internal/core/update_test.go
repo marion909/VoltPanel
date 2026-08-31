@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/marion909/voltpanel/internal/config"
@@ -22,6 +23,23 @@ type updateEnv struct {
 	release   *Release
 	voltPath  string
 	agentPath string
+
+	mux     *http.ServeMux
+	baseURL string
+	extra   []string
+}
+
+// serveText liefert beliebigen Inhalt über den Testserver aus und gibt das
+// passende Asset zurück — für Unit-Dateien im Fahrplan.
+func (e *updateEnv) serveText(t *testing.T, content string) ReleaseAsset {
+	t.Helper()
+	path := "/unit" + strconv.Itoa(len(e.extra))
+	e.extra = append(e.extra, content)
+	body := content
+	e.mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(body))
+	})
+	return ReleaseAsset{URL: e.baseURL + path, SHA256: sum([]byte(content)), Size: int64(len(content))}
 }
 
 func newUpdateEnv(t *testing.T, serveAgent bool) *updateEnv {
@@ -78,7 +96,10 @@ func newUpdateEnv(t *testing.T, serveAgent bool) *updateEnv {
 		},
 	}
 
-	return &updateEnv{updater: u, release: rel, voltPath: voltPath, agentPath: agentPath}
+	return &updateEnv{
+		updater: u, release: rel, voltPath: voltPath, agentPath: agentPath,
+		mux: mux, baseURL: srv.URL,
+	}
 }
 
 // TestApplySwapsBothBinaries hält fest, worum es geht: ein neues Panel mit

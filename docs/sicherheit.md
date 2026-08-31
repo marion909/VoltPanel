@@ -321,6 +321,13 @@ Auslösen darf die Operation nur, wer auch Dienste neu starten darf. Der Stand
 selbst — installierte Version, ob etwas Neueres vorliegt — ist für jeden
 Angemeldeten sichtbar; er steht als Hinweis in der Oberfläche.
 
+Zum Update gehören auch die systemd-Units. Ein Fahrplan darf dabei nur
+Dateien ersetzen, deren Name mit `volt-` beginnt und auf `.service` oder
+`.timer` endet, und der Name muss ein reiner Dateiname sein. Ohne diese
+Schranke wäre ein Update ein Weg, eine beliebige Unit des Systems zu
+überschreiben — etwa die von SSH. Die bisherige Fassung wandert vorher in den
+Snapshot; ein Rollback holt sie zurück.
+
 Was fehlt: die Release-Signatur wird erzeugt, aber nicht geprüft. Es wirkt
 bisher nur der SHA-256-Vergleich gegen `latest.json`, und der ist genau so
 vertrauenswürdig wie die HTTPS-Verbindung zum Kanal.

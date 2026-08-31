@@ -46,6 +46,15 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 make linux VERSION="$VERSION"
 
+# Die systemd-Units gehen mit ans Release. Ohne sie laeuft nach einem Update
+# ein neues Programm unter einer alten Unit weiter - eine Drift, die erst
+# auffaellt, wenn eine Operation aus einem Grund scheitert, den niemand in
+# einer Unit-Datei sucht.
+for unit in packaging/systemd/*; do
+    install -m 0644 "$unit" "$OUT/$(basename "$unit")"
+    sha "$OUT/$(basename "$unit")" > "$OUT/$(basename "$unit").sha256"
+done
+
 for arch in amd64 arm64; do
     for name in volt volt-agent; do
         src="bin/${name}_linux_${arch}"
@@ -93,6 +102,19 @@ NOTES_JSON="$(printf '%s' "$NOTES" | jq -Rs .)"
         printf '        "sha256": "%s",\n' "$(sha "$a")"
         printf '        "size": %s\n' "$(size "$a")"
         printf '      }\n'
+        printf '    }'
+        sep=",\n"
+    done
+    printf '\n  },\n'
+
+    printf '  "units": {\n'
+    sep=""
+    for unit in packaging/systemd/*; do
+        name="$(basename "$unit")"
+        printf '%b    "%s": {\n' "$sep" "$name"
+        printf '      "url": "%s/%s",\n' "$BASE" "$name"
+        printf '      "sha256": "%s",\n' "$(sha "$OUT/$name")"
+        printf '      "size": %s\n' "$(size "$OUT/$name")"
         printf '    }'
         sep=",\n"
     done

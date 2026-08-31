@@ -42,6 +42,12 @@ type Updater struct {
 	// self ist der Pfad des eigenen Binaries. Er ist überschreibbar, damit die
 	// Tests den Tausch üben können, ohne das Testbinary zu ersetzen.
 	self string
+	// systemdDir ebenso — ein Test darf die Units des laufenden Systems nicht
+	// anfassen.
+	systemdDir string
+	// reload wird nach geänderten Units aufgerufen. In Tests ersetzbar, damit
+	// kein systemctl gebraucht wird.
+	reload func() error
 }
 
 func NewUpdater(cfg *config.Config, st *store.Store, log *slog.Logger) *Updater {
@@ -77,6 +83,10 @@ type Release struct {
 	URL string `json:"url,omitempty"`
 	// Assets sind nach "linux_amd64" / "linux_arm64" benannt.
 	Assets map[string]ReleaseAsset `json:"assets"`
+	// Units sind die systemd-Dateien, nach Dateinamen benannt. Ohne sie
+	// bliebe ein Server mit neuen Programmen und alten Units zurück — eine
+	// Drift, die erst auffällt, wenn eine Operation unerwartet scheitert.
+	Units map[string]ReleaseAsset `json:"units,omitempty"`
 }
 
 type ReleaseAsset struct {
@@ -193,6 +203,7 @@ type Snapshot struct {
 	Dir        string
 	BinaryPath string
 	AgentPath  string // leer, wenn neben volt kein volt-agent lag
+	UnitDir    string // Kopie der systemd-Units vor dem Update
 	DBPath     string
 	Version    string
 	SchemaFrom int
@@ -303,6 +314,16 @@ func (u *Updater) Apply(ctx context.Context, rel *Release, snap *Snapshot) error
 		}
 	}
 
+	// Units vor der Migration: schlägt hier etwas fehl, ist noch nichts an
+	// der Datenbank geändert und der Rollback bleibt einfach.
+	if _, err := u.syncUnits(ctx, rel, snap); err != nil {
+		u.log.Error("units nicht aktualisiert, rolle zurück", "err", err)
+		if rbErr := u.Rollback(ctx, snap); rbErr != nil {
+			return fmt.Errorf("units fehlgeschlagen (%w) UND rollback fehlgeschlagen: %v", err, rbErr)
+		}
+		return fmt.Errorf("units fehlgeschlagen, stand wurde zurückgerollt: %w", err)
+	}
+
 	from, to, err := u.store.Migrate(ctx)
 	if err != nil {
 		u.log.Error("migration fehlgeschlagen, rolle zurück", "err", err)
@@ -333,6 +354,10 @@ func (u *Updater) Rollback(_ context.Context, snap *Snapshot) error {
 	}
 	if err := os.Rename(self+".rollback", self); err != nil {
 		return fmt.Errorf("altes binary zurücktauschen: %w", err)
+	}
+
+	if err := u.restoreUnits(snap); err != nil {
+		u.log.Warn("units nicht zurückgespielt", "err", err)
 	}
 
 	if snap.AgentPath != "" {
