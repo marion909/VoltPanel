@@ -39,6 +39,7 @@ func (a *app) doctorCmd() *cobra.Command {
 			checks = append(checks, a.checkAgent(ctx))
 			checks = append(checks, a.checkServices(ctx)...)
 			checks = append(checks, a.checkPort())
+			checks = append(checks, a.checkSharedConfig())
 			checks = append(checks, a.checkCerts(ctx)...)
 
 			var failed, warned int
@@ -152,6 +153,25 @@ func (a *app) checkPort() check {
 	}
 	conn.Close()
 	return check{"Panel-Port", "ok", addr}
+}
+
+// checkSharedConfig prüft die vhost-übergreifende nginx-Config.
+//
+// Fehlt sie, beantwortet die Standardseite der Distribution die
+// ACME-Prüfungen mit 404 — und ein `volt cert issue` scheitert mit einer
+// Meldung von Let's Encrypt, die den Grund nicht nennt.
+func (a *app) checkSharedConfig() check {
+	path := filepath.Join(a.cfg.NginxDir, "conf.d", "volt-shared.conf")
+	if _, err := os.Stat(path); err != nil {
+		return check{"Nginx-Grundconfig", "fail",
+			path + " fehlt — ACME-Prüfungen laufen ins Leere. `volt site rebuild --all` schreibt sie"}
+	}
+
+	webroot := filepath.Join(a.cfg.DataDir, "acme")
+	if _, err := os.Stat(webroot); err != nil {
+		return check{"Nginx-Grundconfig", "warn", "ACME-Webroot " + webroot + " fehlt"}
+	}
+	return check{"Nginx-Grundconfig", "ok", path}
 }
 
 func (a *app) checkCerts(ctx context.Context) []check {

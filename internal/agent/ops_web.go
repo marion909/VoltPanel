@@ -71,6 +71,70 @@ func (s *Server) opNginxWriteVhost(ctx context.Context, raw json.RawMessage) (an
 	return TextResult{Text: "vhost " + p.Domain + " aktiv"}, nil
 }
 
+// opNginxWriteShared legt die vhost-übergreifende Config ab.
+//
+// Sie enthält den Standardserver, der /.well-known/acme-challenge/ für jeden
+// unbekannten Hostnamen ausliefert. Ohne sie lässt sich ein Zertifikat nur
+// für Domains holen, die schon einen Vhost haben — für das Panel selbst also
+// nie, und das ist genau der erste Fall nach einer Installation.
+//
+// Der Ablageort ist fest verdrahtet: es gibt genau eine solche Datei, und ein
+// Pfad aus der Anfrage wäre eine Angriffsfläche ohne jeden Nutzen.
+func (s *Server) opNginxWriteShared(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[SharedParams](raw, OpNginxWriteShared)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.Contains(p.Content, "server {") {
+		return nil, opErr(OpNginxWriteShared, "inhalt enthält keinen server-block")
+	}
+
+	path := filepath.Join(s.nginxDir, "conf.d", "volt-shared.conf")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, opErr(OpNginxWriteShared, "conf.d anlegen: %v", err)
+	}
+
+	previous, hadPrevious := readIfExists(path)
+	if err := writeFileAtomic(path, []byte(p.Content), 0o644); err != nil {
+		return nil, opErr(OpNginxWriteShared, "config schreiben: %v", err)
+	}
+
+	// Die Standardseite der Distribution beansprucht denselben
+	// default_server. Bliebe sie aktiv, lehnte nginx beide ab ("duplicate
+	// default server"). Entfernt wird nur der Link — die Datei bleibt unter
+	// sites-available liegen und ist mit einem Symlink wiederherstellbar.
+	distDefault := filepath.Join(s.nginxDir, "sites-enabled", "default")
+	removedDefault := false
+	if _, err := os.Lstat(distDefault); err == nil {
+		if err := os.Remove(distDefault); err != nil {
+			restoreVhost(path, previous, hadPrevious)
+			return nil, opErr(OpNginxWriteShared, "standardseite abschalten: %v", err)
+		}
+		removedDefault = true
+	}
+
+	if out, err := run(ctx, shortTimeout, "nginx", "-t"); err != nil {
+		restoreVhost(path, previous, hadPrevious)
+		if !hadPrevious {
+			_ = os.Remove(path)
+		}
+		if removedDefault {
+			_ = ensureSymlink(filepath.Join(s.nginxDir, "sites-available", "default"), distDefault)
+		}
+		return nil, opErr(OpNginxWriteShared, "config abgelehnt, änderung zurückgenommen: %s", truncate(out, 500))
+	}
+
+	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "nginx"); err != nil {
+		return nil, opErr(OpNginxWriteShared, "reload fehlgeschlagen: %s", truncate(out, 300))
+	}
+
+	msg := "gemeinsame config aktiv"
+	if removedDefault {
+		msg += ", standardseite der distribution abgeschaltet"
+	}
+	return TextResult{Text: msg}, nil
+}
+
 func (s *Server) opNginxRemoveVhost(ctx context.Context, raw json.RawMessage) (any, error) {
 	p, err := decode[VhostParams](raw, OpNginxRemoveVhost)
 	if err != nil {

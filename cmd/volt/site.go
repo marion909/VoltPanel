@@ -148,6 +148,14 @@ func (a *app) siteRebuildCmd() *cobra.Command {
 			ctx, sys := cmd.Context(), store.SystemScope()
 			svc := core.NewSiteService(a.store, a.agent, a.cfg)
 
+			// Immer zuerst, unabhaengig davon welche Sites folgen: sie ist
+			// Voraussetzung dafuer, dass ACME-Pruefungen ueberhaupt
+			// ankommen, und haengt an keiner einzelnen Site.
+			if err := svc.SyncShared(ctx); err != nil {
+				return fmt.Errorf("gemeinsame nginx-config: %w", err)
+			}
+			fmt.Println("  gemeinsame nginx-config geschrieben")
+
 			var sites []*store.Site
 			switch {
 			case all:

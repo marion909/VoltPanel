@@ -30,6 +30,24 @@ func NewSiteService(st *store.Store, ag *agent.Client, cfg *config.Config) *Site
 	}
 }
 
+// SyncShared schreibt die vhost-übergreifende nginx-Config.
+//
+// Sie enthält den Standardserver, der /.well-known/acme-challenge/ für jeden
+// unbekannten Hostnamen ausliefert. Ohne sie beantwortet die Standardseite
+// der Distribution diese Anfragen mit 404, und ein Zertifikat lässt sich nur
+// für Domains holen, die bereits einen Vhost besitzen — für das Panel selbst
+// also nie.
+//
+// Der Aufruf ist idempotent und gehört an jede Stelle, die den
+// Webserver-Zustand herstellt: Ersteinrichtung und `site rebuild`.
+func (s *SiteService) SyncShared(ctx context.Context) error {
+	content, err := templates.RenderShared(filepath.Join(s.cfg.DataDir, "acme"))
+	if err != nil {
+		return fmt.Errorf("gemeinsame config erzeugen: %w", err)
+	}
+	return s.agent.WriteShared(ctx, content)
+}
+
 // CreateSiteInput ist das, was die API oder die CLI übergibt.
 type CreateSiteInput struct {
 	Domain       string

@@ -166,7 +166,13 @@ sudo -u volt volt cert issue panel.voltpanel.dev
 
 Die Prüfung läuft über Port 80. Ein Vhost dafür ist nicht nötig: der
 Standardserver aus `volt-shared.conf` liefert `/.well-known/acme-challenge/`
-für jeden unbekannten Hostnamen aus — genau für diesen Fall.
+für jeden unbekannten Hostnamen aus — genau für diesen Fall. Die Datei
+entsteht bei der Ersteinrichtung; `volt doctor` meldet, wenn sie fehlt, und
+`volt site rebuild --all` schreibt sie nach.
+
+Antwortet Let's Encrypt mit `404` auf die Challenge, ist meist genau das die
+Ursache: dann beantwortet noch die Standardseite der Distribution die
+Anfrage.
 
 volt-web übernimmt das neue Zertifikat **ohne Neustart**. Es prüft bei jedem
 Handshake, ob eine neuere Datei vorliegt; ein Neustart würde die offenen

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/marion909/voltpanel/internal/authn"
+	"github.com/marion909/voltpanel/internal/core"
 	"github.com/marion909/voltpanel/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -77,6 +78,18 @@ func (a *app) setupCmd() *cobra.Command {
 				TenantID: &tenant.ID, UserID: &user.ID, Actor: "cli",
 				Action: "setup.complete", TargetType: "user", TargetID: email,
 			})
+
+			// Der Webserver-Grundzustand gehoert zur Einrichtung. Ohne die
+			// gemeinsame Config beantwortet die Standardseite der
+			// Distribution die ACME-Pruefungen mit 404, und das erste
+			// Zertifikat scheitert - fuer das Panel selbst zuerst.
+			if err := core.NewSiteService(a.store, a.agent, a.cfg).SyncShared(ctx); err != nil {
+				// Kein Abbruch: der Zugang steht bereits, und ein fehlender
+				// Agent darf die Ersteinrichtung nicht ungueltig machen.
+				fmt.Fprintf(os.Stderr,
+					"warnung: gemeinsame nginx-config nicht geschrieben (%v)\n"+
+						"         nachholen mit: volt site rebuild --all\n", err)
+			}
 
 			fmt.Printf("\nOwner angelegt: %s\n", email)
 			if printPW || generated {

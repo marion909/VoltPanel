@@ -40,6 +40,7 @@ const (
 	OpNginxRemoveVhost Op = "nginx.remove_vhost"
 	OpNginxTest        Op = "nginx.test"
 	OpNginxReload      Op = "nginx.reload"
+	OpNginxWriteShared Op = "nginx.write_shared"
 	OpNginxWriteAuth   Op = "nginx.write_htpasswd"
 	OpNginxRemoveAuth  Op = "nginx.remove_htpasswd"
 
@@ -135,6 +136,12 @@ type ServiceParams struct {
 
 type VhostParams struct {
 	Domain  string `json:"domain"`
+	Content string `json:"content"`
+}
+
+// SharedParams trägt die vhost-übergreifende Config. Sie hat keinen
+// Domainnamen: ihr Ablageort steht fest, es gibt genau eine davon.
+type SharedParams struct {
 	Content string `json:"content"`
 }
 

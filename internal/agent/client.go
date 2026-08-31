@@ -210,6 +210,13 @@ func (c *Client) WriteVhost(ctx context.Context, domain, content string) error {
 	return c.Call(ctx, OpNginxWriteVhost, VhostParams{Domain: domain, Content: content}, nil)
 }
 
+// WriteShared legt die vhost-übergreifende Config ab. Ohne sie beantwortet
+// nginx Anfragen an unbekannte Hostnamen mit der Standardseite der
+// Distribution — und die ACME-Prüfung läuft ins Leere.
+func (c *Client) WriteShared(ctx context.Context, content string) error {
+	return c.Call(ctx, OpNginxWriteShared, SharedParams{Content: content}, nil)
+}
+
 func (c *Client) RemoveVhost(ctx context.Context, domain string) error {
 	return c.Call(ctx, OpNginxRemoveVhost, VhostParams{Domain: domain}, nil)
 }
