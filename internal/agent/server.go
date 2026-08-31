@@ -268,6 +268,11 @@ func (s *Server) dispatch(ctx context.Context, req *Request) *Response {
 	result, err := handler(ctx, req.Params)
 	if err != nil {
 		resp.Error = err.Error()
+		// errBadInput deckt die Prüfungen ab, die es schon gab
+		// (checkDomain, checkUsername, checkPHPVersion …); OpError.Input die
+		// neueren. Beide meinen dasselbe: der Aufrufer hat Unsinn geschickt.
+		var opE *OpError
+		resp.Input = errors.Is(err, errBadInput) || (errors.As(err, &opE) && opE.Input)
 		s.log.Warn("operation fehlgeschlagen",
 			"op", req.Op, "actor", req.Actor, "dauer", time.Since(start), "err", err)
 		return resp

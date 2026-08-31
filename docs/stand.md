@@ -51,6 +51,9 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Ausführungszeit, Upload-Größe. `disable_functions` und eigene ini-Werte
   bleiben Administratoren vorbehalten — sie heben die Isolation der Site auf.
 - Log-Viewer für Access- und Error-Log in der Site-Detailansicht
+- PHP-Erweiterungen: installierte Module je Version anzeigen, ein- und
+  ausschalten, neue über die Paketverwaltung nachrüsten. Der Paketname
+  entsteht im Agent aus Version und Modulname — er kommt nie aus der Anfrage.
 
 **Phase 3 — Daten, Dateien, Cronjobs**
 
@@ -94,7 +97,6 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 
 **Phase 2**
 
-- PHP-Extension-Manager (Erweiterungen installieren und aktivieren)
 - Panel-Zertifikat über die Oberfläche beantragen (über die CLI geht es)
 - HSTS-Schalter in der Oberfläche (im Datenmodell und Template vorhanden)
 

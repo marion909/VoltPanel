@@ -50,6 +50,9 @@ const (
 	OpPHPRemovePool Op = "php.remove_pool"
 	OpPHPReload     Op = "php.reload"
 	OpPHPVersions   Op = "php.versions"
+	OpPHPExtensions Op = "php.extensions"
+	OpPHPExtInstall Op = "php.extension_install"
+	OpPHPExtToggle  Op = "php.extension_toggle"
 
 	// Systembenutzer
 	OpUserCreate Op = "user.create"
@@ -110,9 +113,14 @@ type Request struct {
 
 // Response ist die Antwort auf genau eine Request-ID.
 type Response struct {
-	ID     string          `json:"id"`
-	OK     bool            `json:"ok"`
-	Error  string          `json:"error,omitempty"`
+	ID    string `json:"id"`
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+	// Input trennt "die Anfrage war falsch" von "die Operation ist
+	// gescheitert". Ohne diese Unterscheidung kommt eine abgelehnte Eingabe
+	// als Gateway-Fehler beim Benutzer an — mit einem Text, der so klingt,
+	// als sei der Agent kaputt.
+	Input  bool            `json:"input,omitempty"`
 	Result json.RawMessage `json:"result,omitempty"`
 }
 
@@ -323,6 +331,24 @@ type TextResult struct {
 // Welche Version installiert wird, ergibt sich allein aus dem Kanal in seiner
 // eigenen Konfiguration. Dürfte der Web-Prozess eine Quelle mitgeben, wäre
 // jede Übernahme des Panels ein Weg, beliebigen Code als root auszuführen.
+// PHPExtension beschreibt ein Modul einer PHP-Version.
+type PHPExtension struct {
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+	// Essential markiert Module, ohne die kein Pool mehr startet. Sie lassen
+	// sich nicht abschalten — sonst wäre die Site tot und der Grund stünde
+	// nirgends.
+	Essential bool `json:"essential"`
+}
+
+// PHPExtParams trägt Version und Modulname. Der Paketname entsteht daraus im
+// Agent; er kommt nie aus der Anfrage.
+type PHPExtParams struct {
+	PHPVersion string `json:"php_version"`
+	Name       string `json:"name"`
+	Enable     bool   `json:"enable"`
+}
+
 type UpdateResult struct {
 	From      string `json:"from"`
 	To        string `json:"to"`
@@ -346,10 +372,19 @@ type SystemInfo struct {
 type OpError struct {
 	Op      Op
 	Message string
+	// Input markiert Fehler, die an der Anfrage liegen und nicht am System.
+	Input bool
 }
 
 func (e *OpError) Error() string { return fmt.Sprintf("%s: %s", e.Op, e.Message) }
 
 func opErr(op Op, format string, args ...any) error {
 	return &OpError{Op: op, Message: fmt.Sprintf(format, args...)}
+}
+
+// opInputErr meldet eine unbrauchbare Eingabe. Der Unterschied zu opErr ist
+// nicht kosmetisch: er entscheidet, ob der Aufrufer einen 400 oder einen 502
+// sieht — also ob er seine Eingabe korrigiert oder den Server sucht.
+func opInputErr(op Op, format string, args ...any) error {
+	return &OpError{Op: op, Message: fmt.Sprintf(format, args...), Input: true}
 }

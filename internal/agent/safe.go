@@ -48,6 +48,11 @@ var allowedBinaries = map[string]string{
 	// selbst nachzubauen. Snapshot, Prüfsumme und automatischer Rollback
 	// stecken dort und sind getestet.
 	"volt": "/usr/local/bin/volt",
+	// Fuer PHP-Module: apt installiert das Paket, phpenmod/phpdismod setzen
+	// nur Symlinks. Abschalten bleibt damit umkehrbar.
+	"apt-get":   "/usr/bin/apt-get",
+	"phpenmod":  "/usr/sbin/phpenmod",
+	"phpdismod": "/usr/sbin/phpdismod",
 }
 
 var (
@@ -221,7 +226,12 @@ func runInto(ctx context.Context, timeout time.Duration, stdout io.Writer, stdin
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
+	cmd.Env = []string{
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C",
+		// apt darf unter keinen Umständen nachfragen: ein wartender Dialog
+		// hinge bis zum Timeout und hinterliesse eine halbe Installation.
+		"DEBIAN_FRONTEND=noninteractive",
+	}
 	cmd.Stdout = stdout
 	cmd.Stdin = stdin
 

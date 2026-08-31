@@ -149,6 +149,13 @@ func (s *Server) setupRoutes() {
 	// Den Stand darf jeder Angemeldete sehen — er steht als Hinweis in der
 	// Oberfläche. Auslösen darf ihn nur, wer auch Dienste neu starten darf:
 	// das Update startet das Panel neu und tauscht beide Binaries.
+	// Erweiterungen gelten systemweit je PHP-Version. Sie zu installieren
+	// heißt, ein Paket auf den Server zu holen — das darf nur, wer auch
+	// Dienste steuern darf.
+	auth.GET("/system/php/:version/extensions", s.handlePHPExtensions, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/php/:version/extensions/install", s.handlePHPExtensionInstall, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/php/:version/extensions/toggle", s.handlePHPExtensionToggle, s.requireRole(store.RoleAdmin))
+
 	auth.GET("/system/update", s.handleUpdateStatus)
 	auth.POST("/system/update", s.handleUpdateStart, s.requireRole(store.RoleAdmin))
 

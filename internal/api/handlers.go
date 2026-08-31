@@ -470,6 +470,14 @@ func agentError(err error) error {
 		return echo.NewHTTPError(http.StatusServiceUnavailable,
 			"der volt-agent läuft nicht — systemaktionen sind derzeit nicht möglich")
 	}
+
+	// Eine abgelehnte Eingabe ist kein Gateway-Fehler. Als 502 stünde da eine
+	// Meldung, die den Server verdächtigt, obwohl der Text im Eingabefeld
+	// steht.
+	var opErr *agent.OpError
+	if errors.As(err, &opErr) && opErr.Input {
+		return echo.NewHTTPError(http.StatusBadRequest, opErr.Message)
+	}
 	return echo.NewHTTPError(http.StatusBadGateway, "agent: "+err.Error())
 }
 

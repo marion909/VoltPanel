@@ -692,3 +692,26 @@ func TestUpdateStartNeedsAdmin(t *testing.T) {
 		t.Errorf("Status %d, erwartet 403 — ein Kunde darf das Panel nicht aktualisieren", rec.Code)
 	}
 }
+
+// TestPHPExtensionsNeedAdmin: ein Modul zu installieren heißt, ein Paket auf
+// den Server zu holen. Das ist nichts, was ein Kunde für seine Site entscheidet
+// — es gilt für alle Sites derselben PHP-Version.
+func TestPHPExtensionsNeedAdmin(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // Kunde
+
+	paths := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/v1/system/php/8.3/extensions"},
+		{http.MethodPost, "/api/v1/system/php/8.3/extensions/install"},
+		{http.MethodPost, "/api/v1/system/php/8.3/extensions/toggle"},
+	}
+	for _, p := range paths {
+		rec := ts.do(p.method, p.path, map[string]string{"name": "redis"})
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s: Status %d, erwartet 403", p.method, p.path, rec.Code)
+		}
+	}
+}

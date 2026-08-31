@@ -69,7 +69,7 @@ func (c *Client) Call(ctx context.Context, op Op, params any, out any) error {
 		return err
 	}
 	if !resp.OK {
-		return &OpError{Op: op, Message: resp.Error}
+		return &OpError{Op: op, Message: resp.Error, Input: resp.Input}
 	}
 	if out == nil || len(resp.Result) == 0 {
 		return nil
@@ -211,6 +211,28 @@ func (c *Client) ServiceAction(ctx context.Context, action, name string) (*Servi
 
 func (c *Client) WriteVhost(ctx context.Context, domain, content string) error {
 	return c.Call(ctx, OpNginxWriteVhost, VhostParams{Domain: domain, Content: content}, nil)
+}
+
+// PHPExtensions listet die Module einer PHP-Version.
+func (c *Client) PHPExtensions(ctx context.Context, version string) ([]PHPExtension, error) {
+	var out []PHPExtension
+	err := c.Call(ctx, OpPHPExtensions, PoolParams{PHPVersion: version}, &out)
+	return out, err
+}
+
+// InstallPHPExtension holt ein Modul nach. Der Paketname entsteht im Agent
+// aus Version und Modulname — hier geht keiner über die Leitung.
+func (c *Client) InstallPHPExtension(ctx context.Context, version, name string) error {
+	// Paketinstallationen dauern länger als die Vorgabe des Clients.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	return c.Call(ctx, OpPHPExtInstall, PHPExtParams{PHPVersion: version, Name: name}, nil)
+}
+
+// TogglePHPExtension schaltet ein installiertes Modul an oder ab.
+func (c *Client) TogglePHPExtension(ctx context.Context, version, name string, enable bool) error {
+	return c.Call(ctx, OpPHPExtToggle,
+		PHPExtParams{PHPVersion: version, Name: name, Enable: enable}, nil)
 }
 
 // SystemUpdate stößt das Update an. Ohne Parameter: welche Version kommt,

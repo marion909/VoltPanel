@@ -12,6 +12,9 @@ import (
 const (
 	shortTimeout = 15 * time.Second
 	longTimeout  = 120 * time.Second
+	// aptTimeout deckt Paketindex und Download ab. Ein Abbruch mittendrin
+	// hinterlässt eine halb konfigurierte Paketdatenbank — teurer als warten.
+	aptTimeout = 10 * time.Minute
 )
 
 // newRegistry ist die Whitelist des Agents: exakt diese Operationen existieren.
@@ -37,6 +40,9 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpNginxReload:      s.opNginxReload,
 		OpNginxWriteShared: s.opNginxWriteShared,
 		OpSystemUpdate:     s.opSystemUpdate,
+		OpPHPExtensions:    s.opPHPExtensions,
+		OpPHPExtInstall:    s.opPHPExtInstall,
+		OpPHPExtToggle:     s.opPHPExtToggle,
 		OpNginxWriteAuth:   s.opNginxWriteAuth,
 		OpNginxRemoveAuth:  s.opNginxRemoveAuth,
 
