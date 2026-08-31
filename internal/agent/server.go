@@ -28,12 +28,16 @@ type Handler func(ctx context.Context, raw json.RawMessage) (any, error)
 type Server struct {
 	socketPath string
 	peerUID    int // erlaubte UID des Web-Prozesses, -1 = jede
-	log        *slog.Logger
-	roots      []string // erlaubte Datei-Wurzeln
-	nginxDir   string
-	phpDir     string
-	certDir    string
-	logDir     string
+	// peerGID ist die Hauptgruppe des Peers und nicht dasselbe wie peerUID:
+	// useradd vergibt Benutzer- und Gruppennummern unabhängig voneinander,
+	// sie stimmen nur häufig zufällig überein.
+	peerGID  int
+	log      *slog.Logger
+	roots    []string // erlaubte Datei-Wurzeln
+	nginxDir string
+	phpDir   string
+	certDir  string
+	logDir   string
 	// panelDomain kommt aus der Konfiguration, nicht aus der Anfrage: nur so
 	// kann der Web-Prozess sich nicht selbst zum Eigentümer eines fremden
 	// Schlüssels erklären.
@@ -73,7 +77,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	setDefault(&opts.SitesDir, "/var/www")
 	setDefault(&opts.LogDir, "/var/log")
 
-	peerUID := -1
+	peerUID, peerGID := -1, -1
 	if opts.PeerUser != "" {
 		u, err := user.Lookup(opts.PeerUser)
 		if err != nil {
@@ -82,11 +86,15 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		if peerUID, err = strconv.Atoi(u.Uid); err != nil {
 			return nil, fmt.Errorf("peer-uid %q: %w", u.Uid, err)
 		}
+		if peerGID, err = strconv.Atoi(u.Gid); err != nil {
+			return nil, fmt.Errorf("peer-gid %q: %w", u.Gid, err)
+		}
 	}
 
 	s := &Server{
 		socketPath:  opts.SocketPath,
 		peerUID:     peerUID,
+		peerGID:     peerGID,
 		log:         opts.Logger,
 		nginxDir:    opts.NginxDir,
 		phpDir:      opts.PHPDir,
@@ -119,15 +127,22 @@ func (s *Server) Listen() error {
 		ln.Close()
 		return fmt.Errorf("socket-rechte: %w", err)
 	}
-	if s.peerUID >= 0 {
-		// Gruppe des Web-Users, damit 0660 überhaupt greift.
-		if err := os.Chown(s.socketPath, 0, s.peerUID); err != nil {
-			s.log.Warn("socket-gruppe konnte nicht gesetzt werden", "err", err)
+	if s.peerGID >= 0 {
+		// Die Gruppe des Web-Users, damit 0660 überhaupt jemanden durchlässt.
+		// -1 für den Eigentümer heißt "unverändert" — der Agent läuft als
+		// root und ist bereits Eigentümer.
+		//
+		// Kein Warnen, sondern Abbruch: einen Socket, den der Panel-Prozess
+		// nicht öffnen darf, macht den Agent nutzlos. Das soll beim Start
+		// auffallen und nicht erst bei der ersten Operation.
+		if err := os.Chown(s.socketPath, -1, s.peerGID); err != nil {
+			ln.Close()
+			return fmt.Errorf("socket-gruppe auf %d setzen: %w", s.peerGID, err)
 		}
 	}
 
 	s.listener = ln
-	s.log.Info("agent hört", "socket", s.socketPath, "peer_uid", s.peerUID)
+	s.log.Info("agent hört", "socket", s.socketPath, "peer_uid", s.peerUID, "peer_gid", s.peerGID)
 	return nil
 }
 

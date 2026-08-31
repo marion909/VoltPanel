@@ -339,7 +339,33 @@ for unit in volt-agent volt-web; do
         die "$unit startet nicht — die Installation ist unvollständig."
     fi
 done
-info "volt-agent und volt-web laufen, Timer für Erneuerung und Backup aktiv"
+
+# Dass beide Prozesse laufen, heisst noch nicht, dass sie miteinander reden.
+# Der Agent nimmt Verbindungen ueber einen Socket entgegen, den nur seine
+# Gruppe oeffnen darf - stimmt dort etwas nicht, laeuft das Panel trotzdem
+# und meldet den Fehler erst bei der ersten Operation.
+HEALTH_URL="https://127.0.0.1:${VOLT_PORT}/healthz"
+[ -n "${ACCESS_PATH:-}" ] && HEALTH_URL="https://127.0.0.1:${VOLT_PORT}/${ACCESS_PATH}/healthz"
+
+# -k, weil das Panel bis zum ersten `volt cert issue` ein selbstsigniertes
+# Zertifikat zeigt. Geprueft wird die Erreichbarkeit, nicht die Vertrauenskette.
+HEALTH="$(curl -sk --max-time 5 "$HEALTH_URL" 2>/dev/null || true)"
+case "$HEALTH" in
+    *'"status":"ok"'*)
+        info "volt-agent und volt-web laufen und erreichen einander"
+        ;;
+    *'"agent"'*)
+        warn "Das Panel antwortet, erreicht aber den Agent nicht:"
+        printf '%s\n' "$HEALTH" | sed 's/^/    /' >&2
+        warn "Systemaktionen (Sites, Zertifikate) funktionieren so nicht."
+        warn "Journal ansehen mit: journalctl -u volt-agent -n 30"
+        ;;
+    *)
+        warn "Das Panel antwortet nicht unter $HEALTH_URL."
+        warn "Journal ansehen mit: journalctl -u volt-web -n 30"
+        ;;
+esac
+info "Timer für Erneuerung und Backup aktiv"
 
 # --- Firewall --------------------------------------------------------------
 
