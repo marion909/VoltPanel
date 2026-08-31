@@ -38,8 +38,13 @@ type Config struct {
 	DBPath     string // /var/lib/volt/volt.db
 	SocketPath string // /run/volt/agent.sock
 	NginxDir   string // /etc/nginx
-	PHPFPMDir  string // /etc/php
-	CertDir    string // /var/lib/volt/certs
+	// WebGroup ist die Gruppe, unter der die nginx-Worker laufen. Das
+	// Wurzelverzeichnis einer Site gehört ihr, sonst kommt der Webserver
+	// nicht hinein: die Site selbst gehört ihrem eigenen Systembenutzer, und
+	// ohne Gruppenrecht bliebe für nginx nur ein "Permission denied".
+	WebGroup  string // www-data
+	PHPFPMDir string // /etc/php
+	CertDir   string // /var/lib/volt/certs
 
 	// Sicherheit
 	// SecretKeyPath liegt in einem Unterverzeichnis, das dem Panel-Benutzer
@@ -76,6 +81,7 @@ func Default() *Config {
 		DBPath:        "/var/lib/volt/volt.db",
 		SocketPath:    DefaultSocketPath,
 		NginxDir:      "/etc/nginx",
+		WebGroup:      "www-data",
 		PHPFPMDir:     "/etc/php",
 		CertDir:       "/var/lib/volt/certs",
 		SecretKeyPath: "/etc/volt/keys/secret.key",
@@ -159,6 +165,7 @@ var fieldSetters = map[string]func(*Config, string) error{
 	"db_path":         func(c *Config, v string) error { c.DBPath = v; return nil },
 	"socket_path":     func(c *Config, v string) error { c.SocketPath = v; return nil },
 	"nginx_dir":       func(c *Config, v string) error { c.NginxDir = v; return nil },
+	"web_group":       func(c *Config, v string) error { c.WebGroup = strings.TrimSpace(v); return nil },
 	"php_fpm_dir":     func(c *Config, v string) error { c.PHPFPMDir = v; return nil },
 	"cert_dir":        func(c *Config, v string) error { c.CertDir = v; return nil },
 	"secret_key_path": func(c *Config, v string) error { c.SecretKeyPath = v; return nil },

@@ -110,18 +110,32 @@ func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error
 		return nil, err
 	}
 
-	mode := os.FileMode(p.Mode) & 0o777
-	if mode == 0 {
-		mode = 0o750
+	// setgid ist erlaubt, setuid und sticky nicht. Mit setgid erben neue
+	// Dateien die Gruppe des Verzeichnisses — nur so bleibt ein Upload, den
+	// PHP anlegt, für den Webserver lesbar, unabhängig von dessen umask.
+	// setuid auf einem Verzeichnis bewirkt unter Linux ohnehin nichts und
+	// hätte hier nur den Zweck, verwirrend auszusehen.
+	mode := os.FileMode(p.Mode) & 0o2777
+	if mode&0o777 == 0 {
+		mode |= 0o750
 	}
-	if err := os.MkdirAll(path, mode); err != nil {
+	perm := mode & 0o777
+	if err := os.MkdirAll(path, perm); err != nil {
 		return nil, opErr(OpFileMkdir, "%v", err)
 	}
-	// MkdirAll respektiert die umask; explizit nachziehen.
-	if err := os.Chmod(path, mode); err != nil {
-		return nil, opErr(OpFileMkdir, "%v", err)
-	}
+	// Erst der Eigentümer, dann die Rechte. Die Reihenfolge ist nicht
+	// beliebig: chown löscht setgid wieder — auf manchen Systemen auch bei
+	// Verzeichnissen. Wer zuerst chmod aufruft, verliert das Bit still.
 	if err := applyOwner(path, p.Owner, p.Group, false); err != nil {
+		return nil, opErr(OpFileMkdir, "%v", err)
+	}
+
+	// MkdirAll respektiert die umask und kennt kein setgid; beides nachziehen.
+	chmod := perm
+	if mode&0o2000 != 0 {
+		chmod |= os.ModeSetgid
+	}
+	if err := os.Chmod(path, chmod); err != nil {
 		return nil, opErr(OpFileMkdir, "%v", err)
 	}
 	return TextResult{Text: path}, nil

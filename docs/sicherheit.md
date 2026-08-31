@@ -273,6 +273,32 @@ seiner eigenen Konfiguration, nicht aus der Anfrage. Sonst könnte ein
 übernommener Web-Prozess sich zum Eigentümer eines beliebigen fremden
 Schlüssels erklären.
 
+## Rechte auf den Site-Verzeichnissen
+
+Jede Site gehört ihrem eigenen Systembenutzer. Das ist die Trennung, die
+verhindert, dass PHP einer Site die Dateien einer anderen liest — sie hängt
+nicht an `open_basedir`, sondern an den Dateirechten darunter.
+
+Damit gehört die Site aber auch nicht dem Webserver, und nginx läuft als
+eigener Benutzer. Ohne Zutun endet jede Anfrage in
+`stat() failed (13: Permission denied)`.
+
+Der Ausweg ist nicht, die Verzeichnisse für alle zu öffnen: dann könnte jeder
+Site-Benutzer die Dateien jeder anderen lesen, und die Trennung wäre weg.
+Stattdessen bleibt der Systembenutzer Eigentümer, die Gruppe wird die des
+Webservers (`web_group`, Vorgabe `www-data`), und Weltrechte gibt es keine —
+0750 auf der Wurzel, 2750 auf dem Dokumentenstamm.
+
+Das setgid-Bit dort ist kein Beiwerk: ohne es bekommt eine Datei, die PHP
+anlegt, die Gruppe des Site-Benutzers, und ob der Webserver sie noch lesen
+darf, hinge an der umask des FPM-Pools. Beim Setzen zählt außerdem die
+Reihenfolge — `chown` löscht setgid wieder, es muss also nach dem Eigentümer
+gesetzt werden.
+
+`tmp`, `tmp/sessions` und `logs` bleiben ausdrücklich außen vor: 0750 für den
+Systembenutzer allein. Der Webserver hat dort nichts zu suchen, und
+Sitzungsdateien schon gar nicht.
+
 ## Update aus der Oberfläche
 
 Ein Update von der Weboberfläche aus ist der naheliegendste Weg, aus einer

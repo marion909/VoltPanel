@@ -249,6 +249,10 @@ data_dir: $VOLT_DATA_DIR
 config_dir: $VOLT_CONFIG_DIR
 log_dir: $VOLT_LOG_DIR
 sites_dir: $VOLT_SITES_DIR
+
+# Gruppe, unter der die nginx-Worker laufen. Das Wurzelverzeichnis jeder Site
+# gehoert ihr, sonst kommt der Webserver nicht hinein.
+web_group: www-data
 backup_dir: $VOLT_BACKUP_DIR
 db_path: $VOLT_DATA_DIR/volt.db
 cert_dir: $VOLT_DATA_DIR/certs

@@ -30,6 +30,31 @@ func NewSiteService(st *store.Store, ag *agent.Client, cfg *config.Config) *Site
 	}
 }
 
+// applyWebPermissions richtet die Rechte so ein, dass der Webserver an die
+// Dateien kommt und sonst niemand.
+//
+// Die Site gehört ihrem eigenen Systembenutzer — das ist die Trennung, die
+// verhindert, dass PHP einer Site die Dateien einer anderen liest. Damit
+// gehört sie aber auch nicht dem Webserver, und der läuft als www-data. Ohne
+// Gruppenrecht endet jede Anfrage in "stat() failed (13: Permission denied)".
+//
+// Deshalb: Eigentümer bleibt der Systembenutzer, Gruppe wird die des
+// Webservers, Weltrechte gibt es keine. Auf dem Dokumentenstamm zusätzlich
+// setgid, damit alles, was PHP dort anlegt, in derselben Gruppe bleibt — ohne
+// das hinge die Lesbarkeit an der umask des FPM-Pools.
+func (s *SiteService) applyWebPermissions(ctx context.Context, site *store.Site) error {
+	group := s.cfg.WebGroup
+
+	// Das Wurzelverzeichnis muss der Webserver durchqueren können, mehr nicht.
+	if err := s.agent.MkdirGroup(ctx, site.RootPath, 0o750, site.SystemUser, group); err != nil {
+		return fmt.Errorf("rechte auf %s: %w", site.RootPath, err)
+	}
+	if err := s.agent.MkdirGroup(ctx, site.WebRoot(), 0o2750, site.SystemUser, group); err != nil {
+		return fmt.Errorf("rechte auf %s: %w", site.WebRoot(), err)
+	}
+	return nil
+}
+
 // SyncShared schreibt die vhost-übergreifende nginx-Config.
 //
 // Sie enthält den Standardserver, der /.well-known/acme-challenge/ für jeden
@@ -111,22 +136,28 @@ func (s *SiteService) provision(ctx context.Context, sc store.Scope, site *store
 		return fmt.Errorf("systembenutzer %s: %w", site.SystemUser, err)
 	}
 
+	if err := s.applyWebPermissions(ctx, site); err != nil {
+		return err
+	}
+
 	// tmp liegt innerhalb der Site, damit open_basedir es abdeckt: PHP-Uploads
 	// und Sessions einer Site landen so nie in einem gemeinsamen /tmp.
-	dirs := []string{
-		site.WebRoot(),
+	//
+	// Diese drei bleiben dem Systembenutzer allein vorbehalten: der Webserver
+	// hat dort nichts zu suchen, und die Sitzungsdateien schon gar nicht.
+	private := []string{
 		filepath.Join(site.RootPath, "tmp"),
 		filepath.Join(site.RootPath, "tmp", "sessions"),
 		filepath.Join(site.RootPath, "logs"),
 	}
-	for _, dir := range dirs {
+	for _, dir := range private {
 		if err := s.agent.Mkdir(ctx, dir, 0o750, site.SystemUser); err != nil {
 			return fmt.Errorf("verzeichnis %s: %w", dir, err)
 		}
 	}
 
-	if err := s.agent.WriteFile(ctx, filepath.Join(site.WebRoot(), "index.html"),
-		placeholderPage(site.Domain), 0o644, site.SystemUser); err != nil {
+	if err := s.agent.WriteFileGroup(ctx, filepath.Join(site.WebRoot(), "index.html"),
+		placeholderPage(site.Domain), 0o640, site.SystemUser, s.cfg.WebGroup); err != nil {
 		return fmt.Errorf("platzhalterseite: %w", err)
 	}
 
@@ -231,6 +262,14 @@ func (s *SiteService) Rebuild(ctx context.Context, sc store.Scope, siteID int64)
 	if err != nil {
 		return err
 	}
+
+	// Rechte gehören zum Zustand, den `rebuild` herstellt: eine Site, deren
+	// Verzeichnis der Webserver nicht betreten darf, ist genauso kaputt wie
+	// eine mit fehlendem Vhost — nur sieht man es erst beim ersten Aufruf.
+	if err := s.applyWebPermissions(ctx, site); err != nil {
+		return err
+	}
+
 	if site.Type == store.SitePHP {
 		pool, err := s.store.PHPPoolBySite(ctx, sc, site.ID)
 		if err != nil {

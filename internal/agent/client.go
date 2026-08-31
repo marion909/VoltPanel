@@ -275,6 +275,21 @@ func (c *Client) Mkdir(ctx context.Context, path string, mode uint32, owner stri
 	return c.Call(ctx, OpFileMkdir, FileMkdirParams{Path: path, Mode: mode, Owner: owner}, nil)
 }
 
+// MkdirGroup legt ein Verzeichnis an, das einer anderen Gruppe als der des
+// Eigentümers gehört — für alles, was der Webserver lesen können muss.
+func (c *Client) MkdirGroup(ctx context.Context, path string, mode uint32, owner, group string) error {
+	return c.Call(ctx, OpFileMkdir,
+		FileMkdirParams{Path: path, Mode: mode, Owner: owner, Group: group}, nil)
+}
+
+// WriteFileGroup legt eine Datei an, die einer anderen Gruppe als der des
+// Eigentümers gehört — für Dateien, die der Webserver ausliefern soll, ohne
+// dass sie für alle lesbar sein müssen.
+func (c *Client) WriteFileGroup(ctx context.Context, path, content string, mode uint32, owner, group string) error {
+	return c.Call(ctx, OpFileWrite,
+		FileWriteParams{Path: path, Content: content, Mode: mode, Owner: owner, Group: group}, nil)
+}
+
 func (c *Client) WriteFile(ctx context.Context, path, content string, mode uint32, owner string) error {
 	return c.Call(ctx, OpFileWrite,
 		FileWriteParams{Path: path, Content: content, Mode: mode, Owner: owner}, nil)
