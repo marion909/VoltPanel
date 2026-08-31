@@ -10,6 +10,7 @@ import { update, checkUpdate } from "../stores/update";
 // der Server ist ja gerade weg.
 const running = ref(false);
 const waiting = ref(false);
+const reloading = ref(false);
 const done = ref("");
 const error = ref("");
 
@@ -52,6 +53,7 @@ async function waitForPanel(expected) {
       if (!update.available) {
         waiting.value = false;
         done.value = expected || update.current;
+        reload();
         return;
       }
     } catch {
@@ -60,6 +62,20 @@ async function waitForPanel(expected) {
   }
   waiting.value = false;
   error.value = t("update.waiting");
+}
+
+// Die Oberfläche steckt im selben Binary wie der Server. Nach dem Tausch
+// liefert er eine neue aus — im Browser läuft aber weiter die alte, die beim
+// Öffnen der Seite geladen wurde. Ohne diesen Neuladen sieht das Update
+// erfolgreich aus und nichts davon ist zu sehen.
+//
+// Der Aufruf steht erst hier, weil das Panel an dieser Stelle nachweislich
+// wieder antwortet: ein früherer Neuladen träfe einen Server, der gerade neu
+// startet, und der Browser zeigte eine Fehlerseite.
+function reload() {
+  reloading.value = true;
+  // Kurz genug, dass niemand wartet, lang genug, dass die Meldung ankommt.
+  setTimeout(() => window.location.reload(), 1200);
 }
 </script>
 
@@ -112,6 +128,9 @@ async function waitForPanel(expected) {
       :style="{ color: 'var(--status-good)' }"
     >
       {{ t("update.done", { v: done }) }}
+      <span v-if="reloading" :style="{ color: 'var(--ink-muted)' }">
+        {{ t("update.reloading") }}
+      </span>
     </p>
     <p
       v-else-if="error"

@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -29,18 +31,25 @@ func (s *Server) opSystemUpdate(ctx context.Context, raw json.RawMessage) (any, 
 		return nil, opErr(OpSystemUpdate, "diese operation nimmt keine parameter entgegen")
 	}
 
-	before := voltVersion(ctx)
+	beforeVersion, beforeStamp := voltVersion(ctx), voltStamp()
 
 	out, err := run(ctx, updateTimeout, "volt", "update", "--yes")
 	if err != nil {
 		return nil, opErr(OpSystemUpdate, "update fehlgeschlagen: %s", truncate(out, 2000))
 	}
 
-	after := voltVersion(ctx)
+	afterVersion, afterStamp := voltVersion(ctx), voltStamp()
 	res := UpdateResult{
-		From: before, To: after,
-		Changed: before != after && after != "",
-		Output:  truncate(strings.TrimSpace(out), 4000),
+		From: beforeVersion, To: afterVersion,
+		// Zwei Signale, und eines genügt. Das verlässlichere ist die Datei
+		// selbst: wurde sie getauscht, muss neu gestartet werden, egal was
+		// `volt --version` sagt. Die Versionszeichenkette allein war zu
+		// schwach — liefert der Aufruf nichts, sähe das Update aus wie ein
+		// Leerlauf, der Neustart bliebe aus, und das Panel liefe mit dem
+		// alten Programm weiter, obwohl das neue längst auf der Platte liegt.
+		Changed: (afterStamp != "" && afterStamp != beforeStamp) ||
+			(afterVersion != "" && afterVersion != beforeVersion),
+		Output: truncate(strings.TrimSpace(out), 4000),
 	}
 
 	if res.Changed {
@@ -87,4 +96,22 @@ func voltVersion(ctx context.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(out)
+}
+
+// voltStamp beschreibt die Datei, die gleich getauscht wird. Größe und
+// Änderungszeit reichen: `volt update` schreibt eine neue Datei und benennt
+// sie um, beide Werte sind danach andere.
+//
+// Der Pfad kommt aus derselben Whitelist, über die der Agent das Programm auch
+// aufruft — nicht aus der Anfrage.
+func voltStamp() string { return fileStamp(allowedBinaries["volt"]) }
+
+// fileStamp gibt "" zurück, wenn die Datei nicht lesbar ist. Der Aufrufer
+// wertet das als "keine Aussage" und verlässt sich auf das zweite Signal.
+func fileStamp(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d@%d", info.Size(), info.ModTime().UnixNano())
 }
