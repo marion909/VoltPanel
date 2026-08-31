@@ -82,9 +82,9 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
-    ca-certificates curl gnupg lsb-release \
+    ca-certificates curl gnupg lsb-release jq \
     nginx openssl cron >/dev/null
-info "nginx, curl, cron installiert"
+info "nginx, curl, jq, cron installiert"
 
 # Sury liefert die parallel installierbaren PHP-Versionen, die Debian selbst
 # nicht mitbringt. Ohne dieses Repo gäbe es nur genau eine PHP-Version.
@@ -147,39 +147,65 @@ chmod 0755 "$VOLT_DATA_DIR" "$VOLT_DATA_DIR/acme"
 
 step "VoltPanel"
 
-fetch_binary() {
-    local name="$1" dest="$2"
+# Alles, was geladen wird, steht in latest.json: Adresse, Prüfsumme und Größe
+# beider Binaries. Ein einziger Fahrplan statt vier einzeln geratener URLs —
+# und die Prüfsumme ist damit nicht mehr optional. Fehlte sie früher, lief die
+# Installation mit einer Warnung weiter; genau dann hätte sie stehen müssen.
+download_verified() {
+    local url="$1" want="$2" dest="$3" tmp got
 
-    if [ -n "$VOLT_LOCAL_DIR" ]; then
-        [ -f "$VOLT_LOCAL_DIR/$name" ] || die "$VOLT_LOCAL_DIR/$name nicht gefunden."
-        install -m 0755 "$VOLT_LOCAL_DIR/$name" "$dest"
-        return
-    fi
+    [ -n "$want" ] || die "Für $url ist keine Prüfsumme hinterlegt."
 
-    local url="${VOLT_BASE_URL}/${VOLT_CHANNEL}/${name}_linux_${VOLT_ARCH}"
-    local tmp
     tmp="$(mktemp)"
     # Erst vollständig herunterladen, dann an den Zielort schieben: ein
     # abgebrochener Download darf kein halbes Binary hinterlassen.
-    curl -fsSL --retry 3 --retry-delay 2 "$url" -o "$tmp" \
-        || die "Download fehlgeschlagen: $url"
+    if ! curl -fsSL --retry 3 --retry-delay 2 "$url" -o "$tmp"; then
+        rm -f "$tmp"
+        die "Download fehlgeschlagen: $url"
+    fi
 
-    if curl -fsSL "${url}.sha256" -o "${tmp}.sha256" 2>/dev/null; then
-        local want got
-        want="$(cut -d' ' -f1 < "${tmp}.sha256")"
-        got="$(sha256sum "$tmp" | cut -d' ' -f1)"
-        [ "$want" = "$got" ] || die "Prüfsumme von $name stimmt nicht."
-        rm -f "${tmp}.sha256"
-    else
-        warn "Keine Prüfsumme für $name gefunden."
+    got="$(sha256sum "$tmp" | cut -d' ' -f1)"
+    if [ "$want" != "$got" ]; then
+        rm -f "$tmp"
+        die "Prüfsumme von $url stimmt nicht (erwartet $want, bekommen $got)."
     fi
 
     install -m 0755 "$tmp" "$dest"
     rm -f "$tmp"
 }
 
-fetch_binary volt "$VOLT_BIN_DIR/volt"
-fetch_binary volt-agent "$VOLT_BIN_DIR/volt-agent"
+if [ -n "$VOLT_LOCAL_DIR" ]; then
+    for name in volt volt-agent; do
+        [ -f "$VOLT_LOCAL_DIR/$name" ] || die "$VOLT_LOCAL_DIR/$name nicht gefunden."
+        install -m 0755 "$VOLT_LOCAL_DIR/$name" "$VOLT_BIN_DIR/$name"
+    done
+    info "Binaries aus $VOLT_LOCAL_DIR übernommen"
+else
+    MANIFEST_URL="${VOLT_BASE_URL}/${VOLT_CHANNEL}/latest.json"
+    MANIFEST="$(curl -fsSL --retry 3 --retry-delay 2 "$MANIFEST_URL")" \
+        || die "Kanal $VOLT_CHANNEL nicht erreichbar: $MANIFEST_URL"
+
+    manifest_field() {
+        printf '%s' "$MANIFEST" | jq -r --arg k "linux_${VOLT_ARCH}" "$1" 2>/dev/null
+    }
+
+    REL_VERSION="$(manifest_field '.version // empty')"
+    [ -n "$REL_VERSION" ] || die "Die Kanalbeschreibung unter $MANIFEST_URL ist unbrauchbar."
+
+    VOLT_URL="$(manifest_field '.assets[$k].url // empty')"
+    VOLT_SHA="$(manifest_field '.assets[$k].sha256 // empty')"
+    AGENT_URL="$(manifest_field '.assets[$k].agent.url // empty')"
+    AGENT_SHA="$(manifest_field '.assets[$k].agent.sha256 // empty')"
+
+    [ -n "$VOLT_URL" ] || die "Version $REL_VERSION hat kein Paket für linux_${VOLT_ARCH}."
+    # Ohne den Agent gäbe es ein Panel, das nichts ausführen kann.
+    [ -n "$AGENT_URL" ] || die "Version $REL_VERSION enthält kein volt-agent für linux_${VOLT_ARCH}."
+
+    info "Version $REL_VERSION aus Kanal $VOLT_CHANNEL"
+    download_verified "$VOLT_URL"  "$VOLT_SHA"  "$VOLT_BIN_DIR/volt"
+    download_verified "$AGENT_URL" "$AGENT_SHA" "$VOLT_BIN_DIR/volt-agent"
+fi
+
 info "$("$VOLT_BIN_DIR/volt" --version)"
 
 # --- Konfiguration ---------------------------------------------------------

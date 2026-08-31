@@ -8,11 +8,6 @@ bash <(curl -fsSL https://get.voltpanel.dev/install.sh)   # Install
 volt update                                              # Update
 ```
 
-> Diese Adresse ist noch nicht aufgeschaltet und es gibt noch kein Release.
-> Bis dahin führt der Weg über das Offline-Paket — siehe
-> [Installation](#installation). Am Server ändert das nichts: derselbe
-> Installer, dieselben Schritte, nur ohne Download.
-
 CLI: `volt` · Dienste: `volt-web`, `volt-agent`
 
 ---
@@ -57,46 +52,43 @@ Details: [docs/architektur.md](docs/architektur.md) ·
 
 ## Installation
 
-Vorausgesetzt wird Debian 12/13 oder Ubuntu 24.04 auf x86_64 oder arm64, mit
-Root-Zugang und freien Ports 80, 443 und 8443.
-
-### Offline-Paket
-
-**Auf dem Entwicklungsrechner** (Go 1.24+, Node 22+):
+Debian 12/13 oder Ubuntu 24.04, x86_64 oder arm64, Root-Zugang, freie Ports
+80, 443 und 8443.
 
 ```bash
-make dist VERSION=0.1.0
+VOLT_PANEL_DOMAIN=panel.example.at \
+VOLT_ACME_EMAIL=du@example.at \
+bash <(curl -fsSL https://get.voltpanel.dev/install.sh)
+```
+
+Der Installer liest `latest.json` aus dem Kanal, lädt beide Binaries und prüft
+jede Datei gegen die dort hinterlegte Prüfsumme. Stimmt sie nicht oder fehlt
+sie, bricht er ab. Er richtet ein: nginx, PHP 8.3 aus dem Sury-Repo, MariaDB,
+cron, Systembenutzer und Verzeichnisse, beide Dienste, Timer für
+Zertifikatserneuerung und nächtliches Backup, Firewall-Freigaben. Ein zweiter
+Durchlauf repariert eine unvollständige Installation, statt sie zu verdoppeln.
+
+Am Ende stehen Panel-URL samt zufälligem Zugriffspfad und das erzeugte
+Administratorpasswort in der Ausgabe. Beides kommt genau einmal.
+
+Den ganzen Weg von der DNS-Zone über die Bezugsquelle bis zum ersten Release
+beschreibt [docs/inbetriebnahme.md](docs/inbetriebnahme.md).
+
+### Ohne Internet
+
+```bash
+make dist VERSION=0.1.0                     # am Entwicklungsrechner
 scp dist/voltpanel_0.1.0_linux_amd64.tar.gz root@server:/tmp/
 ```
 
-`make dist` baut für amd64 und arm64 und legt neben jedes Archiv eine
-SHA-256-Summe. Das Archiv enthält beide Binaries, die systemd-Units und den
-Installer.
-
-**Auf dem Server**, als root:
-
 ```bash
-cd /tmp
-tar xzf voltpanel_0.1.0_linux_amd64.tar.gz
+cd /tmp && tar xzf voltpanel_0.1.0_linux_amd64.tar.gz
 cd voltpanel_0.1.0_linux_amd64
-
-VOLT_PANEL_DOMAIN=panel.example.at \
-VOLT_ACME_EMAIL=du@example.at \
 VOLT_LOCAL_DIR="$PWD" bash install.sh
 ```
 
-Den ganzen Weg von der DNS-Zone bis zum ersten Release beschreibt
-[docs/inbetriebnahme.md](docs/inbetriebnahme.md).
-
 `VOLT_LOCAL_DIR` überspringt den Download und nimmt die mitgelieferten
-Dateien. Der Installer richtet ein: nginx, PHP 8.3 aus dem Sury-Repo, MariaDB,
-cron, Systembenutzer und Verzeichnisse, beide Dienste, Timer für
-Zertifikatserneuerung und nächtliches Backup, Firewall-Freigaben. Er ist
-idempotent — ein zweiter Durchlauf repariert eine unvollständige Installation,
-statt sie zu verdoppeln.
-
-Am Ende stehen die Panel-URL samt zufälligem Zugriffspfad und das erzeugte
-Administratorpasswort in der Ausgabe. Beides kommt genau einmal.
+Binaries und Units. Alles danach ist identisch.
 
 ### Danach
 
@@ -122,37 +114,37 @@ Adressen ans Panel dürfen. Danach `systemctl restart volt-web`.
 
 | Variable | Wirkung |
 |---|---|
-| `VOLT_PORT` | Port des Panels (Vorgabe 8443) |
 | `VOLT_PANEL_DOMAIN` | Hostname des Panels — steht im Zertifikat |
 | `VOLT_ACME_EMAIL` | Adresse für Let's Encrypt, ohne sie kein Zertifikat |
-| `VOLT_SKIP_MARIADB=1` | MariaDB nicht mitinstallieren, weil die Datenbank woanders läuft |
-| `VOLT_LOCAL_DIR` | Binaries und Units aus diesem Verzeichnis statt aus dem Netz |
+| `VOLT_PORT` | Port des Panels (Vorgabe 8443) |
 | `VOLT_CHANNEL` | `stable` oder `beta` |
+| `VOLT_SKIP_MARIADB=1` | MariaDB nicht mitinstallieren, weil sie woanders läuft |
+| `VOLT_LOCAL_DIR` | Binaries und Units aus diesem Verzeichnis statt aus dem Netz |
+| `VOLT_BASE_URL` | eigene Bezugsquelle statt `get.voltpanel.dev` |
+
+### Wo die Bezugsquelle liegt
+
+`get.voltpanel.dev` ist eine statische Seite auf GitHub Pages, die bei jedem
+Release aus `scripts/build-pages.sh` neu entsteht. Sie liegt bewusst **nicht**
+auf einem VoltPanel-Server: sonst bräuchte man ein laufendes Panel, um ein
+Panel zu installieren, und ein Ausfall nähme einem die Möglichkeit, den
+Ersatz aufzusetzen.
+
+Dort liegen nur Textdateien — `install.sh`, `latest.json`, die systemd-Units.
+Die Binaries bleiben am GitHub-Release, `latest.json` zeigt mit absoluten
+Adressen dorthin. So gibt es keinen zweiten Ort, an dem eine veraltete Kopie
+liegen bleiben kann.
 
 ### Aktualisieren
 
-`volt update` lädt gegen `update_base_url` aus der Konfiguration — solange es
-die Adresse nicht gibt, läuft ein Update über ein neues Offline-Paket:
-
 ```bash
-sudo -u volt volt backup create
-VOLT_LOCAL_DIR="$PWD" bash install.sh
+volt update
+systemctl restart volt-agent volt-web
 ```
 
-Migrationen laufen beim Start von `volt-web` automatisch. Was `volt update`
-darüber hinaus mitbringt — Snapshot vorher, automatischer Rollback bei einem
-Fehlschlag — ersetzt hier das Backup davor.
-
-### Über ein GitHub-Release
-
-Ein Tag `v*` lässt die Action mit GoReleaser dieselben Archive bauen und ans
-Release hängen. Auf dem Server dann statt `scp`:
-
-```bash
-curl -fsSLO https://github.com/marion909/VoltPanel/releases/download/v0.1.0/voltpanel_0.1.0_linux_amd64.tar.gz
-```
-
-Der Rest ist identisch.
+Getauscht werden beide Binaries — Panel und Agent müssen zur selben Version
+gehören. Vorher entsteht ein Snapshot aus Binary, Datenbank und Konfiguration;
+scheitert etwas, ist der alte Stand wieder da, bevor die Dienste neu starten.
 
 ## Stand der Umsetzung
 

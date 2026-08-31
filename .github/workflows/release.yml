@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   id-token: write # für die Signatur über cosign (keyless)
+  pages: write # für die Bezugsquelle get.voltpanel.dev
 
 jobs:
   release:
@@ -44,3 +45,26 @@ jobs:
         run: scripts/release-assets.sh "$GITHUB_REF_NAME"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Die Bezugsquelle liegt bewusst nicht auf einem VoltPanel-Server: sonst
+  # bräuchte man ein laufendes Panel, um ein Panel zu installieren.
+  pages:
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seite bauen
+        run: scripts/build-pages.sh "$GITHUB_REF_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/pages
+      - id: deploy
+        uses: actions/deploy-pages@v4

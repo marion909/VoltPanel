@@ -122,9 +122,9 @@ Härtungsphase stehen vollständig aus.
 
 ## Bekannte Einschränkungen
 
-- Der `beta`-Kanal ist nicht eingerichtet. GitHub führt Vorabversionen nicht
-  unter „latest", die Weiterleitung von `get.…/stable/` greift für sie also
-  nicht.
+- Die Release-Signatur wird über cosign erzeugt, aber weder von `install.sh`
+  noch von `volt update` geprüft. Dort wirkt bisher nur der SHA-256-Vergleich
+  gegen `latest.json`.
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
   `volt cert issue <panel_domain>` ersetzt es; die Übernahme braucht keinen
   Neustart.
@@ -132,7 +132,5 @@ Härtungsphase stehen vollständig aus.
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
   Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
 - SSRF-Filterung für ausgehende Aufrufe fehlt (relevant ab Phase 5).
-- Die Release-Signatur wird erzeugt, aber vom Client noch nicht geprüft — dort
-  wirkt bisher nur der SHA-256-Vergleich.
 - Getestet gegen Debian 12/13 und Ubuntu 24.04. RHEL-Derivate sind laut Roadmap
   ohnehin später vorgesehen.

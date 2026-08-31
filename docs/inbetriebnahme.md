@@ -1,37 +1,45 @@
 # Inbetriebnahme
 
-Der Weg von einem frischen Hetzner-Server zu einem erreichbaren Panel unter
-einer eigenen Domain. Beispielhaft mit `voltpanel.dev`; ersetze sie überall
-durch deine eigene.
+Der Weg von einem frischen Hetzner-Server zu einem Panel, das sich mit einer
+Zeile installieren lässt. Beispielhaft mit `voltpanel.dev`; ersetze sie überall
+durch deine eigene Domain.
 
-Zwei Namen werden gebraucht, und sie tun Verschiedenes:
+Zwei Namen werden gebraucht, und sie liegen an verschiedenen Orten:
 
-| Name | Wofür |
-|---|---|
-| `panel.voltpanel.dev` | die Oberfläche, auf Port 8443 |
-| `get.voltpanel.dev` | die Bezugsquelle, aus der `install.sh` und `volt update` laden |
+| Name | Was dort liegt | Wo es gehostet wird |
+|---|---|---|
+| `panel.voltpanel.dev` | die Oberfläche, Port 8443 | auf deinem Server |
+| `get.voltpanel.dev` | `install.sh` und `latest.json` | GitHub Pages |
+
+**Warum die Bezugsquelle nicht auf den Server gehört:** sonst bräuchtest du
+ein laufendes VoltPanel, um VoltPanel zu installieren. Und wenn der Server
+ausfällt, käme kein zweiter mehr hoch. Sie liegt deshalb auf GitHub Pages und
+hängt an nichts, was bei dir ausfallen kann.
+
+Die Binaries liegen nicht auf Pages, sondern am GitHub-Release. Auf der Seite
+stehen nur Textdateien, die mit absoluten Adressen dorthin zeigen — so gibt es
+keinen zweiten Ort, an dem eine veraltete Kopie liegen bleiben könnte.
 
 ## 0. Was `.dev` besonders macht
 
 Die gesamte Top-Level-Domain `.dev` steht auf der HSTS-Preload-Liste der
-Browser. Jeder Aufruf wird ohne Rückfrage auf HTTPS umgeschrieben — ein
-Panel ohne TLS wäre unter einer `.dev`-Domain im Browser schlicht nicht
-benutzbar. Deshalb bringt volt-web sein eigenes Zertifikat mit: beim ersten
-Start ein selbstsigniertes, nach `volt cert issue` ein gültiges.
+Browser. Jeder Aufruf wird ohne Rückfrage auf HTTPS umgeschrieben — ein Panel
+ohne TLS wäre unter einer `.dev`-Domain schlicht nicht benutzbar. Deshalb
+bringt volt-web sein eigenes Zertifikat mit: beim ersten Start ein
+selbstsigniertes, nach `volt cert issue` ein gültiges.
 
 Für Let's Encrypt ist das kein Hindernis. Die HTTP-01-Prüfung kommt nicht aus
 einem Browser und akzeptiert Port 80.
 
 ## 1. DNS
 
-Beim Registrar von `voltpanel.dev` anlegen, mit der IP des Servers aus der
+Beim Registrar von `voltpanel.dev`, mit der IP des Servers aus der
 Hetzner-Konsole:
 
 ```
-panel   A     203.0.113.10
-panel   AAAA  2a01:4f8:c17:1234::1
-get     A     203.0.113.10
-get     AAAA  2a01:4f8:c17:1234::1
+panel   A      203.0.113.10
+panel   AAAA   2a01:4f8:c17:1234::1
+get     CNAME  marion909.github.io.
 ```
 
 Die AAAA-Einträge sind kein Beiwerk: Hetzner vergibt jedem Server ein
@@ -40,13 +48,32 @@ eine Adresse, unter der nichts antwortet, lässt die Zertifikatsprüfung
 scheitern, obwohl über IPv4 alles läuft. Entweder beide Einträge setzen und
 beide erreichbar halten — oder keinen AAAA-Eintrag.
 
-Vor dem nächsten Schritt prüfen, dass die Namen aufgelöst werden:
+## 2. Bezugsquelle aufschalten
+
+Einmalig in den Repository-Einstellungen unter *Settings → Pages* als Quelle
+**GitHub Actions** wählen. Dann das erste Release bauen lassen:
 
 ```bash
-dig +short panel.voltpanel.dev A AAAA
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-## 2. Firewall
+Die Action baut die Binaries, hängt Prüfsummen und `latest.json` ans Release
+und veröffentlicht die Seite. Nach ein paar Minuten prüfen:
+
+```bash
+curl -fsSL https://get.voltpanel.dev/stable/latest.json
+```
+
+Antwortet das mit JSON, ist die Bezugsquelle in Betrieb. Das Zertifikat für
+`get.voltpanel.dev` stellt GitHub selbst aus; darum musst du dich nicht
+kümmern.
+
+Kommt stattdessen ein 404, hat Pages die Domain noch nicht übernommen —
+unter *Settings → Pages* muss `get.voltpanel.dev` als Custom Domain stehen.
+Das CNAME-File dafür schreibt `scripts/build-pages.sh` bei jedem Release mit.
+
+## 3. Firewall
 
 Hetzner hat zwei Firewalls, und nur eine davon kennt der Installer.
 
@@ -63,50 +90,61 @@ freigeben.
 **ufw auf dem Server**: der Installer gibt 80, 443 und den Panel-Port frei,
 sofern ufw aktiv ist. Ist keine Firewall aktiv, sagt er das.
 
-Ist die Cloud Firewall nicht eingerichtet, ist der Server offen und nur ufw
-schützt ihn. Beides gleichzeitig zu pflegen ist Absicht, keine Doppelung.
+## 4. Installation
 
-## 3. Installation
-
-Paket auf dem Entwicklungsrechner bauen und hochladen:
+Auf dem Server, als root — mehr ist es nicht:
 
 ```bash
-make dist VERSION=0.1.0
-scp dist/voltpanel_0.1.0_linux_amd64.tar.gz root@203.0.113.10:/tmp/
-```
-
-Auf dem Server, als root:
-
-```bash
-cd /tmp && tar xzf voltpanel_0.1.0_linux_amd64.tar.gz
-cd voltpanel_0.1.0_linux_amd64
-
 VOLT_PANEL_DOMAIN=panel.voltpanel.dev \
 VOLT_ACME_EMAIL=du@example.at \
-VOLT_LOCAL_DIR="$PWD" bash install.sh
+bash <(curl -fsSL https://get.voltpanel.dev/install.sh)
 ```
 
+Der Installer liest `latest.json`, lädt beide Binaries und prüft jede Datei
+gegen die dort hinterlegte Prüfsumme. **Stimmt eine Prüfsumme nicht oder
+fehlt sie, bricht er ab** — ein Binary aus unbekannter Quelle wird nicht
+installiert.
+
 `VOLT_PANEL_DOMAIN` landet als `panel_domain` in `/etc/volt/config.yaml`,
-steht im selbstsignierten Zertifikat und bestimmt, welches Zertifikat
-volt-web später übernimmt. `VOLT_ACME_EMAIL` ist für Let's Encrypt Pflicht —
-ohne sie verweigert `volt cert issue` den Dienst.
+steht im selbstsignierten Zertifikat und bestimmt, welches Zertifikat volt-web
+später übernimmt. `VOLT_ACME_EMAIL` ist für Let's Encrypt Pflicht — ohne sie
+verweigert `volt cert issue` den Dienst.
 
 Am Ende stehen die URL mit dem zufälligen Zugriffspfad und das erzeugte
 Administratorpasswort in der Ausgabe. **Beides kommt genau einmal.**
 
-## 4. Erster Login
+Ein zweiter Durchlauf repariert eine unvollständige Installation, statt sie zu
+verdoppeln.
+
+### Ohne Internet oder vor dem ersten Release
+
+```bash
+make dist VERSION=0.1.0                    # am Entwicklungsrechner
+scp dist/voltpanel_0.1.0_linux_amd64.tar.gz root@203.0.113.10:/tmp/
+```
+
+```bash
+cd /tmp && tar xzf voltpanel_0.1.0_linux_amd64.tar.gz
+cd voltpanel_0.1.0_linux_amd64
+VOLT_PANEL_DOMAIN=panel.voltpanel.dev VOLT_LOCAL_DIR="$PWD" bash install.sh
+```
+
+`VOLT_LOCAL_DIR` überspringt den Download und nimmt die mitgelieferten
+Dateien. Alles danach ist identisch.
+
+## 5. Erster Login
 
 ```
 https://panel.voltpanel.dev:8443/<zugriffspfad>
 ```
 
 Der Browser warnt vor dem selbstsignierten Zertifikat. Das ist an dieser
-Stelle richtig so — die Ausnahme gilt nur bis Schritt 5.
+Stelle richtig so — die Ausnahme gilt nur bis Schritt 6.
 
 Sofort danach: Passwort ändern und 2FA einschalten. Das Panel darf root auf
 diesem Server, ein übernommener Zugang also auch.
 
-## 5. Gültiges Zertifikat für das Panel
+## 6. Gültiges Zertifikat für das Panel
 
 Sobald `panel.voltpanel.dev` auf den Server zeigt:
 
@@ -124,76 +162,32 @@ Metrik-Streams abreißen lassen. Die Browserwarnung ist nach einem Neuladen weg.
 
 Verlängert wird automatisch durch `volt-renew.timer`.
 
-## 6. `get.voltpanel.dev` als Bezugsquelle
-
-Ab hier ist das Panel selbst das Werkzeug — die Bezugsquelle ist eine ganz
-normale Site mit drei Weiterleitungen. Nichts davon wird von Hand in eine
-nginx-Datei geschrieben.
-
-```bash
-sudo -u volt volt site add get.voltpanel.dev --type static
-sudo -u volt volt cert issue get.voltpanel.dev
-```
-
-Dann im Panel unter *Site → Einstellungen → Zusätzliche Direktiven*:
-
-```nginx
-rewrite ^/install\.sh$ https://raw.githubusercontent.com/marion909/VoltPanel/main/packaging/install.sh redirect;
-rewrite ^/stable/systemd/(.*)$ https://raw.githubusercontent.com/marion909/VoltPanel/main/packaging/systemd/$1 redirect;
-rewrite ^/stable/(.*)$ https://github.com/marion909/VoltPanel/releases/latest/download/$1 redirect;
-```
-
-Die Reihenfolge zählt: nginx nimmt die erste passende Regel, und die dritte
-würde sonst auch die systemd-Units schlucken.
-
-Warum Weiterleitungen statt Dateien: GitHub kennt unter
-`/releases/latest/download/` immer die neueste stabile Version. Damit muss
-nach einem Release nichts auf den Server kopiert werden, und es gibt keinen
-zweiten Ort, an dem eine veraltete Datei liegen bleiben könnte.
-Vorabversionen zählen dort nicht als „latest" — der `beta`-Kanal braucht
-darum eine eigene Regel und ist noch nicht eingerichtet.
-
-Danach funktioniert der Einzeiler aus dem README:
-
-```bash
-bash <(curl -fsSL https://get.voltpanel.dev/install.sh)
-```
-
-## 7. Das erste Release
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-Die Action baut mit GoReleaser die Archive und hängt anschließend über
-`scripts/release-assets.sh` an, was die Programme wirklich laden: die nackten
-Binaries, je eine Prüfsumme daneben und `latest.json`.
-
-Prüfen, ob der Kanal steht:
-
-```bash
-curl -fsSL https://get.voltpanel.dev/stable/latest.json
-sudo -u volt volt update --check
-```
-
-Ab dann genügt auf jedem Server:
-
-```bash
-volt update
-systemctl restart volt-agent volt-web
-```
-
-`volt update` tauscht beide Binaries und legt vorher einen Snapshot aus
-Binary, Datenbank und Konfiguration an. Scheitert etwas, ist der alte Stand
-wieder da, bevor die Dienste neu starten.
-
-## 8. Zum Schluss prüfen
+## 7. Zum Schluss prüfen
 
 ```bash
 sudo -u volt volt doctor
 ```
 
 Geprüft werden Ports, Rechte, Schemastand und Restlaufzeit der Zertifikate.
+
+## Aktualisieren
+
+Ein neuer Tag genügt; die Action erledigt Release und Bezugsquelle. Auf jedem
+Server dann:
+
+```bash
+volt update
+systemctl restart volt-agent volt-web
+```
+
+`volt update` tauscht beide Binaries — Panel und Agent müssen zur selben
+Version gehören, sonst sprechen sie irgendwann verschiedene Protokolle. Vorher
+entsteht ein Snapshot aus Binary, Datenbank und Konfiguration; scheitert
+etwas, ist der alte Stand wieder da, bevor die Dienste neu starten.
+
+Vorabversionen (`v0.2.0-beta.1`) landen im Kanal `beta` und lassen den
+stabilen Kanal unberührt. Ein Server zieht nur den Kanal, der in seiner
+`config.yaml` unter `update_channel` steht.
 
 ## Was auf Hetzner noch auffällt
 
