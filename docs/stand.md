@@ -109,14 +109,14 @@ genannten Punkte.
 
 ## Offen
 
-**Phase 3**
+**Phase 3 — Daten, Dateien, Cronjobs**
 
 - SQL-Browser (oder phpMyAdmin als Plugin)
 - FTP mit Pure-FTPd und virtuellen Benutzern
 - Remote-Whitelist für Datenbankzugriffe von außen
 - Backup-Ziele S3, B2, FTP
 
-**Phase 4**
+**Phase 4 — Multi-Tenant**
 
 - Echte Dateisystem-Quotas (XFS/ext4 Project Quota). Die Grenzen wirken derzeit
   auf Anwendungsebene: eine Aktion über der Quota wird abgelehnt. Ein Prozess,
@@ -127,10 +127,103 @@ genannten Punkte.
 - Eigene Anmeldeseite und Domain für den Kundenbereich (die reduzierte
   Navigation steht bereits)
 
-**Phasen 5–8**
+**Phase 5 — Docker, Node.js, Git-Deploy**
 
-Docker, Node.js, Git-Deploy, Mailserver, App Store und die fokussierte
-Härtungsphase stehen vollständig aus.
+- Docker: Container, Images, Volumes, Netzwerke, Logs, Stats, Exec
+- Compose-Projekte anlegen und starten, Ports automatisch auf den Nginx-Proxy
+  legen
+- Node.js: Versionen über fnm; eine App ist eine systemd-Unit plus
+  Reverse-Proxy, mit Auto-Restart, Log-Stream und ENV-Verwaltung
+- Git-Deploy: Deploy-Keys, Webhook-Endpunkt je Site, Branch-Auswahl
+- Build-Schritte definierbar (`npm ci`, `npm run build`, `composer install`)
+- Releases-Verzeichnis mit Symlink-Wechsel, damit ein Rollback ein Klick ist
+
+Die Hälfte, die den Verkehr betrifft, steht schon: der Site-Typ `proxy`
+schreibt einen fertigen `proxy_pass`-Vhost, und `docker` steht auf der
+Dienst-Whitelist des Agents. Auch die Unit-Vorlage für eine App liegt unter
+`internal/templates/systemd/app.service.tmpl` — sie wird eingebettet und
+geparst, aber von niemandem gerendert. Es fehlt alles dazwischen.
+
+Zwei Dinge sind hier keine Fleißarbeit. Erstens Docker: ein Container mit
+`--privileged` oder einem Bind-Mount auf `/` hebt jede Isolation auf, die
+dieses Panel aufbaut. Die Operationen müssen also nicht nur "Container
+starten" können, sondern vorgeben, was ein Container darf. Zweitens holt
+Git-Deploy Daten von einer Adresse, die der Kunde bestimmt — genau der Fall,
+für den die SSRF-Filterung fehlt.
+
+**Phase 6 — Mailserver**
+
+- Entscheidung vorab: eigener Stack (Postfix, Dovecot, Rspamd, OpenDKIM,
+  virtuelle Domänen aus der Datenbank) oder Mailcow als Docker-Stack, den das
+  Panel nur verwaltet
+- Multidomain: Domänen, Postfächer, Aliase, Catch-All, Weiterleitungen, Quota
+- DKIM-Schlüssel erzeugen, SPF-, DKIM- und DMARC-Einträge automatisch über die
+  Cloudflare-Anbindung aus Phase 2 setzen
+- Webmail (Roundcube oder SnappyMail) als Plugin
+- Autoconfig und Autodiscover für Thunderbird und Outlook
+- Deliverability-Prüfung im Panel: PTR, Blacklists, offene Relays, TLS
+
+Vorbereitet ist zweierlei: `postfix`, `dovecot`, `rspamd` und `opendkim` stehen
+bereits auf der Dienst-Whitelist, und der verschlüsselte Cloudflare-Token je
+Mandant ist genau das, was die DNS-Einträge brauchen. Beides ist Vorarbeit,
+keine Entscheidung.
+
+Der schwierige Teil ist auch nicht der Code. Ob eine Mail bei Gmail im
+Posteingang landet, hängt an PTR-Eintrag, Reputation der IP und daran, dass
+kein Kunde über den Server Spam verschickt. Die Roadmap sagt dazu selbst:
+Mailcow-Variante ernsthaft prüfen, Phase 6 spät ansetzen. Solange das nicht
+entschieden ist, wäre jede Zeile Mailserver-Code eine Wette.
+
+**Phase 7 — App Store und Plugin-System**
+
+- Plugin-Format: Manifest mit Name, Version, Abhängigkeiten, Hooks und
+  benötigten Rechten, dazu Install-, Uninstall- und Update-Skript und ein
+  optionales UI-Bundle
+- Stabile interne Plugin-API
+- Signierte Pakete, eigenes Repository aus statischem JSON und Tarballs
+- Erste Plugins: Redis, phpMyAdmin, Fail2ban-Verwaltung, Backup-Werkzeug,
+  Webmail, WordPress mit einem Klick
+- Später Game-Server-Verwaltung als Plugin statt als zweites System
+
+Die Auslieferung existiert schon in der richtigen Form: `get.voltpanel.dev` ist
+statisches JSON plus Tarballs mit Prüfsummen — dieselbe Bauart, die ein
+Plugin-Repository braucht. Was dort fehlt, fällt hier aber ins Gewicht: die
+cosign-Signatur wird erzeugt und von niemandem geprüft. Für das eigene Update
+ist das ein Mangel, für fremden Code wäre es fahrlässig.
+
+Die Reihenfolge ist Absicht. Eine stabile Plugin-API lohnt sich erst, wenn der
+Kern sich nicht mehr täglich bewegt — sonst bricht jede Änderung die eigenen
+Plugins. Zwei offene Punkte anderer Phasen hängen daran: phpMyAdmin aus
+Phase 3 und Webmail aus Phase 6 sind in der Roadmap Plugins, keine
+Kernfunktionen.
+
+**Phase 8 — Härtung und Release**
+
+Diese Phase läuft nebenher mit und ist deshalb teilweise erledigt.
+
+Steht bereits:
+
+- Panel-Absicherung: eigener Port, nicht erratbarer Zugriffspfad,
+  IP-Whitelist
+- `volt doctor` mit Prüfungen zu Schema, Pfaden, Agent, Diensten, Port,
+  gemeinsamer Config, Benutzersperren und Zertifikaten; strukturierte Logs
+- Update-Kanäle stable und beta sind in der Konfiguration angelegt und werden
+  geprüft; ausgeliefert wird bisher nur stable
+- Vom Security-Review sind Command-Injection, Path-Traversal, IDOR und CSRF
+  umgesetzt und mit Tests belegt — siehe [sicherheit.md](sicherheit.md)
+
+Offen:
+
+- SSRF-Filterung für ausgehende Aufrufe. Heute betrifft das die Cloudflare-API,
+  ab Phase 5 auch Git-Quellen und Webhooks.
+- Fail2ban-Anbindung und eine Oberfläche für die Firewall. Derzeit öffnet
+  `install.sh` Ports in ufw, sofern ufw überhaupt läuft; bei nftables gibt es
+  eine Warnung und sonst nichts. Port-Scan-Schutz fehlt ganz.
+- Voll-Backup und Restore eines einzelnen Mandanten, dazu Migration von Server
+  zu Server. Das Backup ist heute serverweit — für einen Umzug ist das zu
+  grob.
+- Doku-Site und Changelog
+- Closed Beta mit zwei bis drei fremden Nutzern, erst danach öffentlich
 
 ## Bekannte Einschränkungen
 
