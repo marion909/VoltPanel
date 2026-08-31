@@ -26,20 +26,25 @@ RestrictNamespaces=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 
-# /usr und /boot bleiben schreibgeschützt. /etc dagegen muss offen sein, und
-# zwar als Verzeichnis: useradd legt seine Sperrdatei (/etc/passwd.lock) neben
-# der Datei an, die es ändert. Einzelne Dateien freizugeben reicht deshalb
-# nicht — ohne das Verzeichnis meldet es "cannot lock /etc/passwd".
+# ProtectSystem=true und nicht "full": full setzt zusätzlich /etc
+# schreibgeschützt, und ein ReadWritePaths=/etc hebt das NICHT auf. Steht
+# derselbe Pfad in beiden Listen, gewinnt die restriktivere Angabe — die Unit
+# sah dann richtig aus, `systemctl show` zeigte /etc als beschreibbar, und
+# useradd scheiterte trotzdem mit "cannot lock /etc/passwd".
 #
-# Dieselbe Freigabe deckt /etc/cron.d ab, wohin jeder Cronjob als eigene Datei
-# geht.
+# Eine Freigabe wirkt nur für echte Unterpfade. So macht es volt-web.service
+# mit /etc/volt/keys, und dort funktioniert es.
 #
-# Die eigentliche Grenze ist ohnehin eine andere: der Agent kennt nur die
-# typisierten Operationen aus internal/agent/protocol.go, und jeder Pfad läuft
-# zusätzlich durch das Gefängnis in jail(). Die Einhängung ist die zweite
-# Verteidigungslinie, nicht die erste.
-ProtectSystem=full
-ReadWritePaths=/etc /var/www /var/lib/volt /var/log/volt /var/backups/volt
+# Der Agent schreibt: /etc (Systembenutzer, nginx, php, cron.d), /var/www,
+# /var/lib/volt, /var/log/volt, /var/backups/volt. Unter ProtectSystem=true
+# sind die alle ohnehin beschreibbar; aufgezählt werden muss nur, was unter
+# /usr liegt.
+ProtectSystem=true
+
+# /usr/local/bin, damit `volt update` beide Programme austauschen kann — auch
+# das aus der Oberfläche ausgelöste. Ein echter Unterpfad von /usr, die
+# Freigabe greift also.
+ReadWritePaths=/usr/local/bin
 
 StandardOutput=journal
 StandardError=journal

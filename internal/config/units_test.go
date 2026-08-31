@@ -48,46 +48,99 @@ func TestConfigFileStaysReadOnly(t *testing.T) {
 // TestAgentMayWriteWhereItWorks prüft die Unit des Agents gegen die Pfade,
 // die er tatsächlich anfasst.
 //
-// Auch das kommt aus einem echten Ausfall: ProtectSystem=full macht /etc
-// schreibgeschützt, und useradd meldete daraufhin "cannot lock /etc/passwd".
-// Nichts davon war am Panel zu sehen — die Site-Anlage brach erst beim
-// Anlegen des Systembenutzers ab, nachdem der Vhost schon gedacht war.
+// Zweimal aus echten Ausfällen gewachsen. Erst war /etc gar nicht
+// freigegeben, dann stand es zwar in ReadWritePaths — und blieb trotzdem
+// schreibgeschützt, weil ProtectSystem=full denselben Pfad beansprucht. Die
+// Unit sah beide Male richtig aus.
 func TestAgentMayWriteWhereItWorks(t *testing.T) {
 	unit := readUnit(t, "volt-agent.service")
 	cfg := Default()
 
 	needed := map[string]string{
-		cfg.NginxDir:  "Vhosts und htpasswd",
-		cfg.PHPFPMDir: "FPM-Pools",
-		cfg.SitesDir:  "Site-Verzeichnisse",
-		cfg.CertDir:   "Zertifikate",
-		cfg.LogDir:    "Site-Logs",
-		"/etc":        "Systembenutzer (useradd sperrt /etc/passwd) und Cronjobs in /etc/cron.d",
+		cfg.NginxDir:     "Vhosts und htpasswd",
+		cfg.PHPFPMDir:    "FPM-Pools",
+		cfg.SitesDir:     "Site-Verzeichnisse",
+		cfg.CertDir:      "Zertifikate",
+		cfg.LogDir:       "Site-Logs",
+		"/etc":           "Systembenutzer (useradd sperrt /etc/passwd) und Cronjobs in /etc/cron.d",
+		"/etc/cron.d":    "Cronjobs",
+		"/usr/local/bin": "Binärtausch beim Update",
 	}
 
 	for path, why := range needed {
-		if !writableUnder(unit, path) {
-			t.Errorf("volt-agent darf %s nicht beschreiben, braucht es aber für: %s", path, why)
+		if !unitCanWrite(unit, path) {
+			t.Errorf("volt-agent kann %s nicht beschreiben, braucht es aber für: %s", path, why)
 		}
 	}
 }
 
-// writableUnder erlaubt auch ein übergeordnetes Verzeichnis: /var/lib/volt
-// deckt /var/lib/volt/certs mit ab. Für den Web-Prozess gilt das bewusst
-// nicht — dort entzieht ReadOnlyPaths einen Teilbaum wieder.
-func writableUnder(unit, path string) bool {
-	for _, line := range strings.Split(unit, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "ReadWritePaths=") {
+// unitCanWrite bildet nach, was systemd aus ProtectSystem und ReadWritePaths
+// tatsächlich macht.
+//
+// Der Kern ist die letzte Regel: eine Freigabe wirkt für Unterpfade, aber
+// nicht für denselben Pfad. Steht er in beiden Listen, gewinnt die
+// restriktivere Angabe. Genau daran ist die vorige Fassung gescheitert, und
+// eine Prüfung, die nur "steht es in ReadWritePaths?" fragt, hätte sie
+// durchgewinkt.
+func unitCanWrite(unit, path string) bool {
+	var readOnly []string
+	switch protectSystem(unit) {
+	case "strict":
+		readOnly = []string{"/"}
+	case "full":
+		readOnly = []string{"/usr", "/boot", "/efi", "/etc"}
+	case "true", "yes", "on", "1":
+		readOnly = []string{"/usr", "/boot", "/efi"}
+	}
+
+	blocked := ""
+	for _, ro := range readOnly {
+		if ro == path || under(path, ro) {
+			blocked = ro
+		}
+	}
+	if blocked == "" {
+		return true
+	}
+
+	for _, rw := range unitValues(unit, "ReadWritePaths=") {
+		if rw == blocked {
+			// Derselbe Pfad in beiden Listen: die Freigabe verpufft.
 			continue
 		}
-		for _, p := range strings.Fields(strings.TrimPrefix(line, "ReadWritePaths=")) {
-			if p == path || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {
-				return true
-			}
+		if rw == path || under(path, rw) {
+			return true
 		}
 	}
 	return false
+}
+
+func protectSystem(unit string) string {
+	for _, line := range strings.Split(unit, "\n") {
+		line = strings.TrimSpace(line)
+		if v, ok := strings.CutPrefix(line, "ProtectSystem="); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func unitValues(unit, key string) []string {
+	var out []string
+	for _, line := range strings.Split(unit, "\n") {
+		line = strings.TrimSpace(line)
+		if v, ok := strings.CutPrefix(line, key); ok {
+			out = append(out, strings.Fields(v)...)
+		}
+	}
+	return out
+}
+
+func under(path, root string) bool {
+	if root == "/" {
+		return path != "/"
+	}
+	return strings.HasPrefix(path, strings.TrimSuffix(root, "/")+"/")
 }
 
 func readUnit(t *testing.T, name string) string {

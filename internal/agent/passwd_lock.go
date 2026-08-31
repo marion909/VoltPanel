@@ -62,9 +62,17 @@ func probeEtcWritable() string {
 		return ""
 	}
 	if errors.Is(err, syscall.EROFS) {
-		return "/etc ist für den Agent schreibgeschützt. useradd legt seine Sperrdatei dort an. " +
-			"Die Unit braucht /etc in ReadWritePaths — prüfen mit " +
-			"`systemctl show volt-agent -p ReadWritePaths`, danach " +
+		// Der naheliegende Verdacht — /etc fehlt in ReadWritePaths — ist oft
+		// falsch. Steht dort ProtectSystem=full oder strict, hebt ein Eintrag
+		// mit exakt demselben Pfad die Sperre nicht auf: bei gleichem Pfad
+		// gewinnt die restriktivere Angabe. `systemctl show` zeigt /etc dann
+		// als beschreibbar an, und es ist es trotzdem nicht.
+		return "/etc ist für den Agent schreibgeschützt, obwohl die Unit es " +
+			"vielleicht freigibt: mit ProtectSystem=full oder strict wirkt ein " +
+			"ReadWritePaths=/etc nicht, weil derselbe Pfad in beiden Listen steht. " +
+			"Prüfen mit `systemctl show volt-agent -p ProtectSystem -p ReadWritePaths` " +
+			"und `grep ' /etc ' /proc/$(systemctl show volt-agent -p MainPID --value)/mountinfo`. " +
+			"Der Installer bringt die richtige Unit mit; danach " +
 			"`systemctl daemon-reload && systemctl restart volt-agent`"
 	}
 	return fmt.Sprintf("/etc ist nicht beschreibbar: %v", err)
