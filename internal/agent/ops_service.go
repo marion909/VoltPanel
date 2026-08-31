@@ -43,8 +43,16 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpPHPExtensions:    s.opPHPExtensions,
 		OpPHPExtInstall:    s.opPHPExtInstall,
 		OpPHPExtToggle:     s.opPHPExtToggle,
-		OpNginxWriteAuth:   s.opNginxWriteAuth,
-		OpNginxRemoveAuth:  s.opNginxRemoveAuth,
+
+		OpSystemProcesses:   s.opSystemProcesses,
+		OpSystemProcessKill: s.opSystemProcessKill,
+
+		OpTerminalOpen:   s.opTerminalOpen,
+		OpTerminalResize: s.opTerminalResize,
+		OpTerminalClose:  s.opTerminalClose,
+
+		OpNginxWriteAuth:  s.opNginxWriteAuth,
+		OpNginxRemoveAuth: s.opNginxRemoveAuth,
 
 		OpPHPWritePool:  s.opPHPWritePool,
 		OpPHPRemovePool: s.opPHPRemovePool,

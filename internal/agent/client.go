@@ -498,3 +498,38 @@ func (c *Client) WriteChunk(ctx context.Context, path string, offset int64, data
 
 // ChunkSize ist die Blockgröße, mit der Aufrufer arbeiten sollten.
 const ChunkSize = maxChunkBytes
+
+// --- Prozesse --------------------------------------------------------------
+
+func (c *Client) Processes(ctx context.Context) ([]ProcessInfo, error) {
+	var res []ProcessInfo
+	err := c.Call(ctx, OpSystemProcesses, nil, &res)
+	return res, err
+}
+
+// StopProcess beendet einen Prozess. user ist der erwartete Eigentümer; der
+// Agent lehnt ab, wenn der Prozess jemand anderem gehört.
+func (c *Client) StopProcess(ctx context.Context, pid int, user, signal string) error {
+	return c.Call(ctx, OpSystemProcessKill,
+		ProcessKillParams{PID: pid, User: user, Signal: signal}, nil)
+}
+
+// --- Terminal --------------------------------------------------------------
+
+// OpenTerminal startet eine Shell als user und liefert den Socket, über den die
+// Sitzung läuft. Sie muss innerhalb weniger Sekunden abgeholt werden.
+func (c *Client) OpenTerminal(ctx context.Context, user, dir string, cols, rows int) (*TerminalSession, error) {
+	var res TerminalSession
+	err := c.Call(ctx, OpTerminalOpen,
+		TerminalParams{User: user, Dir: dir, Cols: cols, Rows: rows}, &res)
+	return &res, err
+}
+
+func (c *Client) ResizeTerminal(ctx context.Context, session string, cols, rows int) error {
+	return c.Call(ctx, OpTerminalResize,
+		TerminalParams{Session: session, Cols: cols, Rows: rows}, nil)
+}
+
+func (c *Client) CloseTerminal(ctx context.Context, session string) error {
+	return c.Call(ctx, OpTerminalClose, TerminalParams{Session: session}, nil)
+}

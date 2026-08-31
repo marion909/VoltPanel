@@ -98,6 +98,15 @@ const (
 
 	// Zertifikate
 	OpCertInstall Op = "cert.install"
+
+	// Prozesse
+	OpSystemProcesses   Op = "system.processes"
+	OpSystemProcessKill Op = "system.process_kill"
+
+	// Terminal: eine Shell als Systembenutzer einer Site, nie als root.
+	OpTerminalOpen   Op = "terminal.open"
+	OpTerminalResize Op = "terminal.resize"
+	OpTerminalClose  Op = "terminal.close"
 )
 
 // Request ist eine einzelne Anfrage an den Agent.
@@ -283,6 +292,25 @@ type CronParams struct {
 	Lines    int    `json:"lines"`
 }
 
+type ProcessKillParams struct {
+	PID int `json:"pid"`
+	// User ist der erwartete Eigentümer. Der Agent beendet den Prozess nur,
+	// wenn er wirklich diesem Benutzer gehört — der Web-Prozess kennt den
+	// Mandanten, der Agent kennt den Prozess.
+	User   string `json:"user"`
+	Signal string `json:"signal"` // TERM (Vorgabe) oder KILL
+}
+
+// TerminalParams eröffnet eine Sitzung. Der Benutzer kommt vom Web-Prozess aus
+// der Site, nie aus der Anfrage des Browsers.
+type TerminalParams struct {
+	User    string `json:"user"`
+	Dir     string `json:"dir"`
+	Cols    int    `json:"cols"`
+	Rows    int    `json:"rows"`
+	Session string `json:"session"`
+}
+
 type CertInstallParams struct {
 	Domain  string `json:"domain"`
 	CertPEM string `json:"cert_pem"`
@@ -290,6 +318,25 @@ type CertInstallParams struct {
 }
 
 // --- Ergebnisstrukturen ----------------------------------------------------
+
+type ProcessInfo struct {
+	PID        int     `json:"pid"`
+	PPID       int     `json:"ppid"`
+	User       string  `json:"user"`
+	State      string  `json:"state"`
+	CPUPercent float64 `json:"cpu_percent"`
+	MemBytes   int64   `json:"mem_bytes"`
+	Threads    int     `json:"threads"`
+	Command    string  `json:"command"`
+}
+
+// TerminalSession ist der Rückweg zu einer eröffneten Shell: ein eigener
+// Socket je Sitzung, über den der Web-Prozess die rohen Bytes durchreicht.
+type TerminalSession struct {
+	Session string `json:"session"`
+	Socket  string `json:"socket"`
+	User    string `json:"user"`
+}
 
 type ServiceStatus struct {
 	Name        string `json:"name"`

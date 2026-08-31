@@ -164,6 +164,15 @@ func (s *Server) setupRoutes() {
 	auth.POST("/system/php/:version/extensions/install", s.handlePHPExtensionInstall, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/php/:version/extensions/toggle", s.handlePHPExtensionToggle, s.requireRole(store.RoleAdmin))
 
+	// Die Prozessliste ist gefiltert: ein Kunde sieht nur die Prozesse seiner
+	// eigenen Sites. Beenden lassen sich ohnehin nur diese.
+	auth.GET("/system/processes", s.handleProcesses)
+	auth.POST("/system/processes/stop", s.handleStopProcess)
+
+	// Das Zertifikat des Panels betrifft den Server, nicht einen Mandanten.
+	auth.GET("/system/panel-certificate", s.handlePanelCertStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/panel-certificate", s.handleIssuePanelCert, s.requireRole(store.RoleAdmin))
+
 	auth.GET("/system/update", s.handleUpdateStatus)
 	auth.POST("/system/update", s.handleUpdateStart, s.requireRole(store.RoleAdmin))
 
@@ -179,6 +188,12 @@ func (s *Server) setupRoutes() {
 	auth.GET("/sites/:id/php", s.handleGetSitePHP)
 	auth.PATCH("/sites/:id/php", s.handleUpdateSitePHP)
 	auth.POST("/sites/:id/certificate", s.handleIssueCert)
+
+	// Terminal: eine Shell als Systembenutzer der Site. Vorerst nur für
+	// Administratoren — mehr gibt es damit zwar nicht als über einen Cronjob
+	// derselben Site, aber eine Shell macht das Umsehen auf dem Server eben
+	// deutlich bequemer. Die Freigabe für Kunden ist eine eigene Entscheidung.
+	auth.GET("/sites/:id/terminal", s.handleTerminal, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/certs", s.handleListCerts)
 	auth.DELETE("/certs/:id", s.handleDeleteCert)

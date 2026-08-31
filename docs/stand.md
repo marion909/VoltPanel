@@ -32,6 +32,12 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - Dashboard: Ring-Gauges, Kennzahl-Kacheln, Traffic-Chart mit Fadenkreuz und
   Tabellensicht, Disk-Balken je Mount
 - Dienstverwaltung: Liste, Start/Stop/Restart/Reload/Enable/Disable
+- Prozessliste aus /proc mit CPU, Speicher und Kommandozeile. Beenden lässt
+  sich nur ein Prozess, der einer Site gehört — für Systemdienste ist die
+  Dienstverwaltung zuständig. Ein Kunde sieht ausschließlich die Prozesse
+  seiner eigenen Sites.
+- Web-Terminal (xterm.js) je Site: die Shell läuft als unprivilegierter
+  Systembenutzer der Site, nie als root. Vorerst Administratoren vorbehalten.
 - Dark Mode (System/Hell/Dunkel), i18n-Gerüst mit DE und EN
 
 **Phase 2 — Websites, PHP, SSL**
@@ -51,6 +57,12 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Ausführungszeit, Upload-Größe. `disable_functions` und eigene ini-Werte
   bleiben Administratoren vorbehalten — sie heben die Isolation der Site auf.
 - Log-Viewer für Access- und Error-Log in der Site-Detailansicht
+- HTTPS-Verhalten je Site über die Oberfläche: Umleitung erzwingen und HSTS.
+  HSTS ohne Zertifikat wird abgelehnt — es würde die Site für jeden Browser,
+  der sie einmal besucht hat, ein Jahr lang unerreichbar machen.
+- Zertifikat des Panels über die Oberfläche anfordern. Es gilt sofort, ohne
+  Neustart: der Webserver prüft bei jedem Handshake, welche Datei der Kette
+  lesbar ist.
 - PHP-Erweiterungen: installierte Module je Version anzeigen, ein- und
   ausschalten, neue über die Paketverwaltung nachrüsten. Der Paketname
   entsteht im Agent aus Version und Modulname — er kommt nie aus der Anfrage.
@@ -92,18 +104,16 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - Reduzierte Oberfläche für Kunden: keine Server-Dienste, keine
   Mandantenverwaltung
 
+Phase 0 bis 2 sind damit abgeschlossen, Phase 4 bis auf die drei unten
+genannten Punkte.
+
 ## Offen
 
 **Phase 1**
 
-- Web-Terminal (xterm.js). Bewusst zurückgestellt: eine Shell im Browser hebelt
-  die Trennung zwischen Web und Agent auf und braucht ein eigenes Konzept.
-- Prozessliste
-
-**Phase 2**
-
-- Panel-Zertifikat über die Oberfläche beantragen (über die CLI geht es)
-- HSTS-Schalter in der Oberfläche (im Datenmodell und Template vorhanden)
+- Das Terminal ist Administratoren vorbehalten. Es für Kunden zu öffnen wäre
+  vertretbar — ein Cronjob derselben Site läuft unter demselben Konto —, ist
+  aber eine eigene Entscheidung und keine Nebenwirkung.
 
 **Phase 3**
 
@@ -140,5 +150,9 @@ Härtungsphase stehen vollständig aus.
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
   Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
 - SSRF-Filterung für ausgehende Aufrufe fehlt (relevant ab Phase 5).
+- Das Web-Terminal lässt sich nur auf einem Linux-Server wirklich erproben:
+  das Pseudoterminal braucht /dev/ptmx, das Fallenlassen der Rechte braucht
+  root. Die Prüfungen davor und die ioctls laufen im Test, die Shell selbst
+  erst auf dem Zielsystem.
 - Getestet gegen Debian 12/13 und Ubuntu 24.04. RHEL-Derivate sind laut Roadmap
   ohnehin später vorgesehen.

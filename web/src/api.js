@@ -74,10 +74,14 @@ export const api = {
     return payload
   },
 
-  // WebSocket für den Metrik-Strom. Das Session-Cookie geht beim Upgrade
+  // WebSocket auf einen API-Pfad. Das Session-Cookie geht beim Upgrade
   // automatisch mit, der Server prüft zusätzlich den Origin.
-  metricsSocket() {
+  socket(path) {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return new WebSocket(`${proto}//${location.host}${base}/api/v1/system/metrics/stream`)
+    return new WebSocket(`${proto}//${location.host}${base}/api/v1${path}`)
+  },
+
+  metricsSocket() {
+    return api.socket('/system/metrics/stream')
   },
 }

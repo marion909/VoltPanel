@@ -4,6 +4,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { isAdmin } from "../stores/session";
 import PHPExtensions from "../components/PHPExtensions.vue";
+import ProcessList from "../components/ProcessList.vue";
 
 const services = ref([]);
 const loading = ref(true);
@@ -133,6 +134,10 @@ onMounted(load);
 
     <div v-if="isAdmin()" class="mt-6">
       <PHPExtensions />
+    </div>
+
+    <div class="mt-8">
+      <ProcessList />
     </div>
   </div>
 </template>

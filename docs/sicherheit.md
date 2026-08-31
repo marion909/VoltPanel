@@ -194,6 +194,52 @@ Der Export geht den umgekehrten Weg: der Dump wird beim Abruf erzeugt, über den
 Socket blockweise zum Browser gestreamt und danach entfernt. Er enthält alle
 Daten der Site im Klartext und soll nicht als Datei liegen bleiben.
 
+## 4g. Shell im Browser
+
+**Risiko:** Ein Terminal im Panel ist die naheliegendste Art, die Trennung
+zwischen Web-Prozess und Agent zu unterlaufen. Läuft die Shell als root, ist
+jede Lücke im Panel — ein XSS genügt — eine Root-Shell.
+
+**Maßnahmen:** Die Shell läuft als **Systembenutzer der Site**, nie als root
+und nie als ein Konto, das der Browser benennen könnte. Der Web-Prozess leitet
+den Benutzer aus der Site ab, die er im Namen des angemeldeten Kontos aufgelöst
+hat; der Agent prüft anschließend noch einmal, dass der Name mit `site_`
+beginnt, und weigert sich zusätzlich, eine Shell mit UID 0 zu starten.
+
+Damit gibt das Terminal nichts her, was nicht ohnehin ginge: ein Cronjob
+derselben Site führt beliebige Befehle unter demselben Konto aus, und der
+PHP-Prozess der Site ebenso. Bequemer ist es allemal, deshalb ist es vorerst
+Administratoren vorbehalten.
+
+Das Arbeitsverzeichnis geht durch dieselbe `jail()`-Prüfung wie jeder andere
+Pfad. Die Shell bekommt ein festes, knappes Environment und keine Nebengruppen
+— auch nicht die des Agents.
+
+Je Sitzung entsteht ein eigener Socket mit 0660 `root:volt`, der genau **eine**
+Verbindung annimmt und danach verschwindet; ein zweiter Verbinder würde sonst
+am selben Terminal mitlesen. Wird die Sitzung nicht binnen 15 Sekunden
+abgeholt, wird sie beendet — sonst liefe eine Shell weiter, die niemand mehr
+erreichen kann. Nach 30 Minuten ohne Eingabe endet sie ebenfalls, und beim
+Herunterfahren des Agents wird die ganze Prozessgruppe beendet, nicht nur die
+Shell.
+
+## 4h. Prozesse beenden
+
+**Risiko:** Eine Operation, die ein Signal an eine beliebige PID schickt, ist
+ein Weg, sshd, den Agent oder die Datenbank abzuschießen.
+
+**Maßnahmen:** Zwei Schranken, die zusammengehören. Der Web-Prozess bestimmt
+den erwarteten Eigentümer aus den Sites des Mandanten — der Aufrufer schickt
+nur die PID. Der Agent prüft, dass der Prozess wirklich diesem Benutzer gehört
+und dass es überhaupt ein `site_`-Konto ist. Erlaubt sind nur TERM und KILL.
+
+Für Systemdienste ist die Dienstverwaltung zuständig: ein per Signal
+abgeräumter nginx hinterlässt eine Unit, die nicht mehr weiß, was sie tun soll.
+
+Die Liste selbst ist ebenfalls gefiltert. Nicht wegen der Zahlen, sondern wegen
+der Kommandozeilen: dort stehen Domainnamen, Pfade und gelegentlich Argumente
+eines Skripts — die Tätigkeit anderer Mandanten.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

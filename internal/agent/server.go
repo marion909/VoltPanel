@@ -46,6 +46,11 @@ type Server struct {
 	registry map[Op]Handler
 	listener net.Listener
 
+	// Laufende Terminalsitzungen. Jede hat einen eigenen Socket; der Agent
+	// beendet sie beim Herunterfahren, damit keine Shell ihn überlebt.
+	termMu sync.Mutex
+	terms  map[string]*terminal
+
 	mu   sync.Mutex
 	conn int
 }
@@ -112,6 +117,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		roots: []string{opts.SitesDir, opts.NginxDir, opts.PHPDir, opts.CertDir,
 			opts.LogDir, opts.BackupDir},
 	}
+	s.terms = map[string]*terminal{}
 	s.registry = s.newRegistry()
 	return s, nil
 }
@@ -159,6 +165,9 @@ func (s *Server) Serve(ctx context.Context) error {
 		return errors.New("Listen() wurde nicht aufgerufen")
 	}
 	defer s.listener.Close()
+	// Offene Shells sind Kindprozesse des Agents. Endet er, ohne sie zu
+	// beenden, hängen sie an einem Terminal, das niemand mehr liest.
+	defer s.closeTerminals()
 
 	go func() {
 		<-ctx.Done()
@@ -182,6 +191,7 @@ func (s *Server) Serve(ctx context.Context) error {
 }
 
 func (s *Server) Close() error {
+	s.closeTerminals()
 	if s.listener != nil {
 		return s.listener.Close()
 	}

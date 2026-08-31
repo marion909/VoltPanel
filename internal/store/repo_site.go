@@ -239,6 +239,14 @@ func validateSite(site *Site) error {
 	if strings.Contains(site.DocumentRoot, "..") || strings.HasPrefix(site.DocumentRoot, "/") {
 		return fmt.Errorf("document_root %q muss ein relativer pfad ohne .. sein", site.DocumentRoot)
 	}
+	// HSTS ohne Zertifikat sperrt Besucher für ein Jahr aus: der Browser merkt
+	// sich die Anweisung und weigert sich danach, die Seite über http zu
+	// laden — obwohl es kein https gibt. Zurücknehmen lässt sich das nicht,
+	// der Kopf erreicht den Browser ja nicht mehr.
+	if site.HSTS && !site.SSLEnabled {
+		return errors.New("hsts braucht ein gültiges zertifikat — sonst ist die seite für bereits " +
+			"besuchte browser ein jahr lang nicht mehr erreichbar")
+	}
 	return site.Settings.Validate()
 }
 

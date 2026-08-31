@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { t } from '../i18n'
@@ -35,6 +35,10 @@ const inputStyle = {
   color: 'var(--ink-primary)',
 }
 
+// Erst laden, wenn der Reiter geöffnet wird: xterm ist größer als die gesamte
+// übrige Oberfläche zusammen.
+const SiteTerminal = defineAsyncComponent(() => import('../components/SiteTerminal.vue'))
+
 const tabs = computed(() => {
   const list = [
     { key: 'overview', label: 'site.overview' },
@@ -43,6 +47,7 @@ const tabs = computed(() => {
     { key: 'logs', label: 'site.logs' },
   ]
   if (site.value?.type === 'php') list.splice(2, 0, { key: 'php', label: 'site.php' })
+  if (isAdmin()) list.push({ key: 'terminal', label: 'site.terminal' })
   return list
 })
 
@@ -159,6 +164,25 @@ async function savePHP() {
 }
 
 // --- SSL ---
+
+// HSTS gilt für ein Jahr und lässt sich nicht zurückrufen: der Browser merkt
+// sich die Anweisung. Ohne Zertifikat lehnt der Server sie deshalb ab.
+async function saveHTTPS() {
+  busy.value = true
+  error.value = ''
+  try {
+    site.value = await api.patch(`/sites/${siteId.value}`, {
+      force_https: site.value.force_https,
+      hsts: site.value.hsts,
+    })
+    flash(t('site.saved'))
+  } catch (err) {
+    error.value = err.message
+    await load()
+  } finally {
+    busy.value = false
+  }
+}
 
 async function issueCert() {
   busy.value = true
@@ -477,6 +501,39 @@ watch(logType, loadLog)
 
     <!-- SSL -->
     <section v-else-if="tab === 'ssl'" class="max-w-2xl space-y-4">
+      <div class="rounded-lg border p-5"
+           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+        <h2 class="mb-3 text-[14px] font-medium">{{ t('site.httpsBehaviour') }}</h2>
+
+        <label class="mb-2 flex items-start gap-2 text-[13px]">
+          <input v-model="site.force_https" type="checkbox" class="mt-0.5" />
+          <span>
+            {{ t('site.forceHTTPS') }}
+            <span class="block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+              {{ t('site.forceHTTPSHint') }}
+            </span>
+          </span>
+        </label>
+
+        <label class="mb-3 flex items-start gap-2 text-[13px]">
+          <input v-model="site.hsts" type="checkbox" class="mt-0.5"
+                 :disabled="!site.ssl_enabled" />
+          <span>
+            {{ t('site.hsts') }}
+            <span class="block text-[11px]"
+                  :style="{ color: site.ssl_enabled ? 'var(--ink-muted)' : 'var(--status-warning)' }">
+              {{ site.ssl_enabled ? t('site.hstsHint') : t('site.hstsNeedsCert') }}
+            </span>
+          </span>
+        </label>
+
+        <button :disabled="busy"
+                class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
+                :style="{ background: 'var(--series-1)' }" @click="saveHTTPS">
+          {{ t('common.save') }}
+        </button>
+      </div>
+
       <div v-if="certs.length" class="rounded-lg border p-5"
            :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
         <h2 class="mb-3 text-[14px] font-medium">{{ t('site.currentCert') }}</h2>
@@ -517,6 +574,10 @@ watch(logType, loadLog)
           {{ busy ? t('site.issuing') : t('site.issueCert') }}
         </button>
       </div>
+    </section>
+
+    <section v-else-if="tab === 'terminal' && site" class="max-w-4xl">
+      <SiteTerminal :site-id="site.id" />
     </section>
 
     <!-- Logs -->

@@ -103,9 +103,11 @@ Datenbank ihm gehört. Ein Aufruf als root funktioniert auch — `volt` gibt die
 Datenbankdateien danach wieder frei —, aber der Umweg ist der sauberere Weg.
 
 Das Panel terminiert TLS selbst und startet mit einem selbstsignierten
-Zertifikat. Sobald die Domain darauf zeigt, ersetzt
-`volt cert issue panel.example.at` es durch ein gültiges — ohne Neustart, das
-Panel prüft bei jedem Handshake auf eine neuere Datei.
+Zertifikat. Sobald die Domain darauf zeigt, ersetzt es
+**Einstellungen → Zertifikat des Panels** durch ein gültiges — auf der
+Kommandozeile geht dasselbe mit `volt cert issue panel.example.at`. Beides
+wirkt ohne Neustart: das Panel prüft bei jedem Handshake auf eine neuere
+Datei.
 
 In `/etc/volt/config.yaml` lohnt sich noch `ip_whitelist`, wenn nur bestimmte
 Adressen ans Panel dürfen. Danach `systemctl restart volt-web`.
@@ -161,8 +163,8 @@ scheitert etwas, ist der alte Stand wieder da, bevor die Dienste neu starten.
 | Phase | Inhalt | Stand |
 |---|---|---|
 | 0 | Fundament: Datenmodell, Migrationen, Agent/Web-Trennung, `install.sh`, `volt update` | **fertig** |
-| 1 | Auth mit 2FA, Audit-Log, Metriken, Dashboard, Dienstverwaltung, Dark Mode, i18n | **fertig** (ohne Web-Terminal) |
-| 2 | Vhost-Generator, Site-Typen, PHP-FPM-Pools, PHP-Erweiterungen, ACME mit HTTP-01 und Cloudflare-DNS-01 | **fertig** |
+| 1 | Auth mit 2FA, Audit-Log, Metriken, Dashboard, Dienstverwaltung, Prozessliste, Web-Terminal, Dark Mode, i18n | **fertig** |
+| 2 | Vhost-Generator, Site-Typen, PHP-FPM-Pools, PHP-Erweiterungen, HSTS, ACME mit HTTP-01 und Cloudflare-DNS-01 | **fertig** |
 | 3 | MySQL, File Manager, Cronjobs, Backups | **weitgehend** (FTP und SQL-Browser offen) |
 | 4 | Rollen, Quotas, Kundenbereich | **weitgehend** (Disk-Quota auf Anwendungsebene, nicht im Dateisystem) |
 | 5–7 | Docker, Node, Git-Deploy, Mail, App Store | offen |

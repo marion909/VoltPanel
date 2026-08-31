@@ -5,6 +5,8 @@ import { session, setUser } from "../stores/session";
 import { theme, setTheme } from "../stores/theme";
 import { t, i18n, setLocale } from "../i18n";
 import UpdateCard from "../components/UpdateCard.vue";
+import PanelCertificate from "../components/PanelCertificate.vue";
+import { isAdmin } from "../stores/session";
 
 const currentPassword = ref("");
 const newPassword = ref("");
@@ -83,6 +85,8 @@ async function disableTOTP() {
     </h1>
 
     <UpdateCard />
+
+    <PanelCertificate v-if="isAdmin()" />
 
     <section
       class="mb-4 rounded-lg border p-5"
