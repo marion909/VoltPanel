@@ -109,12 +109,6 @@ genannten Punkte.
 
 ## Offen
 
-**Phase 1**
-
-- Das Terminal ist Administratoren vorbehalten. Es für Kunden zu öffnen wäre
-  vertretbar — ein Cronjob derselben Site läuft unter demselben Konto —, ist
-  aber eine eigene Entscheidung und keine Nebenwirkung.
-
 **Phase 3**
 
 - SQL-Browser (oder phpMyAdmin als Plugin)
@@ -144,12 +138,15 @@ Härtungsphase stehen vollständig aus.
   noch von `volt update` geprüft. Dort wirkt bisher nur der SHA-256-Vergleich
   gegen `latest.json`.
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
-  `volt cert issue <panel_domain>` ersetzt es; die Übernahme braucht keinen
-  Neustart.
+  Einstellungen → Zertifikat des Panels ersetzt es, `volt cert issue
+  <panel_domain>` ebenso; die Übernahme braucht keinen Neustart.
 - Die Speicherquota greift gegen den Stand der letzten Messung (stündlich).
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
   Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
 - SSRF-Filterung für ausgehende Aufrufe fehlt (relevant ab Phase 5).
+- Das Web-Terminal ist Administratoren vorbehalten. Es für Kunden zu öffnen
+  wäre vertretbar — ein Cronjob derselben Site läuft unter demselben Konto —,
+  ist aber eine eigene Entscheidung und keine Nebenwirkung.
 - Das Web-Terminal lässt sich nur auf einem Linux-Server wirklich erproben:
   das Pseudoterminal braucht /dev/ptmx, das Fallenlassen der Rechte braucht
   root. Die Prüfungen davor und die ioctls laufen im Test, die Shell selbst
