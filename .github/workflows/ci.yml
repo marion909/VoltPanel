@@ -13,9 +13,9 @@ jobs:
     name: Test und Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.24"
           cache: true
@@ -38,6 +38,11 @@ jobs:
       - name: Skripte ausführbar und syntaktisch heil
         run: make lint-scripts
 
+      # Ohne mindestens eine Datei unter internal/webui/dist scheitert
+      # //go:embed - und zwar vor gofmt, vet und jedem Test.
+      - name: Embed-Verzeichnis vorhanden
+        run: make lint-embed
+
       - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
@@ -50,9 +55,9 @@ jobs:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -71,15 +76,15 @@ jobs:
       matrix:
         arch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.24"
           cache: true
@@ -104,7 +109,7 @@ jobs:
           fi
           file volt volt-agent
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: voltpanel-linux-${{ matrix.arch }}
           path: |

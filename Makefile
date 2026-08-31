@@ -88,7 +88,7 @@ cover: ## Testabdeckung als HTML
 lint: ## gofmt, go vet und die Dateimodi der Skripte
 	@test -z "$$(gofmt -l cmd internal)" || { echo "nicht formatiert:"; gofmt -l cmd internal; exit 1; }
 	go vet ./...
-	@$(MAKE) --no-print-directory lint-scripts
+	@$(MAKE) --no-print-directory lint-scripts lint-embed
 
 .PHONY: lint-scripts
 lint-scripts: ## Prüft, ob alle Skripte in git ausführbar sind
@@ -100,6 +100,14 @@ lint-scripts: ## Prüft, ob alle Skripte in git ausführbar sind
 		exit 1; \
 	fi
 	@for f in $$(git ls-files '*.sh'); do bash -n "$$f" || exit 1; done
+
+.PHONY: lint-embed
+lint-embed: ## Prüft, ob das Embed-Verzeichnis im Klon existiert
+	@test -n "$$(git ls-files internal/webui/dist)" || { \
+		echo "internal/webui/dist ist in git leer — //go:embed all:dist scheitert"; \
+		echo "Beheben mit: git add -f internal/webui/dist/.gitkeep"; \
+		exit 1; \
+	}
 
 .PHONY: dev
 dev: build-go ## Startet das Panel lokal gegen ./tmp (ohne Agent)

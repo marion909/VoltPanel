@@ -24,4 +24,10 @@ fi
 
 npm run build
 
+# Vite leert das Zielverzeichnis vor jedem Build und nimmt den Platzhalter
+# mit. Ohne ihn steht in einem frischen Klon kein einziges Verzeichnis für
+# `//go:embed all:dist` bereit, und `go build` scheitert, bevor irgendetwas
+# anderes geprüft werden kann.
+touch ../internal/webui/dist/.gitkeep
+
 echo "Frontend gebaut: internal/webui/dist"
