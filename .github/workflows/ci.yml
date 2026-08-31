@@ -33,13 +33,18 @@ jobs:
       - name: Tests mit Race-Detector
         run: go test -race ./...
 
-      - name: install.sh auf Syntaxfehler prüfen
-        run: bash -n packaging/install.sh
+      # Ein verlorenes x-Bit faellt sonst erst im Release-Lauf auf, und zwar
+      # mit "Permission denied" statt mit einer brauchbaren Meldung.
+      - name: Skripte ausführbar und syntaktisch heil
+        run: make lint-scripts
 
       - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck packaging/install.sh scripts/build-web.sh
+          # -S warning: die jq-Filter stehen absichtlich in einfachen
+          # Anfuehrungszeichen ($k ist eine jq-Variable, keine Shell-Variable),
+          # und SC2006 trifft Backticks in deutschen Kommentaren.
+          shellcheck -S warning $(git ls-files '*.sh')
 
   frontend:
     name: Frontend

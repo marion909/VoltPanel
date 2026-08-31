@@ -85,9 +85,21 @@ cover: ## Testabdeckung als HTML
 	@echo "→ coverage.html"
 
 .PHONY: lint
-lint: ## gofmt und go vet
+lint: ## gofmt, go vet und die Dateimodi der Skripte
 	@test -z "$$(gofmt -l cmd internal)" || { echo "nicht formatiert:"; gofmt -l cmd internal; exit 1; }
 	go vet ./...
+	@$(MAKE) --no-print-directory lint-scripts
+
+.PHONY: lint-scripts
+lint-scripts: ## Prüft, ob alle Skripte in git ausführbar sind
+	@missing="$$(git ls-files -s '*.sh' | awk '$$1 != "100755" {print $$4}')"; \
+	if [ -n "$$missing" ]; then \
+		echo "Diesen Skripten fehlt in git das x-Bit:"; \
+		echo "$$missing" | sed 's/^/  /'; \
+		echo "Beheben mit: git update-index --chmod=+x <datei>"; \
+		exit 1; \
+	fi
+	@for f in $$(git ls-files '*.sh'); do bash -n "$$f" || exit 1; done
 
 .PHONY: dev
 dev: build-go ## Startet das Panel lokal gegen ./tmp (ohne Agent)
