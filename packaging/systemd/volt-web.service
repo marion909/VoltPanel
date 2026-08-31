@@ -27,7 +27,16 @@ RestrictRealtime=yes
 RestrictNamespaces=yes
 LockPersonality=yes
 
-ReadWritePaths=/var/lib/volt /var/log/volt /var/backups/volt
+# /etc/volt bleibt schreibgeschützt: die config.yaml legt fest, innerhalb
+# welcher Wurzeln der Agent überhaupt Dateien anfassen darf. Könnte der
+# Web-Prozess sie ändern und den Agent neu starten lassen, wäre das ein Weg
+# zu root.
+#
+# keys/ ist die eine Ausnahme. Dort legt das Panel beim ersten Start seinen
+# Schlüssel für Secrets-at-rest an. Er gehört ins Konfigurationsverzeichnis,
+# weil das Backup genau dieses Verzeichnis mitnimmt — ohne den Schlüssel wäre
+# ein wiederhergestelltes Backup nicht entschlüsselbar.
+ReadWritePaths=/var/lib/volt /var/log/volt /var/backups/volt /etc/volt/keys
 ReadOnlyPaths=/etc/volt
 
 # Das Panel hört auf einem hohen Port; es braucht keine privilegierten Ports.
