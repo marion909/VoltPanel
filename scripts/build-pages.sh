@@ -15,8 +15,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TAG="${1:-${GITHUB_REF_NAME:-}}"
-[ -n "$TAG" ] || { echo "Aufruf: $0 <tag>, etwa v0.1.0" >&2; exit 1; }
+# Ohne Argument das neueste Release nehmen. Der Aufruf kommt auch aus einem
+# Lauf auf main, wo GITHUB_REF_NAME "main" waere und kein Tag.
+TAG="${1:-}"
+case "$TAG" in
+    v*) ;;
+    *)  command -v gh >/dev/null 2>&1 \
+            || { echo "Aufruf: $0 <tag>, etwa v0.1.0 (oder gh installieren)" >&2; exit 1; }
+        TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)"
+        [ -n "$TAG" ] || { echo "Kein Release gefunden — erst eines veroeffentlichen." >&2; exit 1; }
+        echo "Neuestes Release: $TAG"
+        ;;
+esac
 
 VERSION="${TAG#v}"
 REPO="${GITHUB_REPOSITORY:-marion909/VoltPanel}"

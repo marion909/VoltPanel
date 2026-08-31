@@ -58,8 +58,15 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Die Action baut die Binaries, hängt Prüfsummen und `latest.json` ans Release
-und veröffentlicht die Seite. Nach ein paar Minuten prüfen:
+Zwei Workflows arbeiten nacheinander. **Release** baut die Binaries und hängt
+Prüfsummen und `latest.json` ans Release. **Bezugsquelle** läuft danach an und
+veröffentlicht die Seite.
+
+Dass das zwei sind, hat einen Grund: die Umgebung `github-pages` lässt
+Deployments nur vom Standardzweig zu, und ein Release läuft auf einem Tag. Ein
+`workflow_run` startet dagegen auf `main` und erfüllt die Regel.
+
+Nach ein paar Minuten prüfen:
 
 ```bash
 curl -fsSL https://get.voltpanel.dev/stable/latest.json
@@ -69,9 +76,14 @@ Antwortet das mit JSON, ist die Bezugsquelle in Betrieb. Das Zertifikat für
 `get.voltpanel.dev` stellt GitHub selbst aus; darum musst du dich nicht
 kümmern.
 
-Kommt stattdessen ein 404, hat Pages die Domain noch nicht übernommen —
+**Wenn die Seite fehlt oder veraltet ist:** unter *Actions → Bezugsquelle →
+Run workflow* neu bauen lassen. Ohne Angabe nimmt sie das neueste Release.
+Das geht auch, ohne ein Release zu wiederholen — die Seite enthält nichts,
+was nicht auch aus dem Release rekonstruierbar wäre.
+
+Kommt ein 404 statt der Datei, hat Pages die Domain noch nicht übernommen —
 unter *Settings → Pages* muss `get.voltpanel.dev` als Custom Domain stehen.
-Das CNAME-File dafür schreibt `scripts/build-pages.sh` bei jedem Release mit.
+Das CNAME-File dafür schreibt `scripts/build-pages.sh` bei jedem Lauf mit.
 
 ## 3. Firewall
 

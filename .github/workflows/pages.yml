@@ -1,0 +1,53 @@
+name: Bezugsquelle
+
+# Läuft bewusst nicht im Release-Workflow mit: die Umgebung github-pages
+# erlaubt Deployments nur vom Standardzweig, und ein Release läuft auf einem
+# Tag. Ein workflow_run startet dagegen auf main und erfüllt die Regel.
+#
+# Der manuelle Start ist kein Notnagel, sondern der Weg, die Seite neu
+# aufzubauen, ohne ein Release zu wiederholen.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag, dessen Release veröffentlicht wird (leer = das neueste)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Zwei gleichzeitige Deployments würden sich gegenseitig überschreiben.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: get.voltpanel.dev veröffentlichen
+    runs-on: ubuntu-latest
+    # Ein abgebrochenes Release darf die Bezugsquelle nicht anfassen: sonst
+    # zeigte sie auf Binaries, die es nicht gibt.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Seite bauen
+        run: scripts/build-pages.sh "${{ inputs.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/pages
+      - id: deploy
+        uses: actions/deploy-pages@v5
