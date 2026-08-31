@@ -45,6 +45,51 @@ func TestConfigFileStaysReadOnly(t *testing.T) {
 	}
 }
 
+// TestAgentMayWriteWhereItWorks prüft die Unit des Agents gegen die Pfade,
+// die er tatsächlich anfasst.
+//
+// Auch das kommt aus einem echten Ausfall: ProtectSystem=full macht /etc
+// schreibgeschützt, und useradd meldete daraufhin "cannot lock /etc/passwd".
+// Nichts davon war am Panel zu sehen — die Site-Anlage brach erst beim
+// Anlegen des Systembenutzers ab, nachdem der Vhost schon gedacht war.
+func TestAgentMayWriteWhereItWorks(t *testing.T) {
+	unit := readUnit(t, "volt-agent.service")
+	cfg := Default()
+
+	needed := map[string]string{
+		cfg.NginxDir:  "Vhosts und htpasswd",
+		cfg.PHPFPMDir: "FPM-Pools",
+		cfg.SitesDir:  "Site-Verzeichnisse",
+		cfg.CertDir:   "Zertifikate",
+		cfg.LogDir:    "Site-Logs",
+		"/etc":        "Systembenutzer (useradd sperrt /etc/passwd) und Cronjobs in /etc/cron.d",
+	}
+
+	for path, why := range needed {
+		if !writableUnder(unit, path) {
+			t.Errorf("volt-agent darf %s nicht beschreiben, braucht es aber für: %s", path, why)
+		}
+	}
+}
+
+// writableUnder erlaubt auch ein übergeordnetes Verzeichnis: /var/lib/volt
+// deckt /var/lib/volt/certs mit ab. Für den Web-Prozess gilt das bewusst
+// nicht — dort entzieht ReadOnlyPaths einen Teilbaum wieder.
+func writableUnder(unit, path string) bool {
+	for _, line := range strings.Split(unit, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "ReadWritePaths=") {
+			continue
+		}
+		for _, p := range strings.Fields(strings.TrimPrefix(line, "ReadWritePaths=")) {
+			if p == path || strings.HasPrefix(path, strings.TrimSuffix(p, "/")+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func readUnit(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("..", "..", "packaging", "systemd", name))

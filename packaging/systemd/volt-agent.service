@@ -26,9 +26,20 @@ RestrictNamespaces=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 
-# Der Agent verwaltet Nginx, PHP und Sites — genau diese Pfade darf er schreiben.
+# /usr und /boot bleiben schreibgeschützt. /etc dagegen muss offen sein, und
+# zwar als Verzeichnis: useradd legt seine Sperrdatei (/etc/passwd.lock) neben
+# der Datei an, die es ändert. Einzelne Dateien freizugeben reicht deshalb
+# nicht — ohne das Verzeichnis meldet es "cannot lock /etc/passwd".
+#
+# Dieselbe Freigabe deckt /etc/cron.d ab, wohin jeder Cronjob als eigene Datei
+# geht.
+#
+# Die eigentliche Grenze ist ohnehin eine andere: der Agent kennt nur die
+# typisierten Operationen aus internal/agent/protocol.go, und jeder Pfad läuft
+# zusätzlich durch das Gefängnis in jail(). Die Einhängung ist die zweite
+# Verteidigungslinie, nicht die erste.
 ProtectSystem=full
-ReadWritePaths=/etc/nginx /etc/php /var/www /var/lib/volt /var/log/volt /etc/volt /var/backups/volt
+ReadWritePaths=/etc /var/www /var/lib/volt /var/log/volt /var/backups/volt
 
 StandardOutput=journal
 StandardError=journal
