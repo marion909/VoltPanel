@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/marion909/voltpanel/internal/store"
@@ -40,6 +41,7 @@ func (a *app) doctorCmd() *cobra.Command {
 			checks = append(checks, a.checkServices(ctx)...)
 			checks = append(checks, a.checkPort())
 			checks = append(checks, a.checkSharedConfig())
+			checks = append(checks, a.checkUserLocks())
 			checks = append(checks, a.checkCerts(ctx)...)
 
 			var failed, warned int
@@ -153,6 +155,30 @@ func (a *app) checkPort() check {
 	}
 	conn.Close()
 	return check{"Panel-Port", "ok", addr}
+}
+
+// checkUserLocks meldet liegengebliebene Sperrdateien von useradd.
+//
+// Sie blockieren jedes Anlegen einer Site — und zwar dauerhaft, obwohl die
+// Meldung "try again later" lautet. Hier gefunden zu werden ist deutlich
+// billiger, als es beim ersten Kunden zu merken.
+func (a *app) checkUserLocks() check {
+	locks := []string{
+		"/etc/passwd.lock", "/etc/group.lock",
+		"/etc/shadow.lock", "/etc/gshadow.lock",
+	}
+
+	var found []string
+	for _, path := range locks {
+		if _, err := os.Lstat(path); err == nil {
+			found = append(found, path)
+		}
+	}
+	if len(found) == 0 {
+		return check{"Benutzerverwaltung", "ok", "keine liegengebliebenen Sperrdateien"}
+	}
+	return check{"Benutzerverwaltung", "fail",
+		strings.Join(found, ", ") + " blockieren useradd — nach dem Prüfen entfernen"}
 }
 
 // checkSharedConfig prüft die vhost-übergreifende nginx-Config.

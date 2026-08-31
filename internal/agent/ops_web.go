@@ -355,12 +355,20 @@ func (s *Server) opUserCreate(ctx context.Context, raw json.RawMessage) (any, er
 		shell = p.Shell
 	}
 
-	if out, err := run(ctx, shortTimeout, "useradd",
+	// longTimeout statt shortTimeout: wird useradd mitten im Lauf abgebrochen,
+	// bleibt seine Sperrdatei in /etc liegen und blockiert danach jeden
+	// weiteren Versuch. Ein langsamer Durchlauf ist billiger als das.
+	if out, err := run(ctx, longTimeout, "useradd",
 		"--home-dir", home, "--create-home", "--shell", shell,
 		"--user-group", "--comment", "voltpanel site user", p.Username); err != nil {
 		// Exit 9 = Benutzer existiert bereits. Idempotenz ist Prinzip 2 der Roadmap.
 		if strings.Contains(out, "already exists") {
 			return TextResult{Text: "benutzer " + p.Username + " existierte bereits"}, nil
+		}
+		// "cannot lock /etc/passwd; try again later" nennt den Grund nicht,
+		// und Warten hilft in beiden möglichen Fällen nicht.
+		if strings.Contains(out, "cannot lock") {
+			return nil, opErr(OpUserCreate, "%s — %s", strings.TrimSpace(out), diagnoseUserLock())
 		}
 		return nil, opErr(OpUserCreate, "%s", truncate(out, 300))
 	}
