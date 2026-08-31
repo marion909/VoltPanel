@@ -102,6 +102,22 @@ if ! command -v php-fpm8.3 >/dev/null 2>&1 && [ ! -d /etc/php/8.3 ]; then
     info "PHP 8.3 mit den gängigen Erweiterungen installiert"
 fi
 
+# MariaDB gehört zur Grundinstallation: der Agent spricht für jede
+# Datenbank-Operation direkt über /var/run/mysqld/mysqld.sock, nicht über eine
+# Shell. Ohne Server scheitert `volt db add` beim ersten Aufruf.
+# VOLT_SKIP_MARIADB=1 überspringt ihn, wenn die Datenbank woanders läuft.
+if [ -z "${VOLT_SKIP_MARIADB:-}" ] \
+   && ! command -v mysqld >/dev/null 2>&1 \
+   && ! command -v mariadbd >/dev/null 2>&1; then
+    step "MariaDB"
+    apt-get install -y -qq --no-install-recommends \
+        mariadb-server mariadb-client >/dev/null
+    systemctl enable --now mariadb >/dev/null 2>&1 || true
+    # root meldet sich auf Debian über den Socket an — genau der Weg, den der
+    # Agent nimmt. Es gibt damit kein Datenbankpasswort, das irgendwo liegt.
+    info "MariaDB installiert, root über Socket-Auth"
+fi
+
 # --- Benutzer und Verzeichnisse -------------------------------------------
 
 step "Benutzer und Verzeichnisse"

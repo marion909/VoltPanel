@@ -14,6 +14,10 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
 BIN_DIR := bin
+DIST_DIR := dist
+
+# sha256sum gibt es auf Linux, shasum auf macOS — dieselbe Ausgabe.
+SHA256 := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo 'shasum -a 256')
 
 .PHONY: help
 help:
@@ -46,6 +50,24 @@ linux: web ## Baut für linux/amd64 und linux/arm64
 		CGO_ENABLED=0 GOOS=linux GOARCH=$$arch go build -trimpath -ldflags "$(LDFLAGS)" \
 			-o $(BIN_DIR)/volt-agent_linux_$$arch ./cmd/volt-agent; \
 		echo "→ linux/$$arch"; \
+	done
+
+.PHONY: dist
+dist: linux ## Schnürt die Offline-Installationspakete nach dist/
+	@rm -rf $(DIST_DIR)
+	@for arch in amd64 arm64; do \
+		name="voltpanel_$(VERSION)_linux_$$arch"; \
+		stage="$(DIST_DIR)/$$name"; \
+		mkdir -p "$$stage/systemd"; \
+		install -m 0755 $(BIN_DIR)/volt_linux_$$arch       "$$stage/volt"; \
+		install -m 0755 $(BIN_DIR)/volt-agent_linux_$$arch "$$stage/volt-agent"; \
+		install -m 0755 packaging/install.sh               "$$stage/install.sh"; \
+		install -m 0644 packaging/systemd/*                "$$stage/systemd/"; \
+		install -m 0644 README.md LICENSE                  "$$stage/"; \
+		tar -C $(DIST_DIR) -czf "$$stage.tar.gz" "$$name"; \
+		( cd $(DIST_DIR) && $(SHA256) "$$name.tar.gz" > "$$name.tar.gz.sha256" ); \
+		rm -rf "$$stage"; \
+		echo "→ $$stage.tar.gz"; \
 	done
 
 .PHONY: test

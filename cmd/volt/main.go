@@ -107,6 +107,11 @@ func (a *app) init(migrate bool) error {
 		return err
 	}
 	a.agent = agent.NewClient(cfg.SocketPath)
+
+	// Ein Aufruf als root darf der Datenbank nicht die Rechte verstellen.
+	if err := alignDBOwnership(cfg.DBPath); err != nil {
+		a.log.Warn("eigentuemer der datenbank nicht angeglichen", "fehler", err)
+	}
 	return nil
 }
 
@@ -142,6 +147,11 @@ func (a *app) close() {
 	}
 	if a.store != nil {
 		_ = a.store.Close()
+	}
+	// Noch einmal nach dem Schließen: die WAL-Dateien entstehen erst beim
+	// ersten Schreibzugriff, also nach der Prüfung in init.
+	if a.cfg != nil {
+		_ = alignDBOwnership(a.cfg.DBPath)
 	}
 }
 

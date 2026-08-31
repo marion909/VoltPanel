@@ -121,6 +121,9 @@ Härtungsphase stehen vollständig aus.
 
 ## Bekannte Einschränkungen
 
+- `get.voltpanel.dev` ist nicht aufgeschaltet und es gibt noch kein Release.
+  Installiert wird deshalb über das Offline-Paket aus `make dist`; `volt update`
+  läuft erst, wenn `update_base_url` auf eine erreichbare Adresse zeigt.
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
 - Die Speicherquota greift gegen den Stand der letzten Messung (stündlich).
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
