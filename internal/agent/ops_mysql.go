@@ -1,0 +1,378 @@
+package agent
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+// Der Agent spricht MySQL über den lokalen Unix-Socket. Auf Debian und Ubuntu
+// authentifiziert sich root dort per unix_socket-Plugin — es gibt also kein
+// Passwort, das irgendwo hinterlegt werden müsste.
+const mysqlDSN = "root@unix(/var/run/mysqld/mysqld.sock)/?timeout=10s&readTimeout=30s&writeTimeout=30s"
+
+// Bezeichner in DDL-Anweisungen lassen sich nicht als Parameter übergeben.
+// Statt auf Quoting zu vertrauen, wird hier eine sehr enge Zeichenmenge
+// erzwungen: Was diese Regexe passiert, kann in Backticks nichts anrichten.
+var (
+	reMyDBName  = regexp.MustCompile(`^[a-z][a-z0-9_]{2,47}$`)
+	reMyUser    = regexp.MustCompile(`^[a-z][a-z0-9_]{2,30}$`)
+	reMyHost    = regexp.MustCompile(`^(localhost|%|[0-9.%]{1,45}|[a-z0-9.\-%]{1,60})$`)
+	reMyCharset = regexp.MustCompile(`^[a-z0-9_]{2,32}$`)
+	reMyCollate = regexp.MustCompile(`^[a-z0-9_]{2,64}$`)
+
+	// Das Passwort steht in einfachen Anführungszeichen in der Anweisung.
+	// Alles, was daraus ausbrechen könnte — Anführungszeichen, Backslash,
+	// Steuerzeichen — ist hier schlicht nicht erlaubt.
+	reMyPassword = regexp.MustCompile(`^[A-Za-z0-9!#%()*+,\-./:;<=>?@^_{|}~]{12,128}$`)
+)
+
+// mysqlPool hält genau eine Verbindung offen. Der Agent macht selten und kurz
+// etwas mit MySQL; ein größerer Pool brächte nichts außer Leerlaufverbindungen.
+var (
+	mysqlOnce sync.Once
+	mysqlDB   *sql.DB
+	mysqlErr  error
+)
+
+func mysqlConn() (*sql.DB, error) {
+	mysqlOnce.Do(func() {
+		mysqlDB, mysqlErr = sql.Open("mysql", mysqlDSN)
+		if mysqlErr != nil {
+			return
+		}
+		mysqlDB.SetMaxOpenConns(2)
+		mysqlDB.SetMaxIdleConns(1)
+		mysqlDB.SetConnMaxLifetime(5 * time.Minute)
+	})
+	if mysqlErr != nil {
+		return nil, fmt.Errorf("mysql-verbindung: %w", mysqlErr)
+	}
+	return mysqlDB, nil
+}
+
+func checkMySQLName(kind, value string, re *regexp.Regexp) error {
+	if !re.MatchString(value) {
+		return fmt.Errorf("%w: %s %q", errBadInput, kind, value)
+	}
+	return nil
+}
+
+// quoteIdent setzt einen bereits validierten Bezeichner in Backticks.
+//
+// Die Verdopplung ist Gürtel zum Hosenträger: Nach den Regexen oben kann hier
+// gar kein Backtick mehr ankommen.
+func quoteIdent(s string) string {
+	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
+}
+
+func (s *Server) opMySQLCreateDB(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLDBParams](raw, OpMySQLCreateDB)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("datenbankname", p.Name, reMyDBName); err != nil {
+		return nil, err
+	}
+	if p.Charset == "" {
+		p.Charset = "utf8mb4"
+	}
+	if p.Collation == "" {
+		p.Collation = "utf8mb4_unicode_ci"
+	}
+	if err := checkMySQLName("zeichensatz", p.Charset, reMyCharset); err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("sortierung", p.Collation, reMyCollate); err != nil {
+		return nil, err
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+	// IF NOT EXISTS macht die Operation idempotent — ein zweiter Aufruf nach
+	// einem Verbindungsabbruch soll nicht scheitern.
+	stmt := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET %s COLLATE %s",
+		quoteIdent(p.Name), p.Charset, p.Collation)
+	if _, err := db.ExecContext(ctx, stmt); err != nil {
+		return nil, opErr(OpMySQLCreateDB, "%v", err)
+	}
+	return TextResult{Text: "datenbank " + p.Name + " angelegt"}, nil
+}
+
+func (s *Server) opMySQLDropDB(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLDBParams](raw, OpMySQLDropDB)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("datenbankname", p.Name, reMyDBName); err != nil {
+		return nil, err
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.ExecContext(ctx, "DROP DATABASE IF EXISTS "+quoteIdent(p.Name)); err != nil {
+		return nil, opErr(OpMySQLDropDB, "%v", err)
+	}
+	return TextResult{Text: "datenbank " + p.Name + " entfernt"}, nil
+}
+
+// opMySQLCreateUser legt einen Benutzer an und erteilt ihm die Rechte auf genau
+// einer Datenbank. Rechte auf "alles" gibt es hier bewusst nicht.
+func (s *Server) opMySQLCreateUser(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLUserParams](raw, OpMySQLCreateUser)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLUser(p); err != nil {
+		return nil, err
+	}
+	if !reMyPassword.MatchString(p.Password) {
+		return nil, opErr(OpMySQLCreateUser,
+			"passwort muss 12–128 zeichen lang sein und darf keine anführungszeichen oder backslashes enthalten")
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+
+	account := fmt.Sprintf("'%s'@'%s'", p.Username, p.HostPattern)
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("CREATE USER IF NOT EXISTS %s IDENTIFIED BY '%s'", account, p.Password)); err != nil {
+		return nil, opErr(OpMySQLCreateUser, "%v", err)
+	}
+	// Ein zweiter Aufruf soll auch das Passwort aktualisieren, sonst wäre die
+	// Operation nur halb idempotent.
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("ALTER USER %s IDENTIFIED BY '%s'", account, p.Password)); err != nil {
+		return nil, opErr(OpMySQLCreateUser, "%v", err)
+	}
+	if err := applyGrants(ctx, db, p); err != nil {
+		return nil, err
+	}
+	return TextResult{Text: "benutzer " + p.Username + " angelegt"}, nil
+}
+
+func (s *Server) opMySQLGrant(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLUserParams](raw, OpMySQLGrant)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLUser(p); err != nil {
+		return nil, err
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+	if err := applyGrants(ctx, db, p); err != nil {
+		return nil, err
+	}
+	return TextResult{Text: "rechte für " + p.Username + " gesetzt"}, nil
+}
+
+// applyGrants entzieht erst alles und erteilt dann neu — sonst würden alte
+// Rechte einer früheren Stufe stehen bleiben.
+func applyGrants(ctx context.Context, db *sql.DB, p MySQLUserParams) error {
+	account := fmt.Sprintf("'%s'@'%s'", p.Username, p.HostPattern)
+	target := quoteIdent(p.Database) + ".*"
+
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s FROM %s", target, account)); err != nil {
+		// Hatte der Benutzer noch keine Rechte, ist das kein Fehler.
+		if !strings.Contains(err.Error(), "1141") && !strings.Contains(err.Error(), "no such grant") {
+			return opErr(OpMySQLGrant, "rechte entziehen: %v", err)
+		}
+	}
+
+	var privileges string
+	switch strings.ToUpper(p.Grants) {
+	case "READONLY":
+		privileges = "SELECT, SHOW VIEW"
+	case "READWRITE":
+		privileges = "SELECT, INSERT, UPDATE, DELETE, SHOW VIEW"
+	case "ALL", "":
+		// Kein GRANT OPTION: der Benutzer darf seine Rechte nicht weiterreichen.
+		privileges = "ALL PRIVILEGES"
+	default:
+		return opErr(OpMySQLGrant, "berechtigung %q ist unbekannt", p.Grants)
+	}
+
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("GRANT %s ON %s TO %s", privileges, target, account)); err != nil {
+		return opErr(OpMySQLGrant, "rechte erteilen: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "FLUSH PRIVILEGES"); err != nil {
+		return opErr(OpMySQLGrant, "flush privileges: %v", err)
+	}
+	return nil
+}
+
+func (s *Server) opMySQLSetPassword(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLUserParams](raw, OpMySQLSetPassword)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+		return nil, err
+	}
+	if !reMyPassword.MatchString(p.Password) {
+		return nil, opErr(OpMySQLSetPassword,
+			"passwort muss 12–128 zeichen lang sein und darf keine anführungszeichen oder backslashes enthalten")
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("ALTER USER '%s'@'%s' IDENTIFIED BY '%s'",
+		p.Username, p.HostPattern, p.Password)); err != nil {
+		return nil, opErr(OpMySQLSetPassword, "%v", err)
+	}
+	return TextResult{Text: "passwort für " + p.Username + " gesetzt"}, nil
+}
+
+func (s *Server) opMySQLDropUser(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLUserParams](raw, OpMySQLDropUser)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+		return nil, err
+	}
+
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("DROP USER IF EXISTS '%s'@'%s'", p.Username, p.HostPattern)); err != nil {
+		return nil, opErr(OpMySQLDropUser, "%v", err)
+	}
+	return TextResult{Text: "benutzer " + p.Username + " entfernt"}, nil
+}
+
+// opMySQLSizes liefert die Belegung je Datenbank für die Anzeige im Panel.
+func (s *Server) opMySQLSizes(ctx context.Context, _ json.RawMessage) (any, error) {
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT table_schema, COALESCE(SUM(data_length + index_length), 0)
+		FROM information_schema.tables
+		WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')
+		GROUP BY table_schema`)
+	if err != nil {
+		return nil, opErr(OpMySQLSizes, "%v", err)
+	}
+	defer rows.Close()
+
+	out := map[string]int64{}
+	for rows.Next() {
+		var name string
+		var size int64
+		if err := rows.Scan(&name, &size); err != nil {
+			return nil, opErr(OpMySQLSizes, "%v", err)
+		}
+		out[name] = size
+	}
+	return out, rows.Err()
+}
+
+// opMySQLDump schreibt einen Dump nach dest.
+//
+// mysqldump bekommt seine Argumente als argv, das Ziel ist ein Dateihandle —
+// es gibt keine Shell und damit auch keine Umleitung, die man manipulieren könnte.
+func (s *Server) opMySQLDump(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLDumpParams](raw, OpMySQLDump)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("datenbankname", p.Database, reMyDBName); err != nil {
+		return nil, err
+	}
+	dest, err := jail(p.Path, s.roots)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, opErr(OpMySQLDump, "zieldatei: %v", err)
+	}
+	defer f.Close()
+
+	if err := runInto(ctx, longTimeout, f, nil, "mysqldump",
+		"--defaults-file=/dev/null", "--protocol=socket",
+		"--socket=/var/run/mysqld/mysqld.sock", "--user=root",
+		"--single-transaction", "--quick", "--routines", "--events",
+		"--default-character-set=utf8mb4", p.Database); err != nil {
+		return nil, opErr(OpMySQLDump, "%v", err)
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"path": dest, "size_bytes": info.Size()}, nil
+}
+
+// opMySQLImport spielt eine SQL-Datei ein.
+func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MySQLDumpParams](raw, OpMySQLImport)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMySQLName("datenbankname", p.Database, reMyDBName); err != nil {
+		return nil, err
+	}
+	src, err := jail(p.Path, s.roots)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open(src)
+	if err != nil {
+		return nil, opErr(OpMySQLImport, "quelldatei: %v", err)
+	}
+	defer f.Close()
+
+	if err := runInto(ctx, longTimeout, nil, f, "mysql",
+		"--defaults-file=/dev/null", "--protocol=socket",
+		"--socket=/var/run/mysqld/mysqld.sock", "--user=root",
+		"--default-character-set=utf8mb4", p.Database); err != nil {
+		return nil, opErr(OpMySQLImport, "%v", err)
+	}
+	return TextResult{Text: "import in " + p.Database + " abgeschlossen"}, nil
+}
+
+func checkMySQLUser(p MySQLUserParams) error {
+	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
+		return err
+	}
+	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+		return err
+	}
+	return checkMySQLName("datenbankname", p.Database, reMyDBName)
+}

@@ -29,6 +29,9 @@ type Server struct {
 	agent     *agent.Client
 	metrics   *metrics.Collector
 	sites     *core.SiteService
+	databases *core.DatabaseService
+	files     *core.FileService
+	cron      *core.CronService
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
@@ -64,6 +67,9 @@ func New(opts Options) (*Server, error) {
 		metrics:   opts.Metrics,
 		secrets:   opts.Secrets,
 		sites:     core.NewSiteService(opts.Store, opts.Agent, opts.Config),
+		databases: core.NewDatabaseService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
+		files:     core.NewFileService(opts.Store, opts.Agent, opts.Config),
+		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
 		log:       opts.Logger,
 		devOrigin: opts.DevOrigin,
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
@@ -132,6 +138,36 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/sites/:id", s.handleDeleteSite)
 	auth.POST("/sites/:id/rebuild", s.handleRebuildSite)
 	auth.GET("/sites/:id/logs", s.handleSiteLogs)
+
+	// Dateimanager: immer site-gebunden, nie mit absolutem Pfad.
+	auth.GET("/sites/:id/files", s.handleFileList)
+	auth.GET("/sites/:id/files/read", s.handleFileRead)
+	auth.GET("/sites/:id/files/download", s.handleFileDownload)
+	auth.POST("/sites/:id/files/write", s.handleFileWrite)
+	auth.POST("/sites/:id/files/mkdir", s.handleFileMkdir)
+	auth.POST("/sites/:id/files/delete", s.handleFileDelete)
+	auth.POST("/sites/:id/files/move", s.handleFileMove)
+	auth.POST("/sites/:id/files/copy", s.handleFileCopy)
+	auth.POST("/sites/:id/files/chmod", s.handleFileChmod)
+	auth.POST("/sites/:id/files/archive", s.handleFileArchive)
+	auth.POST("/sites/:id/files/extract", s.handleFileExtract)
+	auth.POST("/sites/:id/files/upload", s.handleFileUpload)
+
+	auth.GET("/databases", s.handleListDatabases)
+	auth.POST("/databases", s.handleCreateDatabase)
+	auth.DELETE("/databases/:id", s.handleDeleteDatabase)
+	auth.POST("/databases/:id/dump", s.handleDumpDatabase)
+	auth.GET("/databases/:id/users", s.handleListDBUsers)
+	auth.POST("/databases/:id/users", s.handleCreateDBUser)
+	auth.PATCH("/db-users/:id", s.handleUpdateDBUser)
+	auth.POST("/db-users/:id/reveal", s.handleRevealDBUserPassword)
+	auth.DELETE("/db-users/:id", s.handleDeleteDBUser)
+
+	auth.GET("/cronjobs", s.handleListCronjobs)
+	auth.POST("/cronjobs", s.handleCreateCronjob)
+	auth.PATCH("/cronjobs/:id", s.handleUpdateCronjob)
+	auth.DELETE("/cronjobs/:id", s.handleDeleteCronjob)
+	auth.GET("/cronjobs/:id/log", s.handleCronjobLog)
 
 	auth.GET("/tenants", s.handleListTenants)
 	auth.POST("/tenants", s.handleCreateTenant, s.requireRole(store.RoleAdmin))

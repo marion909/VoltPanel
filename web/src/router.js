@@ -4,6 +4,9 @@ import { session } from './stores/session'
 import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
 import Sites from './views/Sites.vue'
+import Databases from './views/Databases.vue'
+import Files from './views/Files.vue'
+import Cronjobs from './views/Cronjobs.vue'
 import Services from './views/Services.vue'
 import Audit from './views/Audit.vue'
 import Settings from './views/Settings.vue'
@@ -12,6 +15,9 @@ const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
   { path: '/', name: 'dashboard', component: Dashboard },
   { path: '/sites', name: 'sites', component: Sites },
+  { path: '/databases', name: 'databases', component: Databases },
+  { path: '/files', name: 'files', component: Files },
+  { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/services', name: 'services', component: Services },
   { path: '/audit', name: 'audit', component: Audit },
   { path: '/settings', name: 'settings', component: Settings },

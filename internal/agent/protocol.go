@@ -61,6 +61,34 @@ const (
 	OpFileList    Op = "file.list"
 	OpFileTailLog Op = "file.tail_log"
 
+	// Dateien: Umbenennen, Kopieren, Rechte, Archive
+	OpFileMove    Op = "file.move"
+	OpFileCopy    Op = "file.copy"
+	OpFileChmod   Op = "file.chmod"
+	OpFileStat    Op = "file.stat"
+	OpFileArchive Op = "file.archive"
+	OpFileExtract Op = "file.extract"
+
+	// Blockweises Lesen und Schreiben für Up- und Download großer Dateien
+	OpFileReadChunk  Op = "file.read_chunk"
+	OpFileWriteChunk Op = "file.write_chunk"
+
+	// Datenbanken
+	OpMySQLCreateDB    Op = "mysql.create_db"
+	OpMySQLDropDB      Op = "mysql.drop_db"
+	OpMySQLCreateUser  Op = "mysql.create_user"
+	OpMySQLDropUser    Op = "mysql.drop_user"
+	OpMySQLGrant       Op = "mysql.grant"
+	OpMySQLSetPassword Op = "mysql.set_password"
+	OpMySQLSizes       Op = "mysql.sizes"
+	OpMySQLDump        Op = "mysql.dump"
+	OpMySQLImport      Op = "mysql.import"
+
+	// Cronjobs
+	OpCronWrite  Op = "cron.write"
+	OpCronRemove Op = "cron.remove"
+	OpCronLog    Op = "cron.log"
+
 	// Zertifikate
 	OpCertInstall Op = "cert.install"
 )
@@ -157,6 +185,77 @@ type TailParams struct {
 	Lines int    `json:"lines"`
 }
 
+type FileMoveParams struct {
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Overwrite bool   `json:"overwrite"`
+}
+
+type FileChmodParams struct {
+	Path      string `json:"path"`
+	Mode      uint32 `json:"mode"`
+	Recursive bool   `json:"recursive"`
+}
+
+type ChunkParams struct {
+	Path   string `json:"path"`
+	Offset int64  `json:"offset"`
+	Length int    `json:"length"`
+	// Data ist base64-kodiert: JSON verträgt keine rohen Bytes.
+	Data  string `json:"data,omitempty"`
+	Owner string `json:"owner,omitempty"`
+	// Truncate leert die Datei vor dem Schreiben — der erste Block eines Uploads.
+	Truncate bool `json:"truncate,omitempty"`
+}
+
+type ChunkResult struct {
+	Data string `json:"data"`
+	// EOF sagt dem Aufrufer, dass er aufhören kann zu fragen.
+	EOF       bool  `json:"eof"`
+	Size      int64 `json:"size"`
+	BytesRead int   `json:"bytes_read"`
+}
+
+type ArchiveParams struct {
+	// Sources sind die zu packenden Pfade, Dest ist das Archiv (.tar.gz oder .zip).
+	Sources []string `json:"sources"`
+	Dest    string   `json:"dest"`
+	Owner   string   `json:"owner"`
+}
+
+type ExtractParams struct {
+	Archive string `json:"archive"`
+	Dest    string `json:"dest"`
+	Owner   string `json:"owner"`
+}
+
+type MySQLDBParams struct {
+	Name      string `json:"name"`
+	Charset   string `json:"charset"`
+	Collation string `json:"collation"`
+}
+
+type MySQLUserParams struct {
+	Username    string `json:"username"`
+	HostPattern string `json:"host_pattern"`
+	Database    string `json:"database"`
+	Grants      string `json:"grants"`
+	Password    string `json:"password"`
+}
+
+type MySQLDumpParams struct {
+	Database string `json:"database"`
+	Path     string `json:"path"`
+}
+
+type CronParams struct {
+	Name     string `json:"name"`
+	Schedule string `json:"schedule"`
+	Command  string `json:"command"`
+	RunAs    string `json:"run_as"`
+	Lines    int    `json:"lines"`
+}
+
 type CertInstallParams struct {
 	Domain  string `json:"domain"`
 	CertPEM string `json:"cert_pem"`
@@ -172,6 +271,17 @@ type ServiceStatus struct {
 	Enabled     bool   `json:"enabled"`
 	SubState    string `json:"sub_state"`
 	Description string `json:"description"`
+}
+
+type StatResult struct {
+	Path    string `json:"path"`
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	Mode    string `json:"mode"`
+	IsDir   bool   `json:"is_dir"`
+	ModTime int64  `json:"mod_time"`
+	Owner   string `json:"owner"`
+	Group   string `json:"group"`
 }
 
 type FileEntry struct {

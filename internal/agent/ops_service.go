@@ -51,6 +51,29 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFileChown:   s.opFileChown,
 		OpFileList:    s.opFileList,
 		OpFileTailLog: s.opFileTailLog,
+		OpFileMove:    s.opFileMove,
+		OpFileCopy:    s.opFileCopy,
+		OpFileChmod:   s.opFileChmod,
+		OpFileStat:    s.opFileStat,
+		OpFileArchive: s.opFileArchive,
+		OpFileExtract: s.opFileExtract,
+
+		OpFileReadChunk:  s.opFileReadChunk,
+		OpFileWriteChunk: s.opFileWriteChunk,
+
+		OpMySQLCreateDB:    s.opMySQLCreateDB,
+		OpMySQLDropDB:      s.opMySQLDropDB,
+		OpMySQLCreateUser:  s.opMySQLCreateUser,
+		OpMySQLDropUser:    s.opMySQLDropUser,
+		OpMySQLGrant:       s.opMySQLGrant,
+		OpMySQLSetPassword: s.opMySQLSetPassword,
+		OpMySQLSizes:       s.opMySQLSizes,
+		OpMySQLDump:        s.opMySQLDump,
+		OpMySQLImport:      s.opMySQLImport,
+
+		OpCronWrite:  s.opCronWrite,
+		OpCronRemove: s.opCronRemove,
+		OpCronLog:    s.opCronLog,
 
 		OpCertInstall: s.opCertInstall,
 	}

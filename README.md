@@ -57,8 +57,8 @@ Details: [docs/architektur.md](docs/architektur.md) ·
 | 0 | Fundament: Datenmodell, Migrationen, Agent/Web-Trennung, `install.sh`, `volt update` | **fertig** |
 | 1 | Auth mit 2FA, Audit-Log, Metriken, Dashboard, Dienstverwaltung, Dark Mode, i18n | **fertig** (ohne Web-Terminal) |
 | 2 | Vhost-Generator, Site-Typen, PHP-FPM-Pools, ACME mit HTTP-01 und Cloudflare-DNS-01 | **weitgehend** (ohne Extension-Manager, Rewrite-Editor-UI) |
-| 3 | MySQL, File Manager, FTP, Cronjobs, Backups | Backups fertig, Rest offen |
-| 4 | Rollen, Quotas, Kundenbereich | Scope und Rollen stehen, Quotas teilweise |
+| 3 | MySQL, File Manager, Cronjobs, Backups | **weitgehend** (FTP und SQL-Browser offen) |
+| 4 | Rollen, Quotas, Kundenbereich | Scope und Rollen stehen, Quotas für Sites, DBs und Cronjobs |
 | 5–7 | Docker, Node, Git-Deploy, Mail, App Store | offen |
 | 8 | Härtung, Doku, Beta | laufend |
 
@@ -103,6 +103,15 @@ volt user 2fa-reset kunde@example.at
 
 volt backup create [--all-sites]
 volt backup restore <archiv>
+
+volt db add wordpress --tenant 4      Datenbank samt Benutzer anlegen
+volt db list                          mit Live-Größe und Rechten
+volt db dump wordpress                SQL-Dump ins Backup-Verzeichnis
+volt db passwd alice_wp               Passwort neu setzen
+
+volt cron add scheduler --site example.at \
+  --schedule "* * * * *" --command "/usr/bin/php8.3 …/artisan schedule:run"
+volt cron list | log <id> | sync
 ```
 
 ## Sicherheit
@@ -126,8 +135,19 @@ Kurzfassung — ausführlich in [docs/sicherheit.md](docs/sicherheit.md):
   Fehler zurück auf den letzten funktionierenden Stand.
 - **Argon2id** für Passwörter, Sessions nur als SHA-256-Hash gespeichert,
   TOTP-Secrets und API-Tokens mit AES-256-GCM verschlüsselt.
+- **Zwei Gefängnisse für Dateien.** Der Agent sperrt auf `/var/www` — das
+  trennt aber keine Kunden voneinander. Der Dateimanager arbeitet deshalb nie
+  mit absoluten Pfaden, sondern mit `site_id` plus relativem Pfad, und prüft
+  die Site gegen den Tenant-Scope.
+- **Keine SQL-Identifier aus Benutzereingaben.** DDL lässt sich nicht
+  parametrisieren, deshalb passieren Datenbank- und Benutzernamen eine sehr
+  enge Whitelist. Eine Eingabe mit Sonderzeichen wird abgelehnt, nicht
+  stillschweigend umgeschrieben.
+- **Archive brechen nicht aus.** Jeder Eintrag wird einzeln gegen das
+  Zielverzeichnis geprüft (Zip-Slip), Symlinks im Archiv werden übersprungen,
+  und die entpackte Menge ist gedeckelt.
 - **IDOR-Testsuite.** Jede Leseoperation wird mit einer fremden Tenant-ID
-  aufgerufen und muss scheitern.
+  aufgerufen und muss scheitern — auf Repository-, Service- und API-Ebene.
 
 Eine Lücke gefunden? Bitte per E-Mail statt als öffentliches Issue.
 

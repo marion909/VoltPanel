@@ -3,6 +3,7 @@ package agent
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -300,3 +301,122 @@ func isTransportError(err error) bool {
 	var te transportErr
 	return errors.As(err, &te)
 }
+
+// --- Dateien: erweiterte Operationen --------------------------------------
+
+func (c *Client) MovePath(ctx context.Context, from, to string, overwrite bool) error {
+	return c.Call(ctx, OpFileMove, FileMoveParams{From: from, To: to, Overwrite: overwrite}, nil)
+}
+
+func (c *Client) CopyPath(ctx context.Context, from, to string, overwrite bool) error {
+	return c.Call(ctx, OpFileCopy, FileMoveParams{From: from, To: to, Overwrite: overwrite}, nil)
+}
+
+func (c *Client) Chmod(ctx context.Context, path string, mode uint32, recursive bool) error {
+	return c.Call(ctx, OpFileChmod, FileChmodParams{Path: path, Mode: mode, Recursive: recursive}, nil)
+}
+
+func (c *Client) Stat(ctx context.Context, path string) (*StatResult, error) {
+	var res StatResult
+	return &res, c.Call(ctx, OpFileStat, FilePathParams{Path: path}, &res)
+}
+
+func (c *Client) Archive(ctx context.Context, sources []string, dest, owner string) (int64, error) {
+	var res struct {
+		SizeBytes int64 `json:"size_bytes"`
+	}
+	err := c.Call(ctx, OpFileArchive, ArchiveParams{Sources: sources, Dest: dest, Owner: owner}, &res)
+	return res.SizeBytes, err
+}
+
+func (c *Client) Extract(ctx context.Context, archive, dest, owner string) (int, error) {
+	var res struct {
+		Entries int `json:"entries"`
+	}
+	err := c.Call(ctx, OpFileExtract, ExtractParams{Archive: archive, Dest: dest, Owner: owner}, &res)
+	return res.Entries, err
+}
+
+// --- Datenbanken -----------------------------------------------------------
+
+func (c *Client) CreateDatabase(ctx context.Context, name, charset, collation string) error {
+	return c.Call(ctx, OpMySQLCreateDB,
+		MySQLDBParams{Name: name, Charset: charset, Collation: collation}, nil)
+}
+
+func (c *Client) DropDatabase(ctx context.Context, name string) error {
+	return c.Call(ctx, OpMySQLDropDB, MySQLDBParams{Name: name}, nil)
+}
+
+func (c *Client) CreateDBUser(ctx context.Context, p MySQLUserParams) error {
+	return c.Call(ctx, OpMySQLCreateUser, p, nil)
+}
+
+func (c *Client) DropDBUser(ctx context.Context, username, host string) error {
+	return c.Call(ctx, OpMySQLDropUser,
+		MySQLUserParams{Username: username, HostPattern: host}, nil)
+}
+
+func (c *Client) GrantDBUser(ctx context.Context, p MySQLUserParams) error {
+	return c.Call(ctx, OpMySQLGrant, p, nil)
+}
+
+func (c *Client) SetDBUserPassword(ctx context.Context, username, host, password string) error {
+	return c.Call(ctx, OpMySQLSetPassword,
+		MySQLUserParams{Username: username, HostPattern: host, Password: password}, nil)
+}
+
+// DatabaseSizes liefert die Belegung je Datenbank in Bytes.
+func (c *Client) DatabaseSizes(ctx context.Context) (map[string]int64, error) {
+	var out map[string]int64
+	return out, c.Call(ctx, OpMySQLSizes, nil, &out)
+}
+
+func (c *Client) DumpDatabase(ctx context.Context, database, path string) (int64, error) {
+	var res struct {
+		SizeBytes int64 `json:"size_bytes"`
+	}
+	err := c.Call(ctx, OpMySQLDump, MySQLDumpParams{Database: database, Path: path}, &res)
+	return res.SizeBytes, err
+}
+
+func (c *Client) ImportDatabase(ctx context.Context, database, path string) error {
+	return c.Call(ctx, OpMySQLImport, MySQLDumpParams{Database: database, Path: path}, nil)
+}
+
+// --- Cronjobs --------------------------------------------------------------
+
+func (c *Client) WriteCronjob(ctx context.Context, name, schedule, command, runAs string) error {
+	return c.Call(ctx, OpCronWrite,
+		CronParams{Name: name, Schedule: schedule, Command: command, RunAs: runAs}, nil)
+}
+
+func (c *Client) RemoveCronjob(ctx context.Context, name string) error {
+	return c.Call(ctx, OpCronRemove, CronParams{Name: name}, nil)
+}
+
+func (c *Client) CronLog(ctx context.Context, name string, lines int) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpCronLog, CronParams{Name: name, Lines: lines}, &res)
+	return res.Text, err
+}
+
+// ReadChunk liest einen Block aus einer Datei. Der Aufrufer erhöht den Versatz,
+// bis EOF gemeldet wird.
+func (c *Client) ReadChunk(ctx context.Context, path string, offset int64, length int) (*ChunkResult, error) {
+	var res ChunkResult
+	err := c.Call(ctx, OpFileReadChunk,
+		ChunkParams{Path: path, Offset: offset, Length: length}, &res)
+	return &res, err
+}
+
+// WriteChunk schreibt einen Block. Beim ersten Block truncate=true setzen.
+func (c *Client) WriteChunk(ctx context.Context, path string, offset int64, data []byte, owner string, truncate bool) error {
+	return c.Call(ctx, OpFileWriteChunk, ChunkParams{
+		Path: path, Offset: offset, Data: base64.StdEncoding.EncodeToString(data),
+		Owner: owner, Truncate: truncate,
+	}, nil)
+}
+
+// ChunkSize ist die Blockgröße, mit der Aufrufer arbeiten sollten.
+const ChunkSize = maxChunkBytes

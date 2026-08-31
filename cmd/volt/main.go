@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/authn"
@@ -57,6 +58,8 @@ func main() {
 		a.siteCmd(),
 		a.certCmd(),
 		a.backupCmd(),
+		a.dbCmd(),
+		a.cronCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -121,4 +124,13 @@ func (a *app) withApp(migrate bool, fn func(cmd *cobra.Command, args []string) e
 		defer a.close()
 		return fn(cmd, args)
 	}
+}
+
+// parseID liest eine numerische ID aus einem CLI-Argument.
+func parseID(s string) (int64, error) {
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("%q ist keine gültige id", s)
+	}
+	return id, nil
 }

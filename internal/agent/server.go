@@ -33,6 +33,7 @@ type Server struct {
 	nginxDir   string
 	phpDir     string
 	certDir    string
+	logDir     string
 
 	registry map[Op]Handler
 	listener net.Listener
@@ -83,6 +84,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		nginxDir:   opts.NginxDir,
 		phpDir:     opts.PHPDir,
 		certDir:    opts.CertDir,
+		logDir:     opts.LogDir,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
 		roots: []string{opts.SitesDir, opts.NginxDir, opts.PHPDir, opts.CertDir, opts.LogDir},
 	}

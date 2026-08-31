@@ -42,8 +42,17 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   `volt doctor`
 - Log-Viewer über `file.tail_log` (API vorhanden, UI noch nicht)
 
-**Phase 3 — teilweise**
+**Phase 3 — Daten, Dateien, Cronjobs**
 
+- MySQL/MariaDB: Datenbanken und Benutzer anlegen, Rechte in drei Stufen
+  (ALL, READWRITE, READONLY), Passwort setzen und anzeigen, Live-Größen,
+  Dump und Import. Der Agent spricht direkt über den Unix-Socket mit MariaDB,
+  nicht über eine Shell.
+- File Manager: Auflisten, Lesen, Schreiben, Anlegen, Umbenennen, Kopieren,
+  Löschen, Rechte setzen, Archivieren und Entpacken (tar.gz und zip),
+  blockweiser Up- und Download für große Dateien, Editor im Browser
+- Cronjobs: je Job eine Datei in /etc/cron.d, laufend unter dem Systembenutzer
+  der Site, mit eigener Logdatei und Anzeige der letzten Läufe im Panel
 - Backups: Datenbank plus Konfiguration plus Site-Dateien als tar.gz, mit
   Prüfsumme, Eintrag in der Datenbank, nächtlichem Timer und Restore mit
   automatischer Sicherheitskopie davor
@@ -75,15 +84,17 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 
 **Phase 3**
 
-- MySQL/MariaDB-Verwaltung, SQL-Browser
-- File Manager (Agent-Operationen stehen, UI fehlt)
+- SQL-Browser (oder phpMyAdmin als Plugin)
 - FTP mit Pure-FTPd und virtuellen Benutzern
-- Cronjobs
+- Remote-Whitelist für Datenbankzugriffe von außen
 - Backup-Ziele S3, B2, FTP
+- Import einer hochgeladenen SQL-Datei über die Oberfläche
+  (die Agent-Operation steht, die UI fehlt)
 
 **Phase 4**
 
 - Disk-Quotas über Project Quota, Traffic-Zähler
+  (Anzahl-Quotas für Sites, Datenbanken und Cronjobs greifen bereits)
 - Getrennter Kundenbereich mit reduzierter UI
 
 **Phasen 5–8**

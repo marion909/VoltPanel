@@ -97,6 +97,74 @@ besteht. Dasselbe Muster gilt für FPM-Pools.
 Geschrieben wird immer atomar: temporäre Datei im selben Verzeichnis, `fsync`,
 `rename`. Ein Absturz mitten im Schreiben hinterlässt nie eine halbe Config.
 
+## 4b. Dateizugriff über Tenant-Grenzen
+
+**Risiko:** Der Agent erlaubt Dateizugriffe überall unter `/var/www`. Für einen
+einzelnen Server ist das richtig — für Multi-Tenant wäre es ein Leck: jeder
+Kunde könnte im Verzeichnis jedes anderen lesen.
+
+**Maßnahme:** Der Dateimanager nimmt nie einen absoluten Pfad entgegen. Jede
+Anfrage besteht aus `site_id` plus einem Pfad *relativ dazu*. Der Service lädt
+die Site mit dem Scope des Anfragenden — eine fremde `site_id` liefert
+`ErrNotFound`, bevor der Agent überhaupt gefragt wird — und setzt den relativen
+Pfad erst dann an das Wurzelverzeichnis.
+
+Ein Pfad, der aus der Site herausführen will, wird **abgelehnt**, nicht
+stillschweigend hineinnormalisiert. Beides wäre sicher, aber
+`../andere-site/config.php` als `andere-site/config.php` im eigenen Verzeichnis
+anzulegen würde einen Angriffsversuch unsichtbar machen. Innerhalb der Site
+bleibt `..` erlaubt: `public/../public/x` ist eine gewöhnliche Schreibweise.
+
+`TestFileServiceTenantIsolation` fährt beide Angriffe: fremde `site_id` mit
+eigenem Scope, und eigene `site_id` mit einem Pfad, der zum Nachbarn zeigt.
+
+## 4c. Archive
+
+**Risiko:** Ein hochgeladenes Archiv bestimmt die Pfade seiner Einträge selbst.
+`../../etc/cron.d/x` würde als root außerhalb des Ziels landen (Zip-Slip).
+
+**Maßnahmen:** Jeder Eintragsname wird an `/` verankert und normalisiert, bevor
+er ans Ziel gehängt wird; das Ergebnis wird gegen das Zielverzeichnis geprüft.
+Symlinks, Hardlinks und Gerätedateien im Archiv werden übersprungen — ein
+Symlink aus einem fremden Archiv wäre ein Ausbruch mit Ansage. Die entpackte
+Menge ist auf 2 GiB gedeckelt, gegen "zip bombs".
+
+## 4d. SQL-Identifier
+
+**Risiko:** `CREATE DATABASE` und `GRANT` lassen sich nicht parametrisieren —
+der Name muss als Text in die Anweisung.
+
+**Maßnahmen:** Drei Schichten. Die Benutzereingabe muss `ValidNameInput`
+passieren (Buchstaben, Ziffern, Leerzeichen, Bindestrich, Unterstrich) und wird
+sonst **abgelehnt**, nicht umgeschrieben. Der daraus abgeleitete Name muss
+`^[a-z][a-z0-9_]{2,47}$` erfüllen. Im Agent gilt dieselbe Prüfung noch einmal,
+und erst dann geht der Name in Backticks.
+
+Passwörter gehen denselben Weg: `IDENTIFIED BY '…'` verträgt keinen Parameter,
+deshalb muss ein Passwort eine Zeichenmenge ohne Anführungszeichen, Backslash
+und Steuerzeichen erfüllen — sonst wird es abgelehnt. Selbst erzeugte
+Passwörter halten diese Menge ein.
+
+Der Agent verbindet sich über den Unix-Socket als root und nutzt dort die
+`unix_socket`-Authentifizierung: es gibt kein MySQL-Passwort, das irgendwo
+hinterlegt werden müsste.
+
+## 4e. Cronjobs
+
+**Risiko:** Eine Zeile in `/etc/cron.d` besteht aus Zeitplan, **Benutzername**
+und Kommando. Ein sechstes Feld im Zeitplan würde als Benutzername gelesen —
+der Job liefe dann unter einem fremden Konto, womöglich als root.
+
+**Maßnahmen:** Der Zeitplan wird auf genau fünf Felder geprüft, jedes gegen
+seinen Wertebereich; Kurzformen nur aus einer festen Liste (`@reboot` ist
+bewusst nicht dabei). Zeitplan und Kommando dürfen keinen Zeilenumbruch
+enthalten — eine zweite Zeile wäre ein zweiter, ungeprüfter Job. Der Benutzer
+wird nicht aus der Anfrage übernommen, sondern aus der Site abgeleitet, an der
+der Job hängt. Ein Job ohne Site gibt es nicht.
+
+Ein abgeschalteter Job wird aus `/etc/cron.d` **entfernt**, nicht nur im Panel
+als inaktiv markiert.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.
@@ -108,7 +176,8 @@ klassischen Angriffs, ein fremdes Objekt zu laden und die eigene `tenant_id`
 einzutragen.
 
 In der API wird `ErrForbidden` bewusst zu **404**, nicht zu 403: eine 403 würde
-bestätigen, dass die fremde ID existiert.
+bestätigen, dass die fremde ID existiert. `TestCrossTenantReturnsNotFound` prüft
+das auf HTTP-Ebene, `TestCrossTenantAccessDenied` im Repository.
 
 ## Authentifizierung
 
@@ -134,6 +203,9 @@ zweiten Faktor nicht einfach entfernen können. Der Notausgang ist
   noch nicht gegen interne Netze gefiltert. Relevant ab Phase 5 (Git-Deploy).
 - **Fuzzing der Socket-API**: die Roadmap nennt es unter den Gegenmaßnahmen zum
   Root-Daemon; bisher gibt es nur Beispieltests, keinen Fuzzer.
+- **Ratelimit für Dateioperationen**: ein angemeldeter Kunde kann derzeit
+  beliebig viele Uploads gleichzeitig starten. Der Deckel je Datei steht
+  (512 MiB), eine Gesamtquote noch nicht.
 - **Web-Terminal**: bewusst noch nicht gebaut. Eine Shell im Browser hebelt die
   Trennung zwischen Web und Agent auf und braucht ein eigenes Konzept.
 - **Release-Signatur**: `install.sh` und `volt update` prüfen die SHA-256-Summe.

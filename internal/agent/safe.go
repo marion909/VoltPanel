@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -39,6 +41,9 @@ var allowedBinaries = map[string]string{
 	"userdel":   "/usr/sbin/userdel",
 	"id":        "/usr/bin/id",
 	"chown":     "/usr/bin/chown",
+	"mysql":     "/usr/bin/mysql",
+	"mysqldump": "/usr/bin/mysqldump",
+	"crontab":   "/usr/bin/crontab",
 }
 
 var (
@@ -195,6 +200,44 @@ func resolveExisting(path string) (string, error) {
 		missing = append(missing, base)
 		cur = parent
 	}
+}
+
+// runInto ist run() mit umgeleiteter Ein- und Ausgabe — für Dump und Import,
+// bei denen Megabyte fließen und CombinedOutput sie alle in den Speicher holen
+// würde. Auch hier gibt es keine Shell: stdout und stdin sind echte Handles,
+// keine Umleitung, die jemand über die Argumente beeinflussen könnte.
+func runInto(ctx context.Context, timeout time.Duration, stdout io.Writer, stdin io.Reader,
+	name string, args ...string) error {
+	bin, ok := allowedBinaries[name]
+	if !ok {
+		return fmt.Errorf("%w: binary %q", errNotAllow, name)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
+	cmd.Stdout = stdout
+	cmd.Stdin = stdin
+
+	// stderr wird eingesammelt, damit die Fehlermeldung etwas aussagt.
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+
+	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("%s: zeitüberschreitung nach %s", name, timeout)
+	}
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return fmt.Errorf("%s beendet mit code %d: %s", name, ee.ExitCode(),
+				truncate(strings.TrimSpace(errBuf.String()), 400))
+		}
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	return nil
 }
 
 func truncate(s string, n int) string {
