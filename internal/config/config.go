@@ -42,6 +42,10 @@ type Config struct {
 	CertDir    string // /var/lib/volt/certs
 
 	// Sicherheit
+	// SecretKeyPath liegt in einem Unterverzeichnis, das dem Panel-Benutzer
+	// gehört. /etc/volt selbst gehört root, damit ein übernommener
+	// Web-Prozess die config.yaml nicht umschreiben kann — sie legt die
+	// Wurzeln fest, innerhalb derer der Agent Dateien anfassen darf.
 	SecretKeyPath string // Datei mit dem 32-Byte-Schlüssel für Secrets-at-rest
 	SessionTTLMin int
 	IPWhitelist   []string
@@ -74,7 +78,7 @@ func Default() *Config {
 		NginxDir:      "/etc/nginx",
 		PHPFPMDir:     "/etc/php",
 		CertDir:       "/var/lib/volt/certs",
-		SecretKeyPath: "/etc/volt/secret.key",
+		SecretKeyPath: "/etc/volt/keys/secret.key",
 		SessionTTLMin: 720,
 		ACMEDirectory: "https://acme-v02.api.letsencrypt.org/directory",
 		UpdateChannel: "stable",

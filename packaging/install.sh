@@ -138,6 +138,11 @@ install -d -o "$VOLT_USER" -g "$VOLT_USER" -m 0750 \
     "$VOLT_DATA_DIR" "$VOLT_LOG_DIR" "$VOLT_BACKUP_DIR" \
     "$VOLT_DATA_DIR/certs" "$VOLT_DATA_DIR/acme" "$VOLT_LOG_DIR/sites"
 install -d -o root -g "$VOLT_USER" -m 0750 "$VOLT_CONFIG_DIR"
+# /etc/volt gehoert root, damit ein uebernommener Web-Prozess die config.yaml
+# nicht umschreiben kann: sie legt die Wurzeln fest, innerhalb derer der Agent
+# ueberhaupt Dateien anfassen darf. Der Panel-Benutzer braucht aber einen Ort
+# fuer seinen Schluessel — dafuer dieses Unterverzeichnis.
+install -d -o "$VOLT_USER" -g "$VOLT_USER" -m 0700 "$VOLT_CONFIG_DIR/keys"
 install -d -m 0755 "$VOLT_SITES_DIR"
 
 # Das ACME-Webroot muss der Nginx-Benutzer lesen können.
@@ -174,6 +179,10 @@ download_verified() {
     rm -f "$tmp"
 }
 
+# Die jq-Filter unten stehen absichtlich in einfachen Anfuehrungszeichen: $k
+# ist eine jq-Variable aus --arg, keine der Shell. Genau hier ist SC2016 nicht
+# zutreffend — und nur hier.
+# shellcheck disable=SC2016
 if [ -n "$VOLT_LOCAL_DIR" ]; then
     for name in volt volt-agent; do
         [ -f "$VOLT_LOCAL_DIR/$name" ] || die "$VOLT_LOCAL_DIR/$name nicht gefunden."
@@ -229,7 +238,7 @@ port: $VOLT_PORT
 access_path: $ACCESS_PATH
 
 # Hostname des Panels. Er steht im selbstsignierten Zertifikat und bestimmt,
-# welches Zertifikat volt-web nach einem `volt cert issue` uebernimmt.
+# welches Zertifikat volt-web nach einem Zertifikatsbezug uebernimmt.
 panel_domain: $VOLT_PANEL_DOMAIN
 
 # Das Panel terminiert TLS selbst — es muss auch dann erreichbar sein, wenn
@@ -244,7 +253,7 @@ backup_dir: $VOLT_BACKUP_DIR
 db_path: $VOLT_DATA_DIR/volt.db
 cert_dir: $VOLT_DATA_DIR/certs
 socket_path: /run/volt/agent.sock
-secret_key_path: $VOLT_CONFIG_DIR/secret.key
+secret_key_path: $VOLT_CONFIG_DIR/keys/secret.key
 
 session_ttl_min: 720
 update_channel: $VOLT_CHANNEL
@@ -261,6 +270,25 @@ CONF
 else
     ACCESS_PATH="$(awk -F': *' '/^access_path:/ {print $2}' "$VOLT_CONFIG_DIR/config.yaml")"
     info "Bestehende Konfiguration beibehalten"
+fi
+
+# Bestehende Installationen: der Schluessel lag frueher direkt in /etc/volt,
+# wo der Panel-Benutzer ihn nicht anlegen kann. Ohne diesen Schritt scheitert
+# dort jede Ersteinrichtung mit "permission denied".
+OLD_KEY="$VOLT_CONFIG_DIR/secret.key"
+NEW_KEY="$VOLT_CONFIG_DIR/keys/secret.key"
+
+if [ -f "$OLD_KEY" ] && [ ! -f "$NEW_KEY" ]; then
+    mv "$OLD_KEY" "$NEW_KEY"
+    info "Schluesseldatei nach keys/ verschoben"
+fi
+if [ -f "$NEW_KEY" ]; then
+    chown "$VOLT_USER":"$VOLT_USER" "$NEW_KEY"
+    chmod 0600 "$NEW_KEY"
+fi
+if grep -q "^secret_key_path: *$OLD_KEY *$" "$VOLT_CONFIG_DIR/config.yaml" 2>/dev/null; then
+    sed -i "s|^secret_key_path: .*|secret_key_path: $NEW_KEY|" "$VOLT_CONFIG_DIR/config.yaml"
+    info "secret_key_path auf keys/ umgestellt"
 fi
 
 # --- systemd ---------------------------------------------------------------
@@ -285,14 +313,32 @@ for unit in volt-agent.service volt-web.service \
 done
 
 systemctl daemon-reload
-systemctl enable --now volt-agent.service >/dev/null 2>&1
+systemctl enable volt-agent.service volt-web.service >/dev/null 2>&1
+
+# restart statt start: bei einem zweiten Durchlauf liegen neue Binaries oder
+# eine reparierte Konfiguration bereit, und der laufende Prozess kennt beide
+# nicht. Ein "start" auf einen aktiven Dienst taete schlicht nichts.
+systemctl restart volt-agent.service
 # Der Agent legt den Socket beim Start an; das Web darf erst danach starten.
 for _ in $(seq 1 20); do
     [ -S /run/volt/agent.sock ] && break
     sleep 0.25
 done
-systemctl enable --now volt-web.service >/dev/null 2>&1
+systemctl restart volt-web.service
 systemctl enable --now volt-renew.timer volt-backup.timer >/dev/null 2>&1
+
+# Nachsehen, statt es zu behaupten. Ein Dienst, der beim Start abbricht,
+# wird von systemd neu gestartet — "enable --now" meldet trotzdem Erfolg,
+# und die Installation sähe gelungen aus, obwohl nichts läuft.
+sleep 1
+for unit in volt-agent volt-web; do
+    if ! systemctl is-active --quiet "$unit"; then
+        printf '\n'
+        warn "$unit läuft nicht. Die letzten Zeilen aus dem Journal:"
+        journalctl -u "$unit" -n 15 --no-pager 2>/dev/null | sed 's/^/    /' >&2
+        die "$unit startet nicht — die Installation ist unvollständig."
+    fi
+done
 info "volt-agent und volt-web laufen, Timer für Erneuerung und Backup aktiv"
 
 # --- Firewall --------------------------------------------------------------
@@ -304,10 +350,13 @@ if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "^Status: 
     ufw allow 80/tcp >/dev/null 2>&1 || true
     ufw allow 443/tcp >/dev/null 2>&1 || true
     info "ufw: Ports $VOLT_PORT, 80 und 443 freigegeben"
-elif command -v nft >/dev/null 2>&1; then
-    warn "nftables gefunden — Port $VOLT_PORT bitte selbst freigeben."
+elif command -v nft >/dev/null 2>&1 \
+     && nft list ruleset 2>/dev/null | grep -q "hook input.*policy drop"; then
+    warn "nftables verwirft eingehend — Ports $VOLT_PORT, 80 und 443 bitte selbst freigeben."
 else
-    info "Keine aktive Firewall erkannt"
+    # Ein vorhandenes nft ohne Regeln filtert nichts. Davor zu warnen hiesse,
+    # zu einer Aenderung zu raten, die nichts bewirkt.
+    info "Keine lokale Paketfilterung aktiv"
 fi
 
 # --- Ersteinrichtung -------------------------------------------------------
@@ -317,8 +366,19 @@ step "Ersteinrichtung"
 SETUP_OUTPUT=""
 if ! sudo -u "$VOLT_USER" "$VOLT_BIN_DIR/volt" user list >/dev/null 2>&1 \
    || [ -z "$(sudo -u "$VOLT_USER" "$VOLT_BIN_DIR/volt" user list 2>/dev/null | sed -n '2p')" ]; then
-    SETUP_OUTPUT="$(sudo -u "$VOLT_USER" "$VOLT_BIN_DIR/volt" setup \
-        --email "admin@$(hostname -f 2>/dev/null || hostname)" 2>&1 || true)"
+    # Die angegebene ACME-Adresse ist die bessere Wahl als admin@<hostname>:
+    # an sie kommt auch wirklich Post an.
+    SETUP_EMAIL="$VOLT_ACME_EMAIL"
+    [ -n "$SETUP_EMAIL" ] || SETUP_EMAIL="admin@$(hostname -f 2>/dev/null || hostname)"
+
+    # Kein "|| true": ohne Administrator ist die Installation unbenutzbar.
+    # Das darf nicht als Erfolg durchgehen.
+    if ! SETUP_OUTPUT="$(sudo -u "$VOLT_USER" "$VOLT_BIN_DIR/volt" setup \
+            --email "$SETUP_EMAIL" 2>&1)"; then
+        printf '\n'
+        printf '%s\n' "$SETUP_OUTPUT" | sed 's/^/    /' >&2
+        die "Die Ersteinrichtung ist fehlgeschlagen — es gibt noch keinen Zugang."
+    fi
 else
     info "Es existiert bereits ein Benutzer — die Ersteinrichtung wird übersprungen."
 fi
@@ -342,6 +402,9 @@ if [ -n "$SETUP_OUTPUT" ]; then
 fi
 
 cat <<HINT
+
+  Sitzt eine Firewall beim Anbieter davor (Hetzner Cloud Firewall, AWS
+  Security Group), braucht sie eigene Regeln für 80, 443 und $VOLT_PORT.
 
   Nächste Schritte (als Benutzer $VOLT_USER, dem die Datenbank gehört):
     sudo -u $VOLT_USER volt doctor                          Selbstdiagnose

@@ -46,10 +46,12 @@ jobs:
       - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          # -S warning: die jq-Filter stehen absichtlich in einfachen
-          # Anfuehrungszeichen ($k ist eine jq-Variable, keine Shell-Variable),
-          # und SC2006 trifft Backticks in deutschen Kommentaren.
-          shellcheck -S warning $(git ls-files '*.sh')
+          # Volle Strenge, inklusive info und style. Ein heruntergesetzter
+          # Schweregrad hat hier schon einmal einen echten Fehler verdeckt:
+          # SC2006 meldete Backticks, die in einem nicht gequoteten Heredoc
+          # standen und dort ausgefuehrt wurden. Ausnahmen gehoeren an die
+          # betroffene Zeile, nicht in den Aufruf.
+          shellcheck $(git ls-files '*.sh')
 
   frontend:
     name: Frontend
