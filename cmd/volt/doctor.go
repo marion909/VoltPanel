@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/store"
 	"github.com/marion909/voltpanel/internal/version"
 	"github.com/spf13/cobra"
@@ -175,6 +176,13 @@ func (a *app) checkUserLocks() check {
 		}
 	}
 	if len(found) == 0 {
+		// Die Sperre der Benutzerverwaltung ist nicht die Existenz einer
+		// Datei, sondern ein fcntl-Lock auf /etc/.pwd.lock. Ein haengendes
+		// useradd haelt ihn und blockiert alles Weitere.
+		if holder := agent.PwdLockHolder(); holder != "" {
+			return check{"Benutzerverwaltung", "warn",
+				holder + " hält /etc/.pwd.lock — solange scheitert jedes Anlegen einer Site"}
+		}
 		return check{"Benutzerverwaltung", "ok", "keine liegengebliebenen Sperrdateien"}
 	}
 	return check{"Benutzerverwaltung", "fail",

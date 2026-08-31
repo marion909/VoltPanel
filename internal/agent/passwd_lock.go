@@ -37,8 +37,13 @@ func diagnoseUserLock() string {
 	if hint := staleLockHint(); hint != "" {
 		return hint
 	}
-	return "weder ist /etc schreibgeschützt noch liegt eine Sperrdatei herum — " +
-		"möglicherweise hält gerade ein anderer Vorgang /etc/.pwd.lock"
+	if holder := pwdLockHolder(); holder != "" {
+		return holder + " hält /etc/.pwd.lock. Solange der Prozess lebt, " +
+			"scheitert jedes useradd. Zustand ansehen mit `ps -o pid,stat,etime,cmd -p <pid>`; " +
+			"hängt er, hilft nur ihn zu beenden"
+	}
+	return "/etc ist beschreibbar, es liegt keine Sperrdatei herum und " +
+		"/etc/.pwd.lock ist frei — der Grund liegt außerhalb der bekannten Fälle"
 }
 
 // probeEtcWritable prüft, ob der Agent in /etc schreiben darf. Genau das
