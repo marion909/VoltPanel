@@ -168,6 +168,7 @@ func (s *SiteService) writeVhost(ctx context.Context, sc store.Scope, site *stor
 		data.CertPath = filepath.Join(s.cfg.CertDir, site.Domain, "fullchain.pem")
 		data.KeyPath = filepath.Join(s.cfg.CertDir, site.Domain, "privkey.pem")
 	}
+	s.applySettings(&data, site)
 
 	content, err := templates.RenderSite(data)
 	if err != nil {
@@ -177,6 +178,31 @@ func (s *SiteService) writeVhost(ctx context.Context, sc store.Scope, site *stor
 		return fmt.Errorf("vhost schreiben: %w", err)
 	}
 	return nil
+}
+
+// applySettings überträgt die gespeicherten Zusatzeinstellungen in die
+// Vorlagendaten. Der Pfad zur htpasswd-Datei wird hier aus der Konfiguration
+// abgeleitet, nicht gespeichert — so kann er nicht auf eine fremde Datei zeigen.
+func (s *SiteService) applySettings(data *templates.SiteData, site *store.Site) {
+	set := site.Settings
+
+	data.DenyIPs, data.AllowIPs = set.DenyIPs, set.AllowIPs
+	data.ExtraLines = set.ExtraLines
+	data.MaxBodySize, data.FastCGITimeout = set.MaxBodySize, set.FastCGITimeout
+
+	for _, r := range set.Redirects {
+		data.Redirects = append(data.Redirects, templates.Redirect{From: r.From, To: r.To, Code: r.Code})
+	}
+	if set.BasicAuth != nil && set.BasicAuth.Enabled {
+		data.BasicAuthFile = s.htpasswdPath(site.Domain)
+	}
+}
+
+// htpasswdPath leitet den Pfad genauso ab wie der Agent. Beide lesen dasselbe
+// nginx-Verzeichnis aus der Konfiguration — läge der Pfad in der Datenbank,
+// könnte er auf eine beliebige Datei zeigen.
+func (s *SiteService) htpasswdPath(domain string) string {
+	return filepath.Join(s.cfg.NginxDir, "volt-auth", domain+".htpasswd")
 }
 
 // Rebuild schreibt Vhost und Pool aus dem aktuellen Datenbankstand neu. Das ist

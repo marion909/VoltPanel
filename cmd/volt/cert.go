@@ -73,7 +73,7 @@ func (a *app) certIssueCmd() *cobra.Command {
 			}
 
 			fmt.Printf("Fordere Zertifikat für %s an …\n", strings.Join(domains, ", "))
-			svc := core.NewCertService(a.cfg, a.store, a.agent, a.log)
+			svc := core.NewCertService(a.cfg, a.store, a.agent, a.secrets, a.log)
 			cert, err := svc.Issue(ctx, sys, opts)
 			if err != nil {
 				return err
@@ -106,7 +106,7 @@ func (a *app) certRenewCmd() *cobra.Command {
 				return fmt.Errorf("bitte --all angeben, um alle fälligen zertifikate zu erneuern")
 			}
 
-			svc := core.NewCertService(a.cfg, a.store, a.agent, a.log)
+			svc := core.NewCertService(a.cfg, a.store, a.agent, a.secrets, a.log)
 			renewed, errs := svc.RenewDue(cmd.Context(), func(*store.Cert) string { return cfToken })
 
 			fmt.Printf("%d zertifikat(e) erneuert.\n", renewed)

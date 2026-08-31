@@ -534,3 +534,136 @@ func TestQuotaBlocksSiteCreation(t *testing.T) {
 		t.Fatalf("Meldung nennt das Paket nicht: %s", rec.Body.String())
 	}
 }
+
+// --- Site-Einstellungen ----------------------------------------------------
+
+func TestSiteSettingsRoutes(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	t.Run("gueltige einstellungen", func(t *testing.T) {
+		rec := ts.do(http.MethodPatch, "/api/v1/sites/1/settings", map[string]any{
+			"redirects":     []map[string]any{{"from": "/alt", "to": "/neu", "code": 301}},
+			"deny_ips":      []string{"203.0.113.5", "198.51.100.0/24"},
+			"extra_lines":   []string{"add_header X-Robots-Tag noindex;"},
+			"max_body_size": "128M",
+		})
+		// Ohne laufenden Agent scheitert der Vhost-Neubau — die Prüfung der
+		// Eingabe muss aber davor stattgefunden haben.
+		if rec.Code == http.StatusBadRequest {
+			t.Fatalf("gültige Einstellungen abgelehnt: %s", rec.Body.String())
+		}
+	})
+
+	invalid := []struct {
+		name string
+		body map[string]any
+	}{
+		{"zusatzzeile bricht block auf", map[string]any{
+			"extra_lines": []string{"} server { listen 8080;"},
+		}},
+		{"zusatzzeile mit include", map[string]any{
+			"extra_lines": []string{"include /etc/passwd;"},
+		}},
+		{"weiterleitung mit unerlaubtem code", map[string]any{
+			"redirects": []map[string]any{{"from": "/x", "to": "/y", "code": 200}},
+		}},
+		{"unsinnige ip", map[string]any{"deny_ips": []string{"kein.host"}}},
+		{"anfragegroesse unsinnig", map[string]any{"max_body_size": "viel"}},
+	}
+	for _, tc := range invalid {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := ts.do(http.MethodPatch, "/api/v1/sites/1/settings", tc.body)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("Status %d, erwartet 400 — %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	t.Run("fremde site", func(t *testing.T) {
+		ts.login(t, "bob@example.at")
+		rec := ts.do(http.MethodGet, "/api/v1/sites/1/settings", nil)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("Status %d, erwartet 404", rec.Code)
+		}
+	})
+}
+
+// TestCustomerCannotWeakenPHPIsolation: disable_functions leer zu setzen würde
+// der Site erlauben, Shell-Kommandos abzusetzen. Das darf ein Kunde nicht für
+// sich selbst entscheiden.
+func TestCustomerCannotWeakenPHPIsolation(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // Kunde, Site 2 gehört ihm
+
+	for _, body := range []map[string]any{
+		{"disable_functions": ""},
+		{"extra_ini": "disable_functions ="},
+	} {
+		rec := ts.do(http.MethodPatch, "/api/v1/sites/2/php", body)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("PATCH mit %v als Kunde: Status %d, erwartet 403 — %s",
+				body, rec.Code, rec.Body.String())
+		}
+	}
+
+	// Die harmlosen Werte darf er ändern (Site 2 ist static, deshalb 400 —
+	// aber nicht 403).
+	rec := ts.do(http.MethodPatch, "/api/v1/sites/2/php", map[string]any{"memory_limit": "512M"})
+	if rec.Code == http.StatusForbidden {
+		t.Errorf("Kunde darf memory_limit nicht ändern: %s", rec.Body.String())
+	}
+}
+
+func TestCertRoutes(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	if rec := ts.do(http.MethodGet, "/api/v1/certs", nil); rec.Code != http.StatusOK {
+		t.Fatalf("GET /certs: Status %d — %s", rec.Code, rec.Body.String())
+	}
+
+	// Ohne acme_email fehlt die Voraussetzung — das muss ein Client- oder
+	// Gateway-Fehler sein, kein Absturz.
+	rec := ts.do(http.MethodPost, "/api/v1/sites/1/certificate", map[string]any{"wildcard": false})
+	if rec.Code >= 500 && rec.Code != http.StatusServiceUnavailable && rec.Code != http.StatusBadGateway {
+		t.Fatalf("Zertifikat anfordern: Status %d — %s", rec.Code, rec.Body.String())
+	}
+
+	// Ein Wildcard ohne Token muss mit einer erklärenden Meldung scheitern.
+	rec = ts.do(http.MethodPost, "/api/v1/sites/1/certificate", map[string]any{"wildcard": true})
+	if !strings.Contains(strings.ToLower(rec.Body.String()), "dns-01") &&
+		!strings.Contains(strings.ToLower(rec.Body.String()), "acme_email") {
+		t.Fatalf("wenig hilfreiche Meldung: %s", rec.Body.String())
+	}
+}
+
+func TestCloudflareTokenNeverReturned(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	const token = "cf_geheimes_token_1234567890"
+	rec := ts.do(http.MethodPut, "/api/v1/tenants/1/cloudflare", map[string]string{"token": token})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Token setzen: Status %d — %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), token) {
+		t.Fatalf("der Token steht in der Antwort: %s", rec.Body.String())
+	}
+
+	// Auch die Mandantenliste darf ihn nicht enthalten — nur die Angabe,
+	// dass einer hinterlegt ist.
+	rec = ts.do(http.MethodGet, "/api/v1/tenants", nil)
+	if strings.Contains(rec.Body.String(), token) {
+		t.Fatalf("der Token steht in der Mandantenliste: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"has_cloudflare_token":true`) {
+		t.Fatalf("das abgeleitete Feld fehlt: %s", rec.Body.String())
+	}
+
+	// Leerer Wert entfernt ihn.
+	rec = ts.do(http.MethodPut, "/api/v1/tenants/1/cloudflare", map[string]string{"token": ""})
+	if !strings.Contains(rec.Body.String(), "false") {
+		t.Fatalf("Token wurde nicht entfernt: %s", rec.Body.String())
+	}
+}

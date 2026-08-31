@@ -22,6 +22,7 @@ import (
 	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/registration"
 	"github.com/marion909/voltpanel/internal/agent"
+	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/config"
 	"github.com/marion909/voltpanel/internal/store"
 )
@@ -32,17 +33,57 @@ import (
 // DNS-01 geht über die Cloudflare-API und ist der einzige Weg zu einem
 // Wildcard-Zertifikat.
 type CertService struct {
-	cfg   *config.Config
-	store *store.Store
-	agent *agent.Client
-	log   *slog.Logger
+	cfg     *config.Config
+	store   *store.Store
+	agent   *agent.Client
+	secrets *authn.SecretBox
+	log     *slog.Logger
 }
 
-func NewCertService(cfg *config.Config, st *store.Store, ag *agent.Client, log *slog.Logger) *CertService {
+func NewCertService(cfg *config.Config, st *store.Store, ag *agent.Client, secrets *authn.SecretBox, log *slog.Logger) *CertService {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &CertService{cfg: cfg, store: st, agent: ag, log: log}
+	return &CertService{cfg: cfg, store: st, agent: ag, secrets: secrets, log: log}
+}
+
+// CloudflareToken holt den entschlüsselten Token eines Mandanten.
+//
+// Ein leerer Rückgabewert heißt "keiner hinterlegt" und ist kein Fehler —
+// dann läuft die Prüfung eben über HTTP-01.
+func (s *CertService) CloudflareToken(ctx context.Context, sc store.Scope, tenantID int64) (string, error) {
+	if s.secrets == nil {
+		return "", nil
+	}
+	tenant, err := s.store.GetTenant(ctx, sc, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if tenant.CloudflareToken == "" {
+		return "", nil
+	}
+	return s.secrets.Decrypt(tenant.CloudflareToken)
+}
+
+// SetCloudflareToken speichert den Token verschlüsselt. Ein leerer Wert
+// entfernt ihn.
+func (s *CertService) SetCloudflareToken(ctx context.Context, sc store.Scope, tenantID int64, token string) error {
+	if s.secrets == nil {
+		return errors.New("kein schlüssel für verschlüsselte werte geladen")
+	}
+	tenant, err := s.store.GetTenant(ctx, sc, tenantID)
+	if err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(token) == "" {
+		tenant.CloudflareToken = ""
+	} else {
+		if tenant.CloudflareToken, err = s.secrets.Encrypt(token); err != nil {
+			return err
+		}
+	}
+	return s.store.UpdateTenant(ctx, sc, tenant)
 }
 
 // acmeUser ist das Konto beim ACME-Server. Der Schlüssel liegt auf Platte und
@@ -77,6 +118,16 @@ func (s *CertService) Issue(ctx context.Context, sc store.Scope, opts IssueOptio
 		if !store.ValidDomain(d) {
 			return nil, fmt.Errorf("%q ist kein gültiger domainname", d)
 		}
+	}
+
+	// Ohne ausdrücklich übergebenen Token den des Mandanten verwenden — sonst
+	// müsste ihn jeder Aufrufer selbst heraussuchen und entschlüsseln.
+	if opts.CloudflareToken == "" && opts.TenantID > 0 {
+		token, err := s.CloudflareToken(ctx, sc, opts.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		opts.CloudflareToken = token
 	}
 
 	wildcard := false
@@ -169,6 +220,10 @@ func (s *CertService) enableSSL(ctx context.Context, sc store.Scope, siteID int6
 }
 
 // RenewDue erneuert alle fälligen Zertifikate und meldet, wie viele es waren.
+//
+// tokenFor darf nil sein; dann wird der Cloudflare-Token des jeweiligen
+// Mandanten benutzt. Der Parameter existiert für die CLI, wo sich ein Token
+// einmalig übergeben lässt, ohne ihn zu hinterlegen.
 func (s *CertService) RenewDue(ctx context.Context, tokenFor func(*store.Cert) string) (renewed int, errs []error) {
 	certs, err := s.store.CertsDueForRenewal(ctx, 30)
 	if err != nil {
@@ -180,6 +235,11 @@ func (s *CertService) RenewDue(ctx context.Context, tokenFor func(*store.Cert) s
 		token := ""
 		if tokenFor != nil {
 			token = tokenFor(cert)
+		}
+		if token == "" {
+			if fromTenant, err := s.CloudflareToken(ctx, sc, cert.TenantID); err == nil {
+				token = fromTenant
+			}
 		}
 		if cert.Challenge == "dns-01" && token == "" {
 			errs = append(errs, fmt.Errorf("%s: dns-01 ohne cloudflare-token nicht erneuerbar",

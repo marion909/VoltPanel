@@ -197,6 +197,34 @@ falsches Passwort — sonst verrät das Panel, welche Adressen es kennt.
 zweiten Faktor nicht einfach entfernen können. Der Notausgang ist
 `volt user 2fa-reset` und damit ein Zugang zum Server selbst.
 
+## Site-Einstellungen aus der Oberfläche
+
+Die Zusatzeinstellungen einer Site — Weiterleitungen, IP-Regeln, eigene
+Direktiven — sind die einzige Stelle, an der ein Kunde Text schreibt, der
+unverändert in einer Nginx-Config landet. Sie werden **zweimal** geprüft: beim
+Speichern (`SiteSettings.Validate`, damit die Meldung verständlich ist) und noch
+einmal beim Rendern (`templates.validate`, weil dort nichts escaped wird).
+
+Der Rewrite-Editor nimmt nur **einzelne Direktiven** an: eine Zeile, keine
+geschweiften Klammern, abgeschlossen mit `;`, kein `include`. Ein `include`
+würde beliebige Dateien einbinden und die gesamte Prüfung aushebeln.
+
+Beim **Passwortschutz** wird im Web-Prozess gehasht (bcrypt), nicht im Agent —
+so verlässt ein Klartextpasswort den Web-Prozess nie und kann in keinem
+Agent-Log landen. Die htpasswd-Datei liegt unter `/etc/nginx/volt-auth/`, nicht
+im Site-Verzeichnis: läge sie dort, könnte der PHP-Prozess der Site die Hashes
+aller Benutzer lesen, die die Site schützen sollen. Ihr Pfad wird auf beiden
+Seiten aus der Konfiguration abgeleitet und nie gespeichert — sonst könnte er
+auf eine fremde Datei zeigen.
+
+`disable_functions` und eigene ini-Werte sind **Administratoren vorbehalten**.
+Diese Liste isoliert die Site; sie zu leeren erlaubt der Site, Shell-Kommandos
+abzusetzen. Das darf ein Kunde nicht für sich selbst entscheiden.
+
+Der **Cloudflare-Token** liegt AES-256-GCM-verschlüsselt beim Mandanten und wird
+über die API nie wieder herausgegeben — `Tenant.MarshalJSON` ersetzt ihn durch
+das abgeleitete `has_cloudflare_token`.
+
 ## Quotas
 
 Die Grenzen aus dem Hosting-Paket wirken auf **Anwendungsebene**: `CheckCount`

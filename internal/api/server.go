@@ -33,6 +33,7 @@ type Server struct {
 	files     *core.FileService
 	cron      *core.CronService
 	quota     *core.QuotaService
+	certs     *core.CertService
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
@@ -72,6 +73,7 @@ func New(opts Options) (*Server, error) {
 		files:     core.NewFileService(opts.Store, opts.Agent, opts.Config),
 		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
 		quota:     core.NewQuotaService(opts.Store, opts.Agent, opts.Config, opts.Logger),
+		certs:     core.NewCertService(opts.Config, opts.Store, opts.Agent, opts.Secrets, opts.Logger),
 		log:       opts.Logger,
 		devOrigin: opts.DevOrigin,
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
@@ -140,6 +142,14 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/sites/:id", s.handleDeleteSite)
 	auth.POST("/sites/:id/rebuild", s.handleRebuildSite)
 	auth.GET("/sites/:id/logs", s.handleSiteLogs)
+	auth.GET("/sites/:id/settings", s.handleGetSiteSettings)
+	auth.PATCH("/sites/:id/settings", s.handleUpdateSiteSettings)
+	auth.GET("/sites/:id/php", s.handleGetSitePHP)
+	auth.PATCH("/sites/:id/php", s.handleUpdateSitePHP)
+	auth.POST("/sites/:id/certificate", s.handleIssueCert)
+
+	auth.GET("/certs", s.handleListCerts)
+	auth.DELETE("/certs/:id", s.handleDeleteCert)
 
 	// Dateimanager: immer site-gebunden, nie mit absolutem Pfad.
 	auth.GET("/sites/:id/files", s.handleFileList)
@@ -176,6 +186,7 @@ func (s *Server) setupRoutes() {
 	auth.PATCH("/tenants/:id", s.handleUpdateTenant, s.requireRole(store.RoleAdmin))
 	auth.DELETE("/tenants/:id", s.handleDeleteTenant, s.requireRole(store.RoleAdmin))
 	auth.GET("/tenants/:id/quota", s.handleTenantQuota)
+	auth.PUT("/tenants/:id/cloudflare", s.handleSetCloudflareToken, s.requireRole(store.RoleReseller))
 
 	auth.GET("/quota", s.handleQuota)
 	auth.GET("/plans", s.handleListPlans)

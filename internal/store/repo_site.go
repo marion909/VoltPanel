@@ -23,7 +23,7 @@ func ValidDomain(d string) bool {
 const siteCols = `id, tenant_id, domain, aliases, type, system_user, root_path,
 	document_root, php_version, proxy_target, ssl_enabled, force_https, hsts,
 	status, disk_bytes, disk_files, disk_measured_at, traffic_bytes, traffic_period,
-	created_at, updated_at`
+	settings, created_at, updated_at`
 
 func (s *Store) CreateSite(ctx context.Context, sc Scope, site *Site) error {
 	if err := sc.owns(site.TenantID); err != nil {
@@ -40,12 +40,12 @@ func (s *Store) CreateSite(ctx context.Context, sc Scope, site *Site) error {
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO sites (tenant_id, domain, aliases, type, system_user, root_path,
 			document_root, php_version, proxy_target, ssl_enabled, force_https, hsts,
-			status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			status, settings, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		site.TenantID, site.Domain, encodeList(site.Aliases), string(site.Type),
 		site.SystemUser, site.RootPath, site.DocumentRoot, site.PHPVersion, site.ProxyTarget,
 		boolToInt(site.SSLEnabled), boolToInt(site.ForceHTTPS), boolToInt(site.HSTS),
-		site.Status, site.CreatedAt, site.UpdatedAt)
+		site.Status, encodeSettings(&site.Settings), site.CreatedAt, site.UpdatedAt)
 	if err != nil {
 		if isUnique(err) {
 			return fmt.Errorf("%w: domain %s", ErrConflict, site.Domain)
@@ -110,11 +110,12 @@ func (s *Store) UpdateSite(ctx context.Context, sc Scope, site *Site) error {
 
 	set := []any{encodeList(site.Aliases), string(site.Type), site.DocumentRoot,
 		site.PHPVersion, site.ProxyTarget, boolToInt(site.SSLEnabled),
-		boolToInt(site.ForceHTTPS), boolToInt(site.HSTS), site.Status, site.UpdatedAt}
+		boolToInt(site.ForceHTTPS), boolToInt(site.HSTS), site.Status,
+		encodeSettings(&site.Settings), site.UpdatedAt}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE sites SET aliases = ?, type = ?, document_root = ?, php_version = ?,
 			proxy_target = ?, ssl_enabled = ?, force_https = ?, hsts = ?,
-			status = ?, updated_at = ?`+where,
+			status = ?, settings = ?, updated_at = ?`+where,
 		append(set, append(args, site.ID)...)...)
 	return affected(res, err)
 }
@@ -238,18 +239,18 @@ func validateSite(site *Site) error {
 	if strings.Contains(site.DocumentRoot, "..") || strings.HasPrefix(site.DocumentRoot, "/") {
 		return fmt.Errorf("document_root %q muss ein relativer pfad ohne .. sein", site.DocumentRoot)
 	}
-	return nil
+	return site.Settings.Validate()
 }
 
 func scanSite(sc scanner) (*Site, error) {
 	var site Site
-	var aliases, typ string
+	var aliases, typ, settings string
 	var ssl, force, hsts int
 	err := sc.Scan(&site.ID, &site.TenantID, &site.Domain, &aliases, &typ, &site.SystemUser,
 		&site.RootPath, &site.DocumentRoot, &site.PHPVersion, &site.ProxyTarget,
 		&ssl, &force, &hsts, &site.Status,
 		&site.DiskBytes, &site.DiskFiles, &site.DiskMeasuredAt,
-		&site.TrafficBytes, &site.TrafficPeriod,
+		&site.TrafficBytes, &site.TrafficPeriod, &settings,
 		&site.CreatedAt, &site.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -258,6 +259,7 @@ func scanSite(sc scanner) (*Site, error) {
 		return nil, err
 	}
 	site.Aliases, site.Type = decodeList(aliases), SiteType(typ)
+	site.Settings = decodeSettings(settings)
 	site.SSLEnabled, site.ForceHTTPS, site.HSTS = ssl == 1, force == 1, hsts == 1
 	return &site, nil
 }

@@ -35,6 +35,8 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpNginxRemoveVhost: s.opNginxRemoveVhost,
 		OpNginxTest:        s.opNginxTest,
 		OpNginxReload:      s.opNginxReload,
+		OpNginxWriteAuth:   s.opNginxWriteAuth,
+		OpNginxRemoveAuth:  s.opNginxRemoveAuth,
 
 		OpPHPWritePool:  s.opPHPWritePool,
 		OpPHPRemovePool: s.opPHPRemovePool,

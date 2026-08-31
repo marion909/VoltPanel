@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { api } from '../api'
 import { t } from '../i18n'
 
@@ -164,7 +165,11 @@ const inputStyle = {
             class="border-b last:border-0"
             :style="{ borderColor: 'var(--line-hairline)' }"
           >
-            <td class="px-4 py-2.5 font-medium">{{ site.domain }}</td>
+            <td class="px-4 py-2.5">
+              <RouterLink :to="`/sites/${site.id}`" class="font-medium hover:underline">
+                {{ site.domain }}
+              </RouterLink>
+            </td>
             <td class="px-4 py-2.5" :style="{ color: 'var(--ink-secondary)' }">{{ site.type }}</td>
             <td class="px-4 py-2.5 tabular" :style="{ color: 'var(--ink-secondary)' }">
               {{ site.php_version || '—' }}
@@ -185,7 +190,11 @@ const inputStyle = {
             </td>
             <td class="px-4 py-2.5" :style="{ color: 'var(--ink-secondary)' }">{{ site.status }}</td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-              <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+              <RouterLink :to="`/sites/${site.id}`" class="text-[12px] underline"
+                          :style="{ color: 'var(--ink-secondary)' }">
+                {{ t('site.settings') }}
+              </RouterLink>
+              <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
                       @click="rebuild(site)">
                 {{ t('sites.rebuild') }}
               </button>

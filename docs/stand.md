@@ -39,8 +39,15 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   `disable_functions`, eigenem tmp- und Session-Verzeichnis
 - ACME über lego: HTTP-01 über das Webroot, DNS-01 über Cloudflare für
   Wildcards, Auto-Renew per systemd-Timer, Ablaufwarnung im Dashboard und in
-  `volt doctor`
-- Log-Viewer über `file.tail_log` (API vorhanden, UI noch nicht)
+  `volt doctor`. Der Cloudflare-Token liegt verschlüsselt beim Mandanten und
+  wird nie wieder herausgegeben — nur die Angabe, ob einer hinterlegt ist.
+- Site-Einstellungen über Oberfläche und API: Weiterleitungen, IP-Sperren und
+  -Freigaben, Passwortschutz (bcrypt, htpasswd außerhalb des Site-Verzeichnisses),
+  eigene Nginx-Direktiven, maximale Anfragegröße, PHP-Zeitlimit
+- PHP je Site einstellbar: Version, Prozessmanager, Prozesszahl, memory_limit,
+  Ausführungszeit, Upload-Größe. `disable_functions` und eigene ini-Werte
+  bleiben Administratoren vorbehalten — sie heben die Isolation der Site auf.
+- Log-Viewer für Access- und Error-Log in der Site-Detailansicht
 
 **Phase 3 — Daten, Dateien, Cronjobs**
 
@@ -84,12 +91,8 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 
 **Phase 2**
 
-- PHP-Extension-Manager, php.ini-Editor pro Site in der UI
-- Rewrite-Editor als Oberfläche (die Validierung dahinter steht)
-- Redirects, HSTS-Schalter, Basic-Auth und IP-Sperren sind im Template
-  umgesetzt, aber noch nicht über die API einstellbar
-- Cloudflare-Token pro Tenant verschlüsselt speichern (die Verschlüsselung
-  steht, die Verwaltung fehlt)
+- PHP-Extension-Manager (Erweiterungen installieren und aktivieren)
+- HSTS-Schalter in der Oberfläche (im Datenmodell und Template vorhanden)
 
 **Phase 3**
 

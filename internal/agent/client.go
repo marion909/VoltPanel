@@ -214,6 +214,18 @@ func (c *Client) RemoveVhost(ctx context.Context, domain string) error {
 	return c.Call(ctx, OpNginxRemoveVhost, VhostParams{Domain: domain}, nil)
 }
 
+// WriteHtpasswd legt die Datei für den Passwortschutz an. Die Einträge sind
+// bereits gehasht — Klartextpasswörter gehen nie über den Socket.
+func (c *Client) WriteHtpasswd(ctx context.Context, domain string, entries []string) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpNginxWriteAuth, HtpasswdParams{Domain: domain, Entries: entries}, &res)
+	return res.Text, err
+}
+
+func (c *Client) RemoveHtpasswd(ctx context.Context, domain string) error {
+	return c.Call(ctx, OpNginxRemoveAuth, HtpasswdParams{Domain: domain}, nil)
+}
+
 func (c *Client) WritePHPPool(ctx context.Context, phpVersion, poolName, content string) error {
 	return c.Call(ctx, OpPHPWritePool,
 		PoolParams{PHPVersion: phpVersion, PoolName: poolName, Content: content}, nil)

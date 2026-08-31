@@ -1,15 +1,36 @@
 package store
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Tenant struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	PlanID    *int64 `json:"plan_id"`
-	Status    string `json:"status"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Slug   string `json:"slug"`
+	PlanID *int64 `json:"plan_id"`
+	Status string `json:"status"`
+
+	// CloudflareToken liegt verschlüsselt vor und wird nie serialisiert.
+	// Ob einer hinterlegt ist, sagt HasCloudflareToken.
+	CloudflareToken string `json:"-"`
+
+	CreatedAt int64 `json:"created_at"`
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// HasCloudflareToken sagt der Oberfläche, ob DNS-01 möglich ist — ohne den
+// Token selbst herauszugeben.
+func (t *Tenant) HasCloudflareToken() bool { return t.CloudflareToken != "" }
+
+// MarshalJSON ergänzt das abgeleitete Feld, ohne das Geheimnis mitzuschicken.
+func (t Tenant) MarshalJSON() ([]byte, error) {
+	type alias Tenant // verhindert die Endlosschleife über MarshalJSON
+	return json.Marshal(struct {
+		alias
+		HasCloudflareToken bool `json:"has_cloudflare_token"`
+	}{alias(t), t.CloudflareToken != ""})
 }
 
 type Plan struct {
@@ -108,6 +129,10 @@ type Site struct {
 	DiskMeasuredAt *int64 `json:"disk_measured_at"`
 	TrafficBytes   int64  `json:"traffic_bytes"`
 	TrafficPeriod  string `json:"traffic_period"`
+
+	// Settings sind die Vhost-Zusätze: Weiterleitungen, IP-Regeln,
+	// Passwortschutz, eigene Direktiven.
+	Settings SiteSettings `json:"settings"`
 
 	CreatedAt int64 `json:"created_at"`
 	UpdatedAt int64 `json:"updated_at"`

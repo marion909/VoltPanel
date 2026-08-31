@@ -40,6 +40,8 @@ const (
 	OpNginxRemoveVhost Op = "nginx.remove_vhost"
 	OpNginxTest        Op = "nginx.test"
 	OpNginxReload      Op = "nginx.reload"
+	OpNginxWriteAuth   Op = "nginx.write_htpasswd"
+	OpNginxRemoveAuth  Op = "nginx.remove_htpasswd"
 
 	// PHP-FPM
 	OpPHPWritePool  Op = "php.write_pool"
@@ -134,6 +136,15 @@ type ServiceParams struct {
 type VhostParams struct {
 	Domain  string `json:"domain"`
 	Content string `json:"content"`
+}
+
+// HtpasswdParams trägt fertige Hashes, keine Klartextpasswörter: das Hashen
+// passiert im Web-Prozess, damit ein Klartextpasswort nie über den Socket geht
+// und nie in einem Agent-Log landen kann.
+type HtpasswdParams struct {
+	Domain string `json:"domain"`
+	// Entries sind Zeilen der Form "benutzer:$2a$...".
+	Entries []string `json:"entries"`
 }
 
 type PoolParams struct {
