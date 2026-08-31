@@ -6,6 +6,11 @@ import tailwindcss from '@tailwindcss/vite'
 // Go-Binary eingebettet — deshalb gibt es am Zielserver kein Node.
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  // Relativ, nicht absolut: das Panel laeuft hinter einem zufaelligen
+  // Pfadpraefix, das erst bei der Installation entsteht. Ein zur Bauzeit
+  // eingetragenes '/' wuerde jede Asset-Anfrage an diesem Praefix vorbei
+  // schicken. Den tatsaechlichen Ort setzt der Server per <base>-Tag.
+  base: './',
   build: {
     outDir: '../internal/webui/dist',
     emptyOutDir: true,

@@ -29,7 +29,10 @@ const routes = [
 ]
 
 export const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  // Ohne Argument liest vue-router das <base>-Tag, das der Server mit dem
+  // tatsaechlichen Pfadpraefix einsetzt. import.meta.env.BASE_URL waere der
+  // Wert von der Bauzeit und damit falsch.
+  history: createWebHistory(),
   routes,
 })
 

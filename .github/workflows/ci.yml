@@ -20,6 +20,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Ohne gebautes Frontend ueberspringen die Tests, die die Auslieferung
+      # pruefen - und genau dort steckten die Fehler, die erst am Server
+      # aufgefallen sind.
+      - name: Frontend bauen
+        run: ./scripts/build-web.sh
+
       - name: Formatierung prüfen
         run: |
           unformatted="$(gofmt -l cmd internal)"

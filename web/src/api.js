@@ -16,9 +16,11 @@ export class ApiError extends Error {
   }
 }
 
-// Das Panel kann unter einem geheimen Pfadpräfix laufen; die Basis ergibt sich
-// aus dem Ort, an dem die App ausgeliefert wurde.
-const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+// Das Panel kann unter einem geheimen Pfadpräfix laufen. Der Ort steht im
+// <base>-Tag, das der Server einsetzt — document.baseURI löst ihn auf.
+// import.meta.env.BASE_URL wäre der Wert von der Bauzeit und kennt den
+// Präfix nicht, der erst bei der Installation entsteht.
+const base = document.baseURI.replace(/\/$/, '')
 
 async function request(method, path, body) {
   const headers = {}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -110,6 +111,16 @@ func (s *Server) setupRoutes() {
 	root := s.echo.Group("")
 	if s.cfg.AccessPath != "" {
 		root = s.echo.Group("/" + s.cfg.AccessPath)
+	}
+
+	// "/<präfix>" ohne Schrägstrich passt auf keine Route der Gruppe: die
+	// registriert "/<präfix>/*", und das verlangt den Schrägstrich. Ohne
+	// diese Weiterleitung beantwortet das Panel genau die URL mit 404, die
+	// der Installer ausgibt.
+	if s.cfg.AccessPath != "" {
+		s.echo.GET("/"+strings.Trim(s.cfg.AccessPath, "/"), func(c echo.Context) error {
+			return c.Redirect(http.StatusMovedPermanently, s.frontendBase())
+		})
 	}
 
 	root.GET("/healthz", s.handleHealth)
@@ -239,11 +250,60 @@ func (s *Server) mountFrontend(g *echo.Group) {
 			}
 		}
 		// Unbekannter Pfad oder Wurzel: die App entscheidet, was sie anzeigt.
-		if err := serveAsset(c, fsys, "index.html"); err != nil {
+		if err := s.serveIndex(c, fsys); err != nil {
 			return echo.NewHTTPError(http.StatusNotFound, "frontend nicht verfügbar")
 		}
 		return nil
 	})
+}
+
+// serveIndex liefert die App aus und trägt dabei ihren Ort ein.
+//
+// Das Panel läuft hinter einem zufälligen Pfadpräfix, der erst bei der
+// Installation entsteht — zur Bauzeit kann ihn niemand kennen. Das <base>-Tag
+// ist die Stelle, an der er ankommt: Vue Router liest es, fetch löst seine
+// relativen Adressen dagegen auf, und die Asset-Verweise ebenso.
+//
+// Es muss ein Tag sein und darf keine Ersetzung der Asset-Pfade werden: eine
+// Unterseite wie /<präfix>/sites/5 liegt zwei Ebenen tiefer, relative
+// Adressen ohne <base> zeigten von dort ins Leere.
+func (s *Server) serveIndex(c echo.Context, fsys http.FileSystem) error {
+	f, err := fsys.Open("/index.html")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	html := string(raw)
+	if !strings.Contains(html, "<base ") {
+		tag := fmt.Sprintf("<base href=%q>", s.frontendBase())
+		switch {
+		case strings.Contains(html, "<head>"):
+			html = strings.Replace(html, "<head>", "<head>"+tag, 1)
+		default:
+			// Ohne <head> ist die Datei nicht das, was wir gebaut haben —
+			// dann lieber vorne anhängen als still das Falsche ausliefern.
+			html = tag + html
+		}
+	}
+
+	c.Response().Header().Set("Cache-Control", "no-cache, must-revalidate")
+	return c.HTMLBlob(http.StatusOK, []byte(html))
+}
+
+// frontendBase ist der Pfad, unter dem die App liegt, immer mit Schrägstrich
+// am Ende — ohne ihn löst der Browser relative Adressen gegen das
+// übergeordnete Verzeichnis auf.
+func (s *Server) frontendBase() string {
+	if s.cfg.AccessPath == "" {
+		return "/"
+	}
+	return "/" + strings.Trim(s.cfg.AccessPath, "/") + "/"
 }
 
 // serveAsset schreibt eine Datei aus dem eingebetteten Dateisystem in die

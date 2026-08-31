@@ -153,3 +153,21 @@ func copyTo(t *testing.T, src, dst string) {
 		t.Fatal(err)
 	}
 }
+
+// --- Auslieferung unter einem Pfadpräfix ------------------------------------
+
+func TestFrontendBase(t *testing.T) {
+	cases := []struct{ access, want string }{
+		{"", "/"},
+		{"68f5131f", "/68f5131f/"},
+		{"/68f5131f/", "/68f5131f/"},
+	}
+	for _, tc := range cases {
+		cfg := config.Default()
+		cfg.AccessPath = tc.access
+		s := &Server{cfg: cfg}
+		if got := s.frontendBase(); got != tc.want {
+			t.Errorf("access_path %q → %q, erwartet %q", tc.access, got, tc.want)
+		}
+	}
+}
