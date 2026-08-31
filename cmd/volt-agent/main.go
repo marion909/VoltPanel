@@ -53,14 +53,15 @@ func run(configPath, peerUser string, log *slog.Logger) error {
 	}
 
 	srv, err := agent.NewServer(agent.ServerOptions{
-		SocketPath: cfg.SocketPath,
-		PeerUser:   peerUser,
-		Logger:     log,
-		NginxDir:   cfg.NginxDir,
-		PHPDir:     cfg.PHPFPMDir,
-		CertDir:    cfg.CertDir,
-		SitesDir:   cfg.SitesDir,
-		LogDir:     cfg.LogDir,
+		SocketPath:  cfg.SocketPath,
+		PeerUser:    peerUser,
+		Logger:      log,
+		NginxDir:    cfg.NginxDir,
+		PHPDir:      cfg.PHPFPMDir,
+		CertDir:     cfg.CertDir,
+		SitesDir:    cfg.SitesDir,
+		LogDir:      cfg.LogDir,
+		PanelDomain: cfg.PanelDomain,
 	})
 	if err != nil {
 		return err

@@ -35,3 +35,12 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # GoReleaser baut die Archive für Menschen. install.sh und `volt update`
+      # laden dagegen einzelne Dateien: das nackte Binary, eine Prüfsumme
+      # daneben und latest.json. Die entstehen hier und werden ans selbe
+      # Release gehängt.
+      - name: Kanal-Artefakte anhängen
+        run: scripts/release-assets.sh "$GITHUB_REF_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

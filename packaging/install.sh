@@ -12,6 +12,10 @@ set -euo pipefail
 VOLT_CHANNEL="${VOLT_CHANNEL:-stable}"
 VOLT_BASE_URL="${VOLT_BASE_URL:-https://get.voltpanel.dev}"
 VOLT_PORT="${VOLT_PORT:-8443}"
+# Die Domain, unter der das Panel erreichbar sein soll. Ohne sie laeuft das
+# Panel unter der IP und behaelt sein selbstsigniertes Zertifikat.
+VOLT_PANEL_DOMAIN="${VOLT_PANEL_DOMAIN:-}"
+VOLT_ACME_EMAIL="${VOLT_ACME_EMAIL:-}"
 VOLT_USER="volt"
 VOLT_BIN_DIR="/usr/local/bin"
 VOLT_CONFIG_DIR="/etc/volt"
@@ -198,6 +202,14 @@ port: $VOLT_PORT
 # Das Panel ist nur unter diesem Pfad erreichbar.
 access_path: $ACCESS_PATH
 
+# Hostname des Panels. Er steht im selbstsignierten Zertifikat und bestimmt,
+# welches Zertifikat volt-web nach einem `volt cert issue` uebernimmt.
+panel_domain: $VOLT_PANEL_DOMAIN
+
+# Das Panel terminiert TLS selbst — es muss auch dann erreichbar sein, wenn
+# nginx gerade nicht laeuft. Auf false nur, wenn ein eigener Proxy davor sitzt.
+tls: true
+
 data_dir: $VOLT_DATA_DIR
 config_dir: $VOLT_CONFIG_DIR
 log_dir: $VOLT_LOG_DIR
@@ -212,7 +224,7 @@ session_ttl_min: 720
 update_channel: $VOLT_CHANNEL
 
 # Für Let's Encrypt zwingend — hierhin gehen Ablaufwarnungen.
-acme_email: ""
+acme_email: "$VOLT_ACME_EMAIL"
 
 # Nur diese Adressen dürfen ans Panel. Leer lassen = keine Einschränkung.
 # ip_whitelist: 203.0.113.5, 198.51.100.0/24
@@ -290,7 +302,10 @@ fi
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -n "$IP" ] || IP="<server-ip>"
 
-URL="https://${IP}:${VOLT_PORT}"
+HOST="$IP"
+[ -n "$VOLT_PANEL_DOMAIN" ] && HOST="$VOLT_PANEL_DOMAIN"
+
+URL="https://${HOST}:${VOLT_PORT}"
 [ -n "${ACCESS_PATH:-}" ] && URL="${URL}/${ACCESS_PATH}"
 
 printf '\n%s%sVoltPanel ist installiert.%s\n\n' "$C_GREEN" "$C_BOLD" "$C_RESET"
@@ -300,15 +315,30 @@ if [ -n "$SETUP_OUTPUT" ]; then
     printf '%s\n' "$SETUP_OUTPUT" | sed 's/^/  /'
 fi
 
-cat <<'HINT'
+cat <<HINT
 
-  Nächste Schritte:
-    volt doctor                          Selbstdiagnose
-    volt site add example.at --php 8.3   erste Website
-    volt cert issue example.at           Zertifikat holen
-    volt update                          aktualisieren
-
-  Das Panel liefert noch ein selbstsigniertes Zertifikat aus. Sobald eine
-  Domain darauf zeigt, holt `volt cert issue` ein gültiges.
+  Nächste Schritte (als Benutzer $VOLT_USER, dem die Datenbank gehört):
+    sudo -u $VOLT_USER volt doctor                          Selbstdiagnose
+    sudo -u $VOLT_USER volt site add example.at --php 8.3   erste Website
+    sudo -u $VOLT_USER volt cert issue example.at           Zertifikat holen
 
 HINT
+
+if [ -n "$VOLT_PANEL_DOMAIN" ]; then
+cat <<HINT
+  Das Panel zeigt noch ein selbstsigniertes Zertifikat. Sobald
+  $VOLT_PANEL_DOMAIN auf diesen Server zeigt:
+
+    sudo -u $VOLT_USER volt cert issue $VOLT_PANEL_DOMAIN
+
+  volt-web übernimmt es ohne Neustart.
+
+HINT
+else
+cat <<'HINT'
+  Das Panel zeigt ein selbstsigniertes Zertifikat, weil kein Hostname
+  hinterlegt ist. Mit `panel_domain:` in /etc/volt/config.yaml und
+  anschließendem `volt cert issue <domain>` gibt es ein gültiges.
+
+HINT
+fi

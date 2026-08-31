@@ -248,6 +248,20 @@ func (s *Server) opCertInstall(ctx context.Context, raw json.RawMessage) (any, e
 		return nil, opErr(OpCertInstall, "schlüssel schreiben: %v", err)
 	}
 
+	// Das Panel terminiert TLS selbst und läuft dabei nicht als root. Ohne
+	// diesen Schritt läge sein eigenes Zertifikat zwar da, wäre für volt-web
+	// aber unlesbar — und das Panel bliebe beim selbstsignierten stehen.
+	if p.Domain != "" && p.Domain == s.panelDomain && s.peerUID >= 0 {
+		for path, mode := range map[string]os.FileMode{dir: 0o750, keyPath: 0o600, certPath: 0o644} {
+			if err := os.Chown(path, s.peerUID, -1); err != nil {
+				return nil, opErr(OpCertInstall, "eigentümer von %s: %v", path, err)
+			}
+			if err := os.Chmod(path, mode); err != nil {
+				return nil, opErr(OpCertInstall, "rechte von %s: %v", path, err)
+			}
+		}
+	}
+
 	if out, err := run(ctx, shortTimeout, "nginx", "-t"); err != nil {
 		return nil, opErr(OpCertInstall, "zertifikat abgelegt, aber nginx-config fehlerhaft: %s", truncate(out, 400))
 	}

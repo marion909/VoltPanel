@@ -34,6 +34,10 @@ type Server struct {
 	phpDir     string
 	certDir    string
 	logDir     string
+	// panelDomain kommt aus der Konfiguration, nicht aus der Anfrage: nur so
+	// kann der Web-Prozess sich nicht selbst zum Eigentümer eines fremden
+	// Schlüssels erklären.
+	panelDomain string
 
 	registry map[Op]Handler
 	listener net.Listener
@@ -51,6 +55,9 @@ type ServerOptions struct {
 	CertDir    string
 	SitesDir   string
 	LogDir     string
+	// PanelDomain ist die Domain des Panels selbst. Ihr Schlüssel bekommt den
+	// Peer als Eigentümer, weil volt-web ihn lesen muss.
+	PanelDomain string
 }
 
 func NewServer(opts ServerOptions) (*Server, error) {
@@ -78,13 +85,14 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	}
 
 	s := &Server{
-		socketPath: opts.SocketPath,
-		peerUID:    peerUID,
-		log:        opts.Logger,
-		nginxDir:   opts.NginxDir,
-		phpDir:     opts.PHPDir,
-		certDir:    opts.CertDir,
-		logDir:     opts.LogDir,
+		socketPath:  opts.SocketPath,
+		peerUID:     peerUID,
+		log:         opts.Logger,
+		nginxDir:    opts.NginxDir,
+		phpDir:      opts.PHPDir,
+		certDir:     opts.CertDir,
+		logDir:      opts.LogDir,
+		panelDomain: opts.PanelDomain,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
 		roots: []string{opts.SitesDir, opts.NginxDir, opts.PHPDir, opts.CertDir, opts.LogDir},
 	}

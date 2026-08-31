@@ -284,10 +284,33 @@ func (s *Server) Start(ctx context.Context) error {
 		IdleTimeout: 120 * time.Second,
 	}
 
+	scheme := "http"
+	if s.cfg.TLSEnabled {
+		tlsCfg, err := panelTLS(s.cfg, s.log)
+		if err != nil {
+			return fmt.Errorf("panel-tls: %w", err)
+		}
+		srv.TLSConfig = tlsCfg
+		scheme = "https"
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
-		s.log.Info("panel erreichbar", "adresse", addr, "pfad", "/"+s.cfg.AccessPath)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		host := s.cfg.PanelDomain
+		if host == "" {
+			host = s.cfg.ListenAddr
+		}
+		s.log.Info("panel erreichbar",
+			"url", fmt.Sprintf("%s://%s:%d/%s", scheme, host, s.cfg.Port, s.cfg.AccessPath))
+
+		var err error
+		if s.cfg.TLSEnabled {
+			// Zertifikat und Schlüssel stecken in der TLSConfig.
+			err = srv.ListenAndServeTLS("", "")
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()

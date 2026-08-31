@@ -245,6 +245,34 @@ Die Rollenprüfung im Frontend (`hasRole`) blendet nur aus. Durchgesetzt wird si
 im Server bei jeder Anfrage — eine ausgeblendete Route ist Bequemlichkeit, kein
 Schutz.
 
+## TLS des Panels
+
+Das Panel terminiert TLS selbst, statt sich hinter nginx zu stellen. Der Grund
+ist der Notfall: wer eine kaputte nginx-Konfiguration reparieren will, braucht
+das Panel gerade dann, wenn nginx nicht mehr ausliefert. Ein Reverse-Proxy
+davor bliebe möglich (`tls: false` plus `trust_proxy: true`), ist aber nicht
+der Standardweg.
+
+Beim ersten Start entsteht ein selbstsigniertes Zertifikat unter
+`{cert_dir}/panel/`. Es ist nicht vertrauenswürdig und soll es nicht sein — es
+schließt nur das Fenster zwischen Installation und erstem `volt cert issue`,
+in dem sonst das Administratorpasswort im Klartext über die Leitung ginge.
+Solange es gilt, warnt der Browser. Das ist die richtige Warnung.
+
+Ein über ACME geholtes Zertifikat für die `panel_domain` hat Vorrang. Der
+Webserver prüft bei jedem Handshake, ob die Datei neuer ist, und übernimmt sie
+ohne Neustart — sonst würde jede Erneuerung die offenen Metrik-Streams
+abreißen lassen. Sind beim Erneuern beide Dateien unlesbar, behält er das
+Zertifikat im Speicher: ein misslungenes Erneuern darf nicht genau den
+aussperren, der es reparieren müsste.
+
+Der private Schlüssel gehört dabei dem Panel-Benutzer, nicht root. Der Agent
+schreibt Zertifikate sonst als root mit 0600 — richtig für nginx, aber
+unlesbar für volt-web. Welche Domain die des Panels ist, liest der Agent aus
+seiner eigenen Konfiguration, nicht aus der Anfrage. Sonst könnte ein
+übernommener Web-Prozess sich zum Eigentümer eines beliebigen fremden
+Schlüssels erklären.
+
 ## Was noch offen ist
 
 - **SSRF** bei Webhook- und Cloudflare-Aufrufen: die ausgehenden Ziele werden

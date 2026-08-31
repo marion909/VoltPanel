@@ -1,0 +1,187 @@
+package core
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/store"
+)
+
+// updateEnv stellt zwei "Binaries" und einen Server bereit, der ihre
+// Nachfolger ausliefert.
+type updateEnv struct {
+	updater   *Updater
+	release   *Release
+	voltPath  string
+	agentPath string
+}
+
+func newUpdateEnv(t *testing.T, serveAgent bool) *updateEnv {
+	t.Helper()
+
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "etc"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	voltPath := filepath.Join(binDir, "volt")
+	agentPath := filepath.Join(binDir, "volt-agent")
+	write(t, voltPath, "alt-volt")
+	write(t, agentPath, "alt-agent")
+
+	newVolt, newAgent := []byte("neu-volt"), []byte("neu-agent")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/volt", func(w http.ResponseWriter, _ *http.Request) { w.Write(newVolt) })
+	if serveAgent {
+		mux.HandleFunc("/agent", func(w http.ResponseWriter, _ *http.Request) { w.Write(newAgent) })
+	}
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	st, err := store.Open(filepath.Join(dir, "volt.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+
+	cfg := config.Default()
+	cfg.DataDir, cfg.ConfigDir = dir, filepath.Join(dir, "etc")
+	cfg.BackupDir, cfg.DBPath = filepath.Join(dir, "backups"), filepath.Join(dir, "volt.db")
+
+	u := NewUpdater(cfg, st, slog.New(slog.DiscardHandler))
+	u.self = voltPath
+
+	rel := &Release{
+		Version: "9.9.9",
+		Assets: map[string]ReleaseAsset{
+			Platform(): {
+				URL: srv.URL + "/volt", SHA256: sum(newVolt), Size: int64(len(newVolt)),
+				Agent: &ReleaseAsset{
+					URL: srv.URL + "/agent", SHA256: sum(newAgent), Size: int64(len(newAgent)),
+				},
+			},
+		},
+	}
+
+	return &updateEnv{updater: u, release: rel, voltPath: voltPath, agentPath: agentPath}
+}
+
+// TestApplySwapsBothBinaries hält fest, worum es geht: ein neues Panel mit
+// altem Agent sprechen irgendwann verschiedene Protokolle.
+func TestApplySwapsBothBinaries(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	ctx := context.Background()
+
+	snap, err := env.updater.Snapshot(ctx)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	if snap.AgentPath == "" {
+		t.Fatal("der agent wurde nicht mitgesichert — ein rollback könnte ihn nicht zurückholen")
+	}
+
+	if err := env.updater.Apply(ctx, env.release, snap); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	if got := read(t, env.voltPath); got != "neu-volt" {
+		t.Errorf("volt ist %q, erwartet neu-volt", got)
+	}
+	if got := read(t, env.agentPath); got != "neu-agent" {
+		t.Errorf("agent ist %q, erwartet neu-agent", got)
+	}
+}
+
+// TestApplyRollsBackWhenAgentIsUnavailable deckt Prinzip 4 der Roadmap ab:
+// ein halbes Update ist schlimmer als gar keines.
+func TestApplyRollsBackWhenAgentIsUnavailable(t *testing.T) {
+	env := newUpdateEnv(t, false) // der Server liefert /agent nicht aus
+	ctx := context.Background()
+
+	snap, err := env.updater.Snapshot(ctx)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+
+	if err := env.updater.Apply(ctx, env.release, snap); err == nil {
+		t.Fatal("apply meldete erfolg, obwohl der agent nicht ladbar war")
+	}
+
+	if got := read(t, env.voltPath); got != "alt-volt" {
+		t.Errorf("volt blieb auf %q — der rollback hat das binary nicht zurückgeholt", got)
+	}
+	if got := read(t, env.agentPath); got != "alt-agent" {
+		t.Errorf("agent ist %q, erwartet alt-agent", got)
+	}
+}
+
+// TestApplyRejectsManipulatedBinary: die Prüfsumme ist der eigentliche Schutz.
+func TestApplyRejectsManipulatedBinary(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	ctx := context.Background()
+
+	asset := env.release.Assets[Platform()]
+	asset.SHA256 = sum([]byte("etwas ganz anderes"))
+	env.release.Assets[Platform()] = asset
+
+	snap, err := env.updater.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := env.updater.Apply(ctx, env.release, snap); err == nil {
+		t.Fatal("ein binary mit falscher prüfsumme wurde installiert")
+	}
+	if got := read(t, env.voltPath); got != "alt-volt" {
+		t.Errorf("volt wurde trotz falscher prüfsumme ersetzt (%q)", got)
+	}
+}
+
+func TestAgentPathNextTo(t *testing.T) {
+	dir := t.TempDir()
+	self := filepath.Join(dir, "volt")
+	write(t, self, "x")
+
+	if got := agentPathNextTo(self); got != "" {
+		t.Errorf("ohne agent-datei sollte %q leer sein", got)
+	}
+	write(t, filepath.Join(dir, "volt-agent"), "y")
+	if got := agentPathNextTo(self); got != filepath.Join(dir, "volt-agent") {
+		t.Errorf("agent nicht gefunden: %q", got)
+	}
+}
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func sum(b []byte) string {
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}

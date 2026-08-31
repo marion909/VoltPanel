@@ -92,6 +92,7 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 **Phase 2**
 
 - PHP-Extension-Manager (Erweiterungen installieren und aktivieren)
+- Panel-Zertifikat über die Oberfläche beantragen (über die CLI geht es)
 - HSTS-Schalter in der Oberfläche (im Datenmodell und Template vorhanden)
 
 **Phase 3**
@@ -121,10 +122,12 @@ Härtungsphase stehen vollständig aus.
 
 ## Bekannte Einschränkungen
 
-- `get.voltpanel.dev` ist nicht aufgeschaltet und es gibt noch kein Release.
-  Installiert wird deshalb über das Offline-Paket aus `make dist`; `volt update`
-  läuft erst, wenn `update_base_url` auf eine erreichbare Adresse zeigt.
+- Der `beta`-Kanal ist nicht eingerichtet. GitHub führt Vorabversionen nicht
+  unter „latest", die Weiterleitung von `get.…/stable/` greift für sie also
+  nicht.
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
+  `volt cert issue <panel_domain>` ersetzt es; die Übernahme braucht keinen
+  Neustart.
 - Die Speicherquota greift gegen den Stand der letzten Messung (stündlich).
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
   Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.

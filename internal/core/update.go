@@ -30,6 +30,10 @@ type Updater struct {
 	store *store.Store
 	log   *slog.Logger
 	http  *http.Client
+
+	// self ist der Pfad des eigenen Binaries. Er ist überschreibbar, damit die
+	// Tests den Tausch üben können, ohne das Testbinary zu ersetzen.
+	self string
 }
 
 func NewUpdater(cfg *config.Config, st *store.Store, log *slog.Logger) *Updater {
@@ -40,6 +44,20 @@ func NewUpdater(cfg *config.Config, st *store.Store, log *slog.Logger) *Updater 
 		cfg: cfg, store: st, log: log,
 		http: &http.Client{Timeout: 10 * time.Minute},
 	}
+}
+
+// selfPath ist der Pfad des laufenden Binaries.
+func (u *Updater) selfPath() (string, error) {
+	if u.self != "" {
+		return u.self, nil
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	// Über einen Symlink zeigte der Tausch sonst auf den Link statt auf die
+	// Datei — und der Rollback liefe ins Leere.
+	return filepath.EvalSymlinks(self)
 }
 
 // Release beschreibt eine Version aus dem Update-Kanal.
@@ -54,6 +72,10 @@ type ReleaseAsset struct {
 	URL    string `json:"url"`
 	SHA256 string `json:"sha256"`
 	Size   int64  `json:"size"`
+	// Agent ist das passende volt-agent-Binary. Ohne dieses Feld bliebe der
+	// Agent auf dem alten Stand, während das Panel schon neu ist — die beiden
+	// sprechen dann irgendwann verschiedene Protokolle.
+	Agent *ReleaseAsset `json:"agent,omitempty"`
 }
 
 // Platform ist der Asset-Schlüssel für das laufende System.
@@ -93,6 +115,7 @@ func (u *Updater) LatestRelease(ctx context.Context) (*Release, error) {
 type Snapshot struct {
 	Dir        string
 	BinaryPath string
+	AgentPath  string // leer, wenn neben volt kein volt-agent lag
 	DBPath     string
 	Version    string
 	SchemaFrom int
@@ -118,12 +141,21 @@ func (u *Updater) Snapshot(ctx context.Context) (*Snapshot, error) {
 		DBPath:     filepath.Join(dir, "volt.db"),
 	}
 
-	self, err := os.Executable()
+	self, err := u.selfPath()
 	if err != nil {
 		return nil, fmt.Errorf("eigenen pfad ermitteln: %w", err)
 	}
 	if err := copyFile(self, snap.BinaryPath, 0o755); err != nil {
 		return nil, fmt.Errorf("binary sichern: %w", err)
+	}
+	// Der Agent liegt neben dem Binary. Fehlt er, ist das kein Fehler: in der
+	// Entwicklung läuft das Panel auch allein.
+	if agent := agentPathNextTo(self); agent != "" {
+		dst := filepath.Join(dir, "volt-agent")
+		if err := copyFile(agent, dst, 0o755); err != nil {
+			return nil, fmt.Errorf("agent sichern: %w", err)
+		}
+		snap.AgentPath = dst
 	}
 	// VACUUM INTO liefert eine in sich konsistente Kopie, auch während Schreibzugriffe laufen.
 	if err := u.store.Backup(ctx, snap.DBPath); err != nil {
@@ -147,11 +179,8 @@ func (u *Updater) Apply(ctx context.Context, rel *Release, snap *Snapshot) error
 		return fmt.Errorf("release %s enthält kein paket für %s", rel.Version, Platform())
 	}
 
-	self, err := os.Executable()
+	self, err := u.selfPath()
 	if err != nil {
-		return err
-	}
-	if self, err = filepath.EvalSymlinks(self); err != nil {
 		return err
 	}
 
@@ -168,6 +197,34 @@ func (u *Updater) Apply(ctx context.Context, rel *Release, snap *Snapshot) error
 		return fmt.Errorf("binary tauschen: %w", err)
 	}
 	u.log.Info("binary getauscht", "pfad", self, "version", rel.Version)
+
+	// Der Agent muss zur selben Version gehören. Scheitert sein Tausch, wird
+	// sofort zurückgerollt: ein neues Panel mit altem Agent ist ein Zustand,
+	// in dem Operationen unvorhersehbar fehlschlagen.
+	if agent := agentPathNextTo(self); agent != "" {
+		switch {
+		case asset.Agent == nil:
+			u.log.Warn("release enthält kein agent-binary, der agent bleibt auf dem alten stand",
+				"pfad", agent)
+		default:
+			agentTmp := agent + ".new"
+			if err := u.download(ctx, *asset.Agent, agentTmp); err != nil {
+				os.Remove(agentTmp)
+				if rbErr := u.Rollback(ctx, snap); rbErr != nil {
+					return fmt.Errorf("agent laden fehlgeschlagen (%w) UND rollback fehlgeschlagen: %v", err, rbErr)
+				}
+				return fmt.Errorf("agent laden fehlgeschlagen, stand wurde zurückgerollt: %w", err)
+			}
+			if err := os.Rename(agentTmp, agent); err != nil {
+				os.Remove(agentTmp)
+				if rbErr := u.Rollback(ctx, snap); rbErr != nil {
+					return fmt.Errorf("agent tauschen fehlgeschlagen (%w) UND rollback fehlgeschlagen: %v", err, rbErr)
+				}
+				return fmt.Errorf("agent tauschen fehlgeschlagen, stand wurde zurückgerollt: %w", err)
+			}
+			u.log.Info("agent getauscht", "pfad", agent)
+		}
+	}
 
 	from, to, err := u.store.Migrate(ctx)
 	if err != nil {
@@ -189,11 +246,8 @@ func (u *Updater) Rollback(_ context.Context, snap *Snapshot) error {
 		return errors.New("kein snapshot vorhanden")
 	}
 
-	self, err := os.Executable()
+	self, err := u.selfPath()
 	if err != nil {
-		return err
-	}
-	if self, err = filepath.EvalSymlinks(self); err != nil {
 		return err
 	}
 
@@ -202,6 +256,17 @@ func (u *Updater) Rollback(_ context.Context, snap *Snapshot) error {
 	}
 	if err := os.Rename(self+".rollback", self); err != nil {
 		return fmt.Errorf("altes binary zurücktauschen: %w", err)
+	}
+
+	if snap.AgentPath != "" {
+		if agent := agentPathNextTo(self); agent != "" {
+			if err := copyFile(snap.AgentPath, agent+".rollback", 0o755); err != nil {
+				return fmt.Errorf("alten agent bereitstellen: %w", err)
+			}
+			if err := os.Rename(agent+".rollback", agent); err != nil {
+				return fmt.Errorf("alten agent zurücktauschen: %w", err)
+			}
+		}
 	}
 
 	// Die Datenbank zuletzt: erst wenn das alte Binary wieder liegt, passt das
@@ -219,6 +284,20 @@ func (u *Updater) Rollback(_ context.Context, snap *Snapshot) error {
 
 	u.log.Info("rollback abgeschlossen", "version", snap.Version, "snapshot", snap.Dir)
 	return nil
+}
+
+// agentPathNextTo liefert den Pfad des Agents neben dem übergebenen Binary,
+// oder "", wenn dort keiner liegt.
+//
+// Beide Binaries im selben Verzeichnis zu erwarten ist keine Bequemlichkeit,
+// sondern Voraussetzung: os.Rename arbeitet nur innerhalb eines Dateisystems,
+// und nur ein Rename tauscht atomar.
+func agentPathNextTo(self string) string {
+	p := filepath.Join(filepath.Dir(self), "volt-agent")
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
 }
 
 // download lädt das Asset und prüft die Prüfsumme, bevor die Datei benutzt wird.

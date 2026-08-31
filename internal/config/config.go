@@ -23,6 +23,12 @@ type Config struct {
 	AccessPath string // "geheimer" Pfad-Präfix fürs Panel, leer = /
 	TrustProxy bool
 
+	// TLS des Panels selbst
+	PanelDomain string // Hostname, unter dem das Panel erreichbar ist
+	TLSEnabled  bool   // false nur, wenn ein eigener Proxy davor terminiert
+	TLSCert     string // ausdrücklicher Pfad, sonst aus CertDir abgeleitet
+	TLSKey      string
+
 	// Pfade
 	DataDir    string // /var/lib/volt
 	ConfigDir  string // /etc/volt
@@ -51,10 +57,13 @@ type Config struct {
 
 func Default() *Config {
 	return &Config{
-		ListenAddr:    "0.0.0.0",
-		Port:          8443,
-		AccessPath:    "",
-		TrustProxy:    false,
+		ListenAddr: "0.0.0.0",
+		Port:       8443,
+		AccessPath: "",
+		TrustProxy: false,
+		// Das Panel terminiert selbst: es muss auch dann erreichbar bleiben,
+		// wenn nginx gerade kaputt ist — genau dann braucht man es.
+		TLSEnabled:    true,
 		DataDir:       "/var/lib/volt",
 		ConfigDir:     "/etc/volt",
 		LogDir:        "/var/log/volt",
@@ -134,6 +143,10 @@ var fieldSetters = map[string]func(*Config, string) error{
 	"port":            func(c *Config, v string) error { return setInt(&c.Port, v) },
 	"access_path":     func(c *Config, v string) error { c.AccessPath = strings.Trim(v, "/"); return nil },
 	"trust_proxy":     func(c *Config, v string) error { c.TrustProxy = isTrue(v); return nil },
+	"panel_domain":    func(c *Config, v string) error { c.PanelDomain = strings.TrimSpace(v); return nil },
+	"tls":             func(c *Config, v string) error { c.TLSEnabled = isTrue(v); return nil },
+	"tls_cert":        func(c *Config, v string) error { c.TLSCert = v; return nil },
+	"tls_key":         func(c *Config, v string) error { c.TLSKey = v; return nil },
 	"data_dir":        func(c *Config, v string) error { c.DataDir = v; return nil },
 	"config_dir":      func(c *Config, v string) error { c.ConfigDir = v; return nil },
 	"log_dir":         func(c *Config, v string) error { c.LogDir = v; return nil },
@@ -184,6 +197,42 @@ func (c *Config) Validate() error {
 // SiteRoot ist das Wurzelverzeichnis einer Site. Alle Datei-Operationen werden
 // gegen diesen Pfad eingesperrt.
 func (c *Config) SiteRoot(domain string) string { return filepath.Join(c.SitesDir, domain) }
+
+// CertPair ist ein Paar aus Zertifikat und zugehörigem Schlüssel.
+type CertPair struct{ Cert, Key string }
+
+// SelfSignedPanelCert ist der Platz für das Notzertifikat, das beim ersten
+// Start entsteht. Es liegt bewusst nicht unter dem Domainnamen: sonst würde
+// ein späteres echtes Zertifikat für dieselbe Domain daneben liegen und man
+// müsste raten, welches gerade gilt.
+func (c *Config) SelfSignedPanelCert() CertPair {
+	dir := filepath.Join(c.CertDir, "panel")
+	return CertPair{
+		Cert: filepath.Join(dir, "fullchain.pem"),
+		Key:  filepath.Join(dir, "privkey.pem"),
+	}
+}
+
+// PanelTLSChain sind die Zertifikate des Panels in absteigender Güte.
+//
+// Der Webserver nimmt das erste, das lesbar ist, und prüft bei jedem
+// Handshake nach. Dadurch übernimmt ein frisch geholtes Zertifikat ohne
+// Neustart — ein Neustart würde beim Erneuern die offenen Metrik-Streams
+// abreißen lassen.
+func (c *Config) PanelTLSChain() []CertPair {
+	var chain []CertPair
+	if c.TLSCert != "" && c.TLSKey != "" {
+		chain = append(chain, CertPair{Cert: c.TLSCert, Key: c.TLSKey})
+	}
+	if c.PanelDomain != "" {
+		dir := filepath.Join(c.CertDir, c.PanelDomain)
+		chain = append(chain, CertPair{
+			Cert: filepath.Join(dir, "fullchain.pem"),
+			Key:  filepath.Join(dir, "privkey.pem"),
+		})
+	}
+	return append(chain, c.SelfSignedPanelCert())
+}
 
 func setInt(dst *int, v string) error {
 	n, err := strconv.Atoi(strings.TrimSpace(v))

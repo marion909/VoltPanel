@@ -79,8 +79,14 @@ Installer.
 cd /tmp
 tar xzf voltpanel_0.1.0_linux_amd64.tar.gz
 cd voltpanel_0.1.0_linux_amd64
+
+VOLT_PANEL_DOMAIN=panel.example.at \
+VOLT_ACME_EMAIL=du@example.at \
 VOLT_LOCAL_DIR="$PWD" bash install.sh
 ```
+
+Den ganzen Weg von der DNS-Zone bis zum ersten Release beschreibt
+[docs/inbetriebnahme.md](docs/inbetriebnahme.md).
 
 `VOLT_LOCAL_DIR` überspringt den Download und nimmt die mitgelieferten
 Dateien. Der Installer richtet ein: nginx, PHP 8.3 aus dem Sury-Repo, MariaDB,
@@ -104,8 +110,12 @@ sudo -u volt volt cert issue example.at           gültiges Zertifikat
 Datenbank ihm gehört. Ein Aufruf als root funktioniert auch — `volt` gibt die
 Datenbankdateien danach wieder frei —, aber der Umweg ist der sauberere Weg.
 
-In `/etc/volt/config.yaml` lohnen sich gleich zwei Einträge: `acme_email` für
-die Ablaufwarnungen von Let's Encrypt und `ip_whitelist`, wenn nur bestimmte
+Das Panel terminiert TLS selbst und startet mit einem selbstsignierten
+Zertifikat. Sobald die Domain darauf zeigt, ersetzt
+`volt cert issue panel.example.at` es durch ein gültiges — ohne Neustart, das
+Panel prüft bei jedem Handshake auf eine neuere Datei.
+
+In `/etc/volt/config.yaml` lohnt sich noch `ip_whitelist`, wenn nur bestimmte
 Adressen ans Panel dürfen. Danach `systemctl restart volt-web`.
 
 ### Stellschrauben des Installers
@@ -113,6 +123,8 @@ Adressen ans Panel dürfen. Danach `systemctl restart volt-web`.
 | Variable | Wirkung |
 |---|---|
 | `VOLT_PORT` | Port des Panels (Vorgabe 8443) |
+| `VOLT_PANEL_DOMAIN` | Hostname des Panels — steht im Zertifikat |
+| `VOLT_ACME_EMAIL` | Adresse für Let's Encrypt, ohne sie kein Zertifikat |
 | `VOLT_SKIP_MARIADB=1` | MariaDB nicht mitinstallieren, weil die Datenbank woanders läuft |
 | `VOLT_LOCAL_DIR` | Binaries und Units aus diesem Verzeichnis statt aus dem Netz |
 | `VOLT_CHANNEL` | `stable` oder `beta` |
@@ -233,6 +245,11 @@ Kurzfassung — ausführlich in [docs/sicherheit.md](docs/sicherheit.md):
   Server-Block aufbrechen wollen.
 - **Nginx wird nie ungeprüft neu geladen.** Schreiben, `nginx -t`, und bei einem
   Fehler zurück auf den letzten funktionierenden Stand.
+- **Das Panel spricht nur TLS.** Es terminiert selbst statt hinter nginx —
+  wer eine kaputte nginx-Config reparieren will, braucht das Panel gerade
+  dann. Ohne gültiges Zertifikat erzeugt es beim ersten Start ein
+  selbstsigniertes, damit zwischen Installation und `volt cert issue` kein
+  Passwort im Klartext über die Leitung geht.
 - **Argon2id** für Passwörter, Sessions nur als SHA-256-Hash gespeichert,
   TOTP-Secrets und API-Tokens mit AES-256-GCM verschlüsselt.
 - **Zwei Gefängnisse für Dateien.** Der Agent sperrt auf `/var/www` — das
