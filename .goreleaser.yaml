@@ -8,7 +8,9 @@ project_name: voltpanel
 
 before:
   hooks:
-    - go mod tidy
+    # download statt tidy: tidy wuerde go.mod im Release-Lauf veraendern
+    # koennen, und ein Release soll genau den Stand bauen, der getaggt wurde.
+    - go mod download
     - ./scripts/build-web.sh
 
 builds:

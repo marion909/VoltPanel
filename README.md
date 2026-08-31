@@ -177,7 +177,9 @@ Beim ersten Start:
 VOLT_CONFIG=$PWD/tmp/etc/config.yaml ./bin/volt setup --email du@example.at
 ```
 
-Voraussetzungen: Go 1.24+, Node 22+ (nur zum Bauen des Frontends).
+Voraussetzungen: Go 1.25+, Node 22+ (nur zum Bauen des Frontends). Die
+genaue Untergrenze steht in `go.mod`; CI liest sie von dort, damit beide
+nicht auseinanderlaufen.
 
 ## CLI
 
