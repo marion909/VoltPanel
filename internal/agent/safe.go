@@ -44,6 +44,10 @@ var allowedBinaries = map[string]string{
 	"mysql":     "/usr/bin/mysql",
 	"mysqldump": "/usr/bin/mysqldump",
 	"crontab":   "/usr/bin/crontab",
+	// Für das Update: der Agent ruft `volt update` auf, statt den Tausch
+	// selbst nachzubauen. Snapshot, Prüfsumme und automatischer Rollback
+	// stecken dort und sind getestet.
+	"volt": "/usr/local/bin/volt",
 }
 
 var (

@@ -667,3 +667,28 @@ func TestCloudflareTokenNeverReturned(t *testing.T) {
 		t.Fatalf("Token wurde nicht entfernt: %s", rec.Body.String())
 	}
 }
+
+// --- Update über die Oberfläche --------------------------------------------
+
+// TestUpdateStatusNeedsSession: die Version des Panels und der Hinweis auf ein
+// Update sind nichts für Unangemeldete.
+func TestUpdateStatusNeedsSession(t *testing.T) {
+	ts := newTestServer(t)
+
+	if rec := ts.do(http.MethodGet, "/api/v1/system/update", nil); rec.Code != http.StatusUnauthorized {
+		t.Errorf("Status %d, erwartet 401", rec.Code)
+	}
+}
+
+// TestUpdateStartNeedsAdmin hält die Rollengrenze fest. Ein Update tauscht
+// beide Binaries und startet das Panel neu — das darf kein Kunde auslösen,
+// auch nicht für seinen eigenen Mandanten.
+func TestUpdateStartNeedsAdmin(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // bob ist Kunde
+
+	rec := ts.do(http.MethodPost, "/api/v1/system/update", map[string]string{})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Status %d, erwartet 403 — ein Kunde darf das Panel nicht aktualisieren", rec.Code)
+	}
+}

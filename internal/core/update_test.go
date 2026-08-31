@@ -185,3 +185,28 @@ func sum(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
+
+func TestSameVersionIgnoresTagPrefix(t *testing.T) {
+	same := [][2]string{
+		{"0.1.4", "v0.1.4"},
+		{"v0.1.4", "0.1.4"},
+		{" 0.1.4 ", "0.1.4"},
+		{"0.1.4", "0.1.4"},
+	}
+	for _, c := range same {
+		if !sameVersion(c[0], c[1]) {
+			t.Errorf("%q und %q sollten dieselbe Version sein", c[0], c[1])
+		}
+	}
+
+	differ := [][2]string{
+		{"0.1.4", "0.1.5"},
+		{"0.1.4", "0.1.4-beta.1"},
+		{"", "0.1.4"},
+	}
+	for _, c := range differ {
+		if sameVersion(c[0], c[1]) {
+			t.Errorf("%q und %q sind verschiedene Versionen", c[0], c[1])
+		}
+	}
+}

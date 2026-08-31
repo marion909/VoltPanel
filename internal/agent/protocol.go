@@ -40,6 +40,7 @@ const (
 	OpNginxRemoveVhost Op = "nginx.remove_vhost"
 	OpNginxTest        Op = "nginx.test"
 	OpNginxReload      Op = "nginx.reload"
+	OpSystemUpdate     Op = "system.update"
 	OpNginxWriteShared Op = "nginx.write_shared"
 	OpNginxWriteAuth   Op = "nginx.write_htpasswd"
 	OpNginxRemoveAuth  Op = "nginx.remove_htpasswd"
@@ -314,6 +315,20 @@ type FileEntry struct {
 
 type TextResult struct {
 	Text string `json:"text"`
+}
+
+// UpdateResult beschreibt, was ein Update bewirkt hat.
+//
+// Es gibt keine UpdateParams: der Agent nimmt für das Update nichts entgegen.
+// Welche Version installiert wird, ergibt sich allein aus dem Kanal in seiner
+// eigenen Konfiguration. Dürfte der Web-Prozess eine Quelle mitgeben, wäre
+// jede Übernahme des Panels ein Weg, beliebigen Code als root auszuführen.
+type UpdateResult struct {
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Changed   bool   `json:"changed"`
+	Restarted bool   `json:"restarted"`
+	Output    string `json:"output"`
 }
 
 type SystemInfo struct {

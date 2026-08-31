@@ -55,13 +55,30 @@ for arch in amd64 arm64; do
     done
 done
 
+# Die Release-Notes wandern in den Fahrplan, damit das Panel sie anzeigen kann,
+# ohne nach aussen zu telefonieren. GoReleaser hat das Release in diesem Lauf
+# schon angelegt, der Text steht also bereit.
+NOTES=""
+if command -v gh >/dev/null 2>&1; then
+    NOTES="$(gh release view "$TAG" --repo "$REPO" --json body --jq '.body' 2>/dev/null || true)"
+fi
+# Gedeckelt: der Fahrplan wird bei jedem Dashboard-Aufruf geladen, und ein
+# ausuferndes Changelog gehoert auf die Release-Seite, nicht ins Panel.
+NOTES="$(printf '%s' "$NOTES" | head -c 8000)"
+
+# JSON-gerecht kodieren. jq uebernimmt das Escapen von Zeilenumbruechen und
+# Anfuehrungszeichen - von Hand waere das genau die Sorte Fehler, die erst beim
+# ersten Release mit einem Apostroph auffaellt.
+NOTES_JSON="$(printf '%s' "$NOTES" | jq -Rs .)"
+
 # latest.json ist der einzige Fahrplan, den `volt update` liest. Die Adressen
 # stehen absolut darin: der Kanal sagt nur, wo der Fahrplan liegt, nicht wo
 # die Binaries liegen.
 {
     printf '{\n'
     printf '  "version": "%s",\n' "$VERSION"
-    printf '  "notes": "https://github.com/%s/releases/tag/%s",\n' "$REPO" "$TAG"
+    printf '  "notes": %s,\n' "$NOTES_JSON"
+    printf '  "url": "https://github.com/%s/releases/tag/%s",\n' "$REPO" "$TAG"
     printf '  "assets": {\n'
     sep=""
     for arch in amd64 arm64; do

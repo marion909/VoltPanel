@@ -17,8 +17,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - Agent/Web-Trennung mit typisiertem Socket-Protokoll und Whitelist
 - `install.sh`: OS- und Architekturerkennung, Sury-Repo, Benutzer, Verzeichnisse,
   systemd-Units, Firewall, Ersteinrichtung mit erzeugtem Passwort
-- `volt update`: Snapshot, Prüfsummenvergleich, atomarer Tausch, Migration,
-  automatischer Rollback bei Fehler, `--check` und `--dry-run`
+- `volt update`: Snapshot, Prüfsummenvergleich, atomarer Tausch beider
+  Binaries, Migration, automatischer Rollback bei Fehler, `--check` und
+  `--dry-run`. Über die Oberfläche auslösbar: das Panel meldet neue Versionen
+  samt Release-Notes, der Agent führt den Tausch aus und nimmt dafür keine
+  Quelle entgegen.
 
 **Phase 1 — Core & Dashboard**
 

@@ -36,6 +36,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpNginxTest:        s.opNginxTest,
 		OpNginxReload:      s.opNginxReload,
 		OpNginxWriteShared: s.opNginxWriteShared,
+		OpSystemUpdate:     s.opSystemUpdate,
 		OpNginxWriteAuth:   s.opNginxWriteAuth,
 		OpNginxRemoveAuth:  s.opNginxRemoveAuth,
 

@@ -273,6 +273,32 @@ seiner eigenen Konfiguration, nicht aus der Anfrage. Sonst könnte ein
 übernommener Web-Prozess sich zum Eigentümer eines beliebigen fremden
 Schlüssels erklären.
 
+## Update aus der Oberfläche
+
+Ein Update von der Weboberfläche aus ist der naheliegendste Weg, aus einer
+Übernahme des Panels root zu machen: wer bestimmen darf, welches Programm als
+root installiert wird, hat gewonnen.
+
+Deshalb nimmt die Agent-Operation `system.update` **keine Parameter**. Keine
+Adresse, keine Prüfsumme, keine Version. Der Web-Prozess kann das Update
+anstoßen, aber nicht sagen, was installiert werden soll. Woher die Dateien
+kommen, steht im Kanal in `/etc/volt/config.yaml` — einer Datei, die der
+Web-Prozess nicht schreiben darf, weder über die Rechte noch durch die
+Einhängung seiner Unit. Mitgeschickte Parameter werden abgewiesen statt
+ignoriert.
+
+Der Tausch selbst läuft über `volt update` und nicht über eine Nachbildung im
+Agent: Snapshot vor dem Tausch, Prüfsumme gegen den Fahrplan und automatischer
+Rollback bei fehlgeschlagener Migration stecken dort und sind getestet.
+
+Auslösen darf die Operation nur, wer auch Dienste neu starten darf. Der Stand
+selbst — installierte Version, ob etwas Neueres vorliegt — ist für jeden
+Angemeldeten sichtbar; er steht als Hinweis in der Oberfläche.
+
+Was fehlt: die Release-Signatur wird erzeugt, aber nicht geprüft. Es wirkt
+bisher nur der SHA-256-Vergleich gegen `latest.json`, und der ist genau so
+vertrauenswürdig wie die HTTPS-Verbindung zum Kanal.
+
 ## Was noch offen ist
 
 - **SSRF** bei Webhook- und Cloudflare-Aufrufen: die ausgehenden Ziele werden

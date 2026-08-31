@@ -137,6 +137,16 @@ liegen bleiben kann.
 
 ### Aktualisieren
 
+Über die Oberfläche unter *Einstellungen → Version und Aktualisierung*: das
+Panel zeigt an, wenn der Kanal etwas Neueres führt, samt Release-Notes, und
+ein Administrator kann das Update von dort auslösen. Der Web-Prozess tauscht
+dabei nichts selbst — er ruft eine typisierte Operation beim Agent auf, und
+die nimmt **keine Quelle entgegen**: welche Version kommt, steht allein im
+Kanal aus der Konfiguration. Andernfalls wäre das Update die Hintertür, über
+die eine Übernahme des Panels zu root führt.
+
+Oder auf der Kommandozeile:
+
 ```bash
 volt update
 systemctl restart volt-agent volt-web

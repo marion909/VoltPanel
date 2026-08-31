@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/marion909/voltpanel/internal/config"
@@ -30,6 +31,13 @@ type Updater struct {
 	store *store.Store
 	log   *slog.Logger
 	http  *http.Client
+
+	// Der Kanal wird höchstens einmal je Stunde befragt. Ohne den
+	// Zwischenspeicher fragte jeder Aufruf des Dashboards nach außen — bei
+	// mehreren offenen Fenstern im Minutentakt.
+	mu      sync.Mutex
+	cached  *UpdateStatus
+	fetched time.Time
 
 	// self ist der Pfad des eigenen Binaries. Er ist überschreibbar, damit die
 	// Tests den Tausch üben können, ohne das Testbinary zu ersetzen.
@@ -64,6 +72,9 @@ func (u *Updater) selfPath() (string, error) {
 type Release struct {
 	Version string `json:"version"`
 	Notes   string `json:"notes"`
+	// URL zeigt auf die Release-Seite. Notes trägt den Text selbst, damit das
+	// Panel ihn anzeigen kann, ohne nach außen zu telefonieren.
+	URL string `json:"url,omitempty"`
 	// Assets sind nach "linux_amd64" / "linux_arm64" benannt.
 	Assets map[string]ReleaseAsset `json:"assets"`
 }
@@ -76,6 +87,72 @@ type ReleaseAsset struct {
 	// Agent auf dem alten Stand, während das Panel schon neu ist — die beiden
 	// sprechen dann irgendwann verschiedene Protokolle.
 	Agent *ReleaseAsset `json:"agent,omitempty"`
+}
+
+// UpdateStatus ist die Antwort auf "gibt es etwas Neues?".
+type UpdateStatus struct {
+	Current   string    `json:"current"`
+	Latest    string    `json:"latest,omitempty"`
+	Available bool      `json:"available"`
+	Notes     string    `json:"notes,omitempty"`
+	URL       string    `json:"url,omitempty"`
+	Channel   string    `json:"channel"`
+	CheckedAt time.Time `json:"checked_at"`
+	// Error steht drin, wenn der Kanal nicht erreichbar war. Das ist kein
+	// Fehler der Anfrage: das Panel läuft weiter, es weiß nur gerade nicht,
+	// ob es etwas Neues gibt — und das soll man sehen.
+	Error string `json:"error,omitempty"`
+}
+
+const updateCacheTTL = time.Hour
+
+// UpdateStatus fragt den Kanal, höchstens einmal je Stunde.
+//
+// force übergeht den Zwischenspeicher — für den Knopf "Jetzt prüfen", bei dem
+// eine Antwort von vor 50 Minuten wie ein kaputter Knopf aussähe.
+func (u *Updater) UpdateStatus(ctx context.Context, force bool) UpdateStatus {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	if !force && u.cached != nil && time.Since(u.fetched) < updateCacheTTL {
+		return *u.cached
+	}
+
+	status := UpdateStatus{
+		Current:   version.Version,
+		Channel:   u.cfg.UpdateChannel,
+		CheckedAt: time.Now(),
+	}
+
+	rel, err := u.LatestRelease(ctx)
+	switch {
+	case err != nil:
+		status.Error = err.Error()
+		// Einen alten Stand behalten statt ihn wegzuwerfen: eine kurze
+		// Störung soll nicht so aussehen, als gäbe es kein Update mehr.
+		if u.cached != nil {
+			status.Latest, status.Available = u.cached.Latest, u.cached.Available
+			status.Notes, status.URL = u.cached.Notes, u.cached.URL
+		}
+	default:
+		status.Latest, status.Notes, status.URL = rel.Version, rel.Notes, rel.URL
+		status.Available = rel.Version != "" && !sameVersion(rel.Version, version.Version)
+	}
+
+	u.cached, u.fetched = &status, time.Now()
+	return status
+}
+
+// sameVersion vergleicht zwei Versionsangaben.
+//
+// Der Fahrplan führt "0.1.4", ein aus dem Tag gebautes Binary kann "v0.1.4"
+// melden. Ein Vergleich auf Zeichengleichheit meldete dann dauerhaft ein
+// Update, das keines ist — und ein Hinweis, der nie weggeht, wird ignoriert.
+func sameVersion(a, b string) bool {
+	norm := func(v string) string {
+		return strings.TrimPrefix(strings.TrimSpace(v), "v")
+	}
+	return norm(a) == norm(b)
 }
 
 // Platform ist der Asset-Schlüssel für das laufende System.

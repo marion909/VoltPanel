@@ -146,6 +146,12 @@ func (s *Server) setupRoutes() {
 	auth.GET("/system/services", s.handleServices)
 	auth.POST("/system/services/:name/:action", s.handleServiceAction, s.requireRole(store.RoleAdmin))
 
+	// Den Stand darf jeder Angemeldete sehen — er steht als Hinweis in der
+	// Oberfläche. Auslösen darf ihn nur, wer auch Dienste neu starten darf:
+	// das Update startet das Panel neu und tauscht beide Binaries.
+	auth.GET("/system/update", s.handleUpdateStatus)
+	auth.POST("/system/update", s.handleUpdateStart, s.requireRole(store.RoleAdmin))
+
 	auth.GET("/sites", s.handleListSites)
 	auth.POST("/sites", s.handleCreateSite)
 	auth.GET("/sites/:id", s.handleGetSite)

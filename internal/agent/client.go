@@ -97,8 +97,11 @@ func (c *Client) callLocked(ctx context.Context, op Op, params any) (*Response, 
 		req.Actor = actor
 	}
 
+	// Ein ausdrücklich gesetztes Zeitlimit gilt, in beide Richtungen. Der
+	// Vorgabewert deckelt gewöhnliche Operationen; ein Update dauert länger
+	// als alles andere und sagt das über seinen Context.
 	deadline := time.Now().Add(c.timeout)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+	if d, ok := ctx.Deadline(); ok {
 		deadline = d
 	}
 	if err := c.conn.SetDeadline(deadline); err != nil {
@@ -208,6 +211,19 @@ func (c *Client) ServiceAction(ctx context.Context, action, name string) (*Servi
 
 func (c *Client) WriteVhost(ctx context.Context, domain, content string) error {
 	return c.Call(ctx, OpNginxWriteVhost, VhostParams{Domain: domain, Content: content}, nil)
+}
+
+// SystemUpdate stößt das Update an. Ohne Parameter: welche Version kommt,
+// entscheidet der Kanal in der Konfiguration des Agents, nicht der Aufrufer.
+func (c *Client) SystemUpdate(ctx context.Context) (UpdateResult, error) {
+	// Download beider Binaries plus Migration. Das Zeitlimit setzt der
+	// Aufrufer nicht selbst: es gehört zur Operation, nicht zum Aufruf.
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
+	var res UpdateResult
+	err := c.Call(ctx, OpSystemUpdate, nil, &res)
+	return res, err
 }
 
 // WriteShared legt die vhost-übergreifende Config ab. Ohne sie beantwortet
