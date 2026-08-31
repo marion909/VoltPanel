@@ -28,10 +28,14 @@ type FileService struct {
 	store *store.Store
 	agent *agent.Client
 	cfg   *config.Config
+	quota *QuotaService
 }
 
 func NewFileService(st *store.Store, ag *agent.Client, cfg *config.Config) *FileService {
-	return &FileService{store: st, agent: ag, cfg: cfg}
+	return &FileService{
+		store: st, agent: ag, cfg: cfg,
+		quota: NewQuotaService(st, ag, cfg, nil),
+	}
 }
 
 // maxEditableBytes begrenzt, was der Editor im Browser öffnet. Größere Dateien
@@ -327,13 +331,30 @@ func (s *FileService) Download(ctx context.Context, sc store.Scope, siteID int64
 	}
 }
 
+// UploadOptions trennt die beiden Größen, die beim Upload eine Rolle spielen.
+type UploadOptions struct {
+	// Size ist die angekündigte Größe. Sie geht in die Quota-Prüfung, bevor
+	// ein Byte fließt. 0 bedeutet "unbekannt" — dann greift nur MaxBytes.
+	Size int64
+	// MaxBytes ist die harte Obergrenze beim Schreiben, unabhängig davon, was
+	// angekündigt wurde. 0 bedeutet unbegrenzt.
+	MaxBytes int64
+}
+
 // Upload schreibt einen Datenstrom blockweise in eine Datei der Site.
 //
-// maxBytes begrenzt, was ein einzelner Upload belegen darf; 0 bedeutet
-// unbegrenzt. Wird die Grenze überschritten, bleibt keine halbe Datei zurück.
-func (s *FileService) Upload(ctx context.Context, sc store.Scope, siteID int64, rel string, r io.Reader, maxBytes int64) (int64, error) {
+// Wird MaxBytes überschritten, bleibt keine halbe Datei zurück.
+func (s *FileService) Upload(ctx context.Context, sc store.Scope, siteID int64, rel string, r io.Reader, opts UploadOptions) (int64, error) {
 	site, abs, err := s.resolve(ctx, sc, siteID, rel)
 	if err != nil {
+		return 0, err
+	}
+
+	// Gegen die Quota des Tenants prüfen, bevor überhaupt ein Byte fließt.
+	// Grundlage ist der Stand der letzten Messung — zwischen zwei Messungen
+	// lässt sich eine Quota also knapp überschreiten. Das ist der Preis dafür,
+	// dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
+	if err := s.quota.CheckDisk(ctx, sc, site.TenantID, opts.Size); err != nil {
 		return 0, err
 	}
 
@@ -348,9 +369,9 @@ func (s *FileService) Upload(ctx context.Context, sc store.Scope, siteID int64, 
 
 		n, readErr := io.ReadFull(r, buf)
 		if n > 0 {
-			if maxBytes > 0 && written+int64(n) > maxBytes {
+			if opts.MaxBytes > 0 && written+int64(n) > opts.MaxBytes {
 				_ = s.agent.RemovePath(ctx, abs, false)
-				return 0, fmt.Errorf("upload überschreitet das limit von %d bytes", maxBytes)
+				return 0, fmt.Errorf("upload überschreitet das limit von %d bytes", opts.MaxBytes)
 			}
 			// truncate nur beim ersten Block: er ersetzt eine eventuell schon
 			// vorhandene Datei, die folgenden hängen an.

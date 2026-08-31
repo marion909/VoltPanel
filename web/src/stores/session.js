@@ -45,6 +45,14 @@ export async function logout() {
   }
 }
 
+// Dieselbe Rangordnung wie im Server. Sie steuert nur, was die Oberfläche
+// zeigt — durchgesetzt wird sie serverseitig bei jeder Anfrage.
+const roleRank = { owner: 4, admin: 3, reseller: 2, customer: 1 }
+
+export function hasRole(minimum) {
+  return (roleRank[session.user?.role] ?? 0) >= (roleRank[minimum] ?? 99)
+}
+
 export function isAdmin() {
-  return session.user?.role === 'owner' || session.user?.role === 'admin'
+  return hasRole('admin')
 }

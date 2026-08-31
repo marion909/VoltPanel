@@ -5,6 +5,8 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/version"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -37,8 +39,10 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 1 {
-		t.Fatalf("SchemaVersion = %d, erwartet 1", v)
+	// Gegen die Konstante prüfen, nicht gegen eine feste Zahl — sonst muss
+	// dieser Test bei jeder neuen Migration angefasst werden.
+	if v != version.SchemaVersion {
+		t.Fatalf("SchemaVersion = %d, erwartet %d", v, version.SchemaVersion)
 	}
 }
 

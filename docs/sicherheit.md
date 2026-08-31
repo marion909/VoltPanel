@@ -197,6 +197,26 @@ falsches Passwort — sonst verrät das Panel, welche Adressen es kennt.
 zweiten Faktor nicht einfach entfernen können. Der Notausgang ist
 `volt user 2fa-reset` und damit ein Zugang zum Server selbst.
 
+## Quotas
+
+Die Grenzen aus dem Hosting-Paket wirken auf **Anwendungsebene**: `CheckCount`
+vor jedem Anlegen, `CheckDisk` vor jedem Upload. Das ist eine Begrenzung, keine
+Absicherung — PHP-Code der Site selbst schreibt am Panel vorbei und wird davon
+nicht gebremst. Eine echte Dateisystem-Quota wäre die stärkere Maßnahme; sie
+steht in [stand.md](stand.md) als offener Punkt.
+
+Zwei Details, die leicht falsch herum laufen:
+
+- **0 bedeutet unbegrenzt**, nicht "nichts erlaubt". Andersherum wäre ein
+  lückenhaft gepflegtes Paket eine stille Sperre für den Kunden.
+- **Ein gelöschtes Paket lockert**, es verschärft nicht: die zugeordneten
+  Mandanten stehen danach ohne Grenzen da (`ON DELETE SET NULL`). Das ist die
+  harmlosere Richtung, steht aber im Audit-Log, weil es leicht übersehen wird.
+
+Die Rollenprüfung im Frontend (`hasRole`) blendet nur aus. Durchgesetzt wird sie
+im Server bei jeder Anfrage — eine ausgeblendete Route ist Bequemlichkeit, kein
+Schutz.
+
 ## Was noch offen ist
 
 - **SSRF** bei Webhook- und Cloudflare-Aufrufen: die ausgehenden Ziele werden

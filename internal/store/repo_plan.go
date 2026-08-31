@@ -9,7 +9,8 @@ import (
 )
 
 const planCols = `id, name, max_sites, max_databases, max_ftp, max_mailboxes,
-	max_cronjobs, disk_quota_mb, traffic_quota_mb, created_at, updated_at`
+	max_cronjobs, disk_quota_mb, traffic_quota_mb, description, is_default,
+	created_at, updated_at`
 
 // Pläne sind serverweit, nicht tenant-gebunden — deshalb nur für Rollen, die
 // tenant-übergreifend arbeiten dürfen.
@@ -24,10 +25,12 @@ func (s *Store) CreatePlan(ctx context.Context, sc Scope, p *Plan) error {
 
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO plans (name, max_sites, max_databases, max_ftp, max_mailboxes,
-			max_cronjobs, disk_quota_mb, traffic_quota_mb, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			max_cronjobs, disk_quota_mb, traffic_quota_mb, description, is_default,
+			created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.Name, p.MaxSites, p.MaxDatabases, p.MaxFTP, p.MaxMailboxes,
-		p.MaxCronjobs, p.DiskQuotaMB, p.TrafficQuotaMB, p.CreatedAt, p.UpdatedAt)
+		p.MaxCronjobs, p.DiskQuotaMB, p.TrafficQuotaMB, p.Description,
+		boolToInt(p.IsDefault), p.CreatedAt, p.UpdatedAt)
 	if err != nil {
 		if isUnique(err) {
 			return fmt.Errorf("%w: paket %s", ErrConflict, p.Name)
@@ -81,15 +84,62 @@ func prefixCols(cols, alias string) string {
 
 func scanPlan(sc scanner) (*Plan, error) {
 	var p Plan
+	var isDefault int
 	err := sc.Scan(&p.ID, &p.Name, &p.MaxSites, &p.MaxDatabases, &p.MaxFTP, &p.MaxMailboxes,
-		&p.MaxCronjobs, &p.DiskQuotaMB, &p.TrafficQuotaMB, &p.CreatedAt, &p.UpdatedAt)
+		&p.MaxCronjobs, &p.DiskQuotaMB, &p.TrafficQuotaMB, &p.Description, &isDefault,
+		&p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	p.IsDefault = isDefault == 1
 	return &p, nil
+}
+
+// UpdatePlan ändert ein Paket. Die Grenzwerte gelten sofort für alle Tenants,
+// die es zugeordnet haben.
+func (s *Store) UpdatePlan(ctx context.Context, sc Scope, p *Plan) error {
+	if !sc.IsSystem() && !sc.Role.CanCrossTenant() {
+		return fmt.Errorf("%w: rolle %s darf keine pakete ändern", ErrForbidden, sc.Role)
+	}
+	p.UpdatedAt = now()
+
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE plans SET name = ?, max_sites = ?, max_databases = ?, max_ftp = ?,
+			max_mailboxes = ?, max_cronjobs = ?, disk_quota_mb = ?, traffic_quota_mb = ?,
+			description = ?, is_default = ?, updated_at = ?
+		WHERE id = ?`,
+		p.Name, p.MaxSites, p.MaxDatabases, p.MaxFTP, p.MaxMailboxes, p.MaxCronjobs,
+		p.DiskQuotaMB, p.TrafficQuotaMB, p.Description, boolToInt(p.IsDefault),
+		p.UpdatedAt, p.ID)
+	return affected(res, err)
+}
+
+// DeletePlan entfernt ein Paket. Tenants, die es zugeordnet hatten, stehen
+// danach ohne Limit da (ON DELETE SET NULL) — das ist die harmlosere Richtung
+// als sie stillschweigend zu sperren.
+func (s *Store) DeletePlan(ctx context.Context, sc Scope, id int64) error {
+	if !sc.IsSystem() && !sc.Role.CanCrossTenant() {
+		return fmt.Errorf("%w: rolle %s darf keine pakete löschen", ErrForbidden, sc.Role)
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM plans WHERE id = ?`, id)
+	return affected(res, err)
+}
+
+// DefaultPlan liefert das Paket, das neuen Tenants zugeordnet wird.
+func (s *Store) DefaultPlan(ctx context.Context) (*Plan, error) {
+	return scanPlan(s.db.QueryRowContext(ctx,
+		`SELECT `+planCols+` FROM plans WHERE is_default = 1 ORDER BY id LIMIT 1`))
+}
+
+// GetPlan liefert ein einzelnes Paket.
+func (s *Store) GetPlan(ctx context.Context, sc Scope, id int64) (*Plan, error) {
+	if err := sc.valid(); err != nil {
+		return nil, err
+	}
+	return scanPlan(s.db.QueryRowContext(ctx, `SELECT `+planCols+` FROM plans WHERE id = ?`, id))
 }
 
 // CreateBackup hält ein erzeugtes Backup fest, damit es im Panel auftaucht.

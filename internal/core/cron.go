@@ -19,10 +19,14 @@ type CronService struct {
 	store *store.Store
 	agent *agent.Client
 	cfg   *config.Config
+	quota *QuotaService
 }
 
 func NewCronService(st *store.Store, ag *agent.Client, cfg *config.Config) *CronService {
-	return &CronService{store: st, agent: ag, cfg: cfg}
+	return &CronService{
+		store: st, agent: ag, cfg: cfg,
+		quota: NewQuotaService(st, ag, cfg, nil),
+	}
 }
 
 type CreateCronjobInput struct {
@@ -43,7 +47,7 @@ func (s *CronService) CreateCronjob(ctx context.Context, sc store.Scope, in Crea
 	if err != nil {
 		return nil, err
 	}
-	if err := s.checkQuota(ctx, tenantScope, in.TenantID); err != nil {
+	if err := s.quota.CheckCount(ctx, sc, in.TenantID, ResourceCronjobs); err != nil {
 		return nil, err
 	}
 
@@ -139,26 +143,3 @@ func (s *CronService) SyncAll(ctx context.Context) (int, []error) {
 // eindeutig und erlaubt es, den Job später wiederzufinden — auch wenn der
 // Anzeigename geändert wurde.
 func CronFileName(id int64) string { return fmt.Sprintf("volt_job_%d", id) }
-
-func (s *CronService) checkQuota(ctx context.Context, sc store.Scope, tenantID int64) error {
-	plan, err := s.store.PlanForTenant(ctx, sc, tenantID)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if plan.MaxCronjobs <= 0 {
-		return nil
-	}
-
-	count, err := s.store.CountCronjobs(ctx, sc)
-	if err != nil {
-		return err
-	}
-	if count >= plan.MaxCronjobs {
-		return fmt.Errorf("paket %q erlaubt %d cronjobs, %d sind bereits angelegt",
-			plan.Name, plan.MaxCronjobs, count)
-	}
-	return nil
-}

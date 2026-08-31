@@ -32,6 +32,7 @@ type Server struct {
 	databases *core.DatabaseService
 	files     *core.FileService
 	cron      *core.CronService
+	quota     *core.QuotaService
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
@@ -70,6 +71,7 @@ func New(opts Options) (*Server, error) {
 		databases: core.NewDatabaseService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		files:     core.NewFileService(opts.Store, opts.Agent, opts.Config),
 		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
+		quota:     core.NewQuotaService(opts.Store, opts.Agent, opts.Config, opts.Logger),
 		log:       opts.Logger,
 		devOrigin: opts.DevOrigin,
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
@@ -171,6 +173,15 @@ func (s *Server) setupRoutes() {
 
 	auth.GET("/tenants", s.handleListTenants)
 	auth.POST("/tenants", s.handleCreateTenant, s.requireRole(store.RoleAdmin))
+	auth.PATCH("/tenants/:id", s.handleUpdateTenant, s.requireRole(store.RoleAdmin))
+	auth.DELETE("/tenants/:id", s.handleDeleteTenant, s.requireRole(store.RoleAdmin))
+	auth.GET("/tenants/:id/quota", s.handleTenantQuota)
+
+	auth.GET("/quota", s.handleQuota)
+	auth.GET("/plans", s.handleListPlans)
+	auth.POST("/plans", s.handleCreatePlan, s.requireRole(store.RoleAdmin))
+	auth.PATCH("/plans/:id", s.handleUpdatePlan, s.requireRole(store.RoleAdmin))
+	auth.DELETE("/plans/:id", s.handleDeletePlan, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/users", s.handleListUsers)
 	auth.POST("/users", s.handleCreateUser, s.requireRole(store.RoleReseller))

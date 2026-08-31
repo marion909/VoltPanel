@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/marion909/voltpanel/internal/core"
 )
 
 // maxUploadBytes deckelt eine einzelne hochgeladene Datei.
@@ -275,7 +276,8 @@ func (s *Server) handleFileUpload(c echo.Context) error {
 	target := path.Join(c.FormValue("path"), name)
 
 	ctx := c.Request().Context()
-	written, err := s.files.Upload(ctx, currentScope(c), siteID, target, src, maxUploadBytes)
+	written, err := s.files.Upload(ctx, currentScope(c), siteID, target, src,
+		core.UploadOptions{Size: file.Size, MaxBytes: maxUploadBytes})
 	if err != nil {
 		return storeError(err)
 	}

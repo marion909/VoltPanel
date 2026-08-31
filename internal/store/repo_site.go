@@ -22,7 +22,8 @@ func ValidDomain(d string) bool {
 
 const siteCols = `id, tenant_id, domain, aliases, type, system_user, root_path,
 	document_root, php_version, proxy_target, ssl_enabled, force_https, hsts,
-	status, created_at, updated_at`
+	status, disk_bytes, disk_files, disk_measured_at, traffic_bytes, traffic_period,
+	created_at, updated_at`
 
 func (s *Store) CreateSite(ctx context.Context, sc Scope, site *Site) error {
 	if err := sc.owns(site.TenantID); err != nil {
@@ -127,6 +128,83 @@ func (s *Store) DeleteSite(ctx context.Context, sc Scope, id int64) error {
 	return affected(res, err)
 }
 
+// RecordSiteUsage schreibt den gemessenen Verbrauch zurück.
+//
+// Läuft aus dem Quota-Job und deshalb ohne Tenant-Scope — gemessen wird immer
+// über alle Sites, und die Zuordnung steht in der Zeile selbst.
+func (s *Store) RecordSiteUsage(ctx context.Context, siteID, bytes, files int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE sites SET disk_bytes = ?, disk_files = ?, disk_measured_at = ?
+		WHERE id = ?`, bytes, files, now(), siteID)
+	return err
+}
+
+// AddSiteTraffic zählt Traffic auf. period ist der Abrechnungszeitraum als
+// "2026-08"; wechselt er, beginnt der Zähler wieder bei null.
+func (s *Store) AddSiteTraffic(ctx context.Context, siteID int64, bytes int64, period string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE sites
+		SET traffic_bytes  = CASE WHEN traffic_period = ? THEN traffic_bytes + ? ELSE ? END,
+		    traffic_period = ?
+		WHERE id = ?`, period, bytes, bytes, period, siteID)
+	return err
+}
+
+// TenantUsage summiert den Verbrauch aller Sites eines Tenants.
+type TenantUsage struct {
+	TenantID     int64 `json:"tenant_id"`
+	DiskBytes    int64 `json:"disk_bytes"`
+	DiskFiles    int64 `json:"disk_files"`
+	TrafficBytes int64 `json:"traffic_bytes"`
+	Sites        int   `json:"sites"`
+	Databases    int   `json:"databases"`
+	Cronjobs     int   `json:"cronjobs"`
+	FTPAccounts  int   `json:"ftp_accounts"`
+}
+
+// UsageForTenant sammelt alle Zählstände, gegen die Quotas geprüft werden.
+func (s *Store) UsageForTenant(ctx context.Context, sc Scope, tenantID int64) (*TenantUsage, error) {
+	if err := sc.owns(tenantID); err != nil {
+		return nil, err
+	}
+
+	usage := &TenantUsage{TenantID: tenantID}
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(disk_bytes), 0), COALESCE(SUM(disk_files), 0),
+		       COALESCE(SUM(traffic_bytes), 0), COUNT(*)
+		FROM sites WHERE tenant_id = ?`, tenantID).
+		Scan(&usage.DiskBytes, &usage.DiskFiles, &usage.TrafficBytes, &usage.Sites)
+	if err != nil {
+		return nil, err
+	}
+
+	// Die übrigen Zähler einzeln — ein Join über vier Tabellen mit COUNT
+	// liefert Kreuzprodukte statt Zählständen.
+	for table, target := range map[string]*int{
+		"databases":    &usage.Databases,
+		"cronjobs":     &usage.Cronjobs,
+		"ftp_accounts": &usage.FTPAccounts,
+	} {
+		if err := s.db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM `+table+` WHERE tenant_id = ?`, tenantID).Scan(target); err != nil {
+			return nil, err
+		}
+	}
+	return usage, nil
+}
+
+// CountFTPAccounts zählt die FTP-Zugänge eines Scopes. Die Verwaltung selbst
+// kommt erst mit Pure-FTPd; die Quota-Prüfung braucht den Zähler schon jetzt.
+func (s *Store) CountFTPAccounts(ctx context.Context, sc Scope) (int, error) {
+	where, args, err := sc.where("ftp_accounts")
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM ftp_accounts`+where, args...).Scan(&n)
+	return n, err
+}
+
 func (s *Store) CountSites(ctx context.Context, sc Scope) (int, error) {
 	where, args, err := sc.where("sites")
 	if err != nil {
@@ -169,7 +247,10 @@ func scanSite(sc scanner) (*Site, error) {
 	var ssl, force, hsts int
 	err := sc.Scan(&site.ID, &site.TenantID, &site.Domain, &aliases, &typ, &site.SystemUser,
 		&site.RootPath, &site.DocumentRoot, &site.PHPVersion, &site.ProxyTarget,
-		&ssl, &force, &hsts, &site.Status, &site.CreatedAt, &site.UpdatedAt)
+		&ssl, &force, &hsts, &site.Status,
+		&site.DiskBytes, &site.DiskFiles, &site.DiskMeasuredAt,
+		&site.TrafficBytes, &site.TrafficPeriod,
+		&site.CreatedAt, &site.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

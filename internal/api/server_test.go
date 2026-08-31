@@ -365,3 +365,172 @@ func TestSecurityHeadersPresent(t *testing.T) {
 		t.Errorf("CSP ohne frame-ancestors: %q", csp)
 	}
 }
+
+// --- Pakete, Mandanten und Quota ------------------------------------------
+
+func TestPlanAndTenantRoutes(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at") // Owner
+
+	var plan struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}
+	t.Run("paket anlegen", func(t *testing.T) {
+		rec := ts.do(http.MethodPost, "/api/v1/plans", map[string]any{
+			"name": "Klein", "max_sites": 2, "disk_quota_mb": 100, "is_default": true,
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Status %d — %s", rec.Code, rec.Body.String())
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &plan); err != nil {
+			t.Fatal(err)
+		}
+		if plan.ID == 0 {
+			t.Fatal("Paket ohne ID")
+		}
+	})
+
+	t.Run("paket zuordnen", func(t *testing.T) {
+		rec := ts.do(http.MethodPatch, "/api/v1/tenants/1", map[string]any{"plan_id": plan.ID})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status %d — %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("quota spiegelt das paket", func(t *testing.T) {
+		rec := ts.do(http.MethodGet, "/api/v1/quota", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status %d — %s", rec.Code, rec.Body.String())
+		}
+
+		var status struct {
+			PlanName string `json:"plan_name"`
+			Entries  []struct {
+				Resource string  `json:"resource"`
+				Used     int64   `json:"used"`
+				Limit    int64   `json:"limit"`
+				Percent  float64 `json:"percent"`
+			} `json:"entries"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+			t.Fatal(err)
+		}
+		if status.PlanName != "Klein" {
+			t.Fatalf("Paketname %q, erwartet Klein", status.PlanName)
+		}
+
+		for _, e := range status.Entries {
+			if e.Resource != "sites" {
+				continue
+			}
+			if e.Limit != 2 || e.Used != 1 {
+				t.Fatalf("sites: %d/%d, erwartet 1/2", e.Used, e.Limit)
+			}
+			if e.Percent < 0 {
+				t.Fatal("Grenze gesetzt, aber Auslastung unbekannt")
+			}
+			return
+		}
+		t.Fatal("keine Zeile für sites in der Quota-Übersicht")
+	})
+
+	t.Run("zuordnung wieder loesen", func(t *testing.T) {
+		// 0 muss die Zuordnung entfernen — sonst ließe sie sich nie lösen.
+		rec := ts.do(http.MethodPatch, "/api/v1/tenants/1", map[string]any{"plan_id": 0})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status %d — %s", rec.Code, rec.Body.String())
+		}
+		rec = ts.do(http.MethodGet, "/api/v1/quota", nil)
+		if !strings.Contains(rec.Body.String(), "ohne Paket") {
+			t.Fatalf("Paket weiterhin zugeordnet: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("mandant mit inhalt laesst sich nicht loeschen", func(t *testing.T) {
+		// Tenant 2 (Bob) hat eine Site — das Löschen würde Vhost und
+		// Linux-Benutzer verwaist zurücklassen.
+		rec := ts.do(http.MethodDelete, "/api/v1/tenants/2", nil)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("Status %d, erwartet 409 — %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("eigener mandant ist geschuetzt", func(t *testing.T) {
+		rec := ts.do(http.MethodDelete, "/api/v1/tenants/1", nil)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("Status %d, erwartet 400", rec.Code)
+		}
+	})
+
+	t.Run("ungueltiger status wird abgelehnt", func(t *testing.T) {
+		rec := ts.do(http.MethodPatch, "/api/v1/tenants/2", map[string]any{"status": "geloescht"})
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("Status %d, erwartet 400", rec.Code)
+		}
+	})
+}
+
+// TestCustomerCannotManagePlans: Pakete und Mandanten sind Admin-Sache.
+func TestCustomerCannotManagePlans(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // Kunde
+
+	forbidden := []struct {
+		method string
+		path   string
+		body   any
+	}{
+		{http.MethodPost, "/api/v1/plans", map[string]any{"name": "Frei", "max_sites": 999}},
+		{http.MethodPatch, "/api/v1/plans/1", map[string]any{"max_sites": 999}},
+		{http.MethodDelete, "/api/v1/plans/1", nil},
+		{http.MethodPatch, "/api/v1/tenants/1", map[string]any{"plan_id": 0}},
+		{http.MethodDelete, "/api/v1/tenants/1", nil},
+	}
+	for _, r := range forbidden {
+		rec := ts.do(r.method, r.path, r.body)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s als Kunde: Status %d, erwartet 403", r.method, r.path, rec.Code)
+		}
+	}
+
+	// Den eigenen Verbrauch darf ein Kunde sehen.
+	if rec := ts.do(http.MethodGet, "/api/v1/quota", nil); rec.Code != http.StatusOK {
+		t.Errorf("eigener Verbrauch: Status %d, erwartet 200", rec.Code)
+	}
+	// Den eines fremden Mandanten nicht.
+	if rec := ts.do(http.MethodGet, "/api/v1/tenants/1/quota", nil); rec.Code == http.StatusOK {
+		t.Errorf("Kunde konnte fremden Verbrauch abrufen: %s", rec.Body.String())
+	}
+}
+
+// TestQuotaBlocksSiteCreation prüft die Durchsetzung über die HTTP-Ebene.
+func TestQuotaBlocksSiteCreation(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	// Ein Paket, das genau die eine bereits vorhandene Site erlaubt.
+	rec := ts.do(http.MethodPost, "/api/v1/plans", map[string]any{"name": "Winzig", "max_sites": 1})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Paket anlegen: %d — %s", rec.Code, rec.Body.String())
+	}
+	var plan struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if rec := ts.do(http.MethodPatch, "/api/v1/tenants/1", map[string]any{"plan_id": plan.ID}); rec.Code != http.StatusOK {
+		t.Fatalf("Paket zuordnen: %d", rec.Code)
+	}
+
+	rec = ts.do(http.MethodPost, "/api/v1/sites", map[string]any{
+		"domain": "zweite.example.at", "type": "static",
+	})
+	if rec.Code < 400 || rec.Code >= 500 {
+		t.Fatalf("Site über der Quota: Status %d, erwartet 4xx — %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Winzig") {
+		t.Fatalf("Meldung nennt das Paket nicht: %s", rec.Body.String())
+	}
+}

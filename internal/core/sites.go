@@ -5,7 +5,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -21,10 +20,14 @@ type SiteService struct {
 	store *store.Store
 	agent *agent.Client
 	cfg   *config.Config
+	quota *QuotaService
 }
 
 func NewSiteService(st *store.Store, ag *agent.Client, cfg *config.Config) *SiteService {
-	return &SiteService{store: st, agent: ag, cfg: cfg}
+	return &SiteService{
+		store: st, agent: ag, cfg: cfg,
+		quota: NewQuotaService(st, ag, cfg, nil),
+	}
 }
 
 // CreateSiteInput ist das, was die API oder die CLI übergibt.
@@ -56,7 +59,7 @@ func (s *SiteService) CreateSite(ctx context.Context, sc store.Scope, in CreateS
 		in.DocumentRoot = "public"
 	}
 
-	if err := s.checkQuota(ctx, sc, in.TenantID); err != nil {
+	if err := s.quota.CheckCount(ctx, sc, in.TenantID, ResourceSites); err != nil {
 		return nil, err
 	}
 
@@ -255,34 +258,6 @@ func (s *SiteService) cleanup(ctx context.Context, sc store.Scope, site *store.S
 	}
 	_ = s.agent.DeleteSystemUser(ctx, site.SystemUser, true)
 	_ = s.store.DeleteSite(ctx, sc, site.ID)
-}
-
-// checkQuota prüft das Site-Limit des Hosting-Pakets (Phase 4).
-func (s *SiteService) checkQuota(ctx context.Context, sc store.Scope, tenantID int64) error {
-	tenantScope, err := sc.ForTenant(tenantID)
-	if err != nil {
-		return err
-	}
-	plan, err := s.store.PlanForTenant(ctx, tenantScope, tenantID)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil // kein Paket zugeordnet = kein Limit
-	}
-	if err != nil {
-		return err
-	}
-	if plan.MaxSites <= 0 {
-		return nil
-	}
-
-	count, err := s.store.CountSites(ctx, tenantScope)
-	if err != nil {
-		return err
-	}
-	if count >= plan.MaxSites {
-		return fmt.Errorf("paket %q erlaubt %d sites, %d sind bereits angelegt",
-			plan.Name, plan.MaxSites, count)
-	}
-	return nil
 }
 
 // reNonAlnum ersetzt alles, was in einem Linux-Benutzernamen nicht vorkommen darf.

@@ -6,10 +6,12 @@ import { formatBytes, formatUptime } from '../format'
 import RingGauge from '../components/RingGauge.vue'
 import StatTile from '../components/StatTile.vue'
 import TrafficChart from '../components/TrafficChart.vue'
+import QuotaBar from '../components/QuotaBar.vue'
 
 const latest = ref({})
 const series = ref([])
 const info = ref(null)
+const quota = ref(null)
 const error = ref('')
 
 let socket = null
@@ -43,13 +45,15 @@ function connect() {
 
 onMounted(async () => {
   try {
-    const [metrics, sysInfo] = await Promise.all([
+    const [metrics, sysInfo, quotaStatus] = await Promise.all([
       api.get('/system/metrics'),
       api.get('/system/info').catch(() => null),
+      api.get('/quota').catch(() => null),
     ])
     series.value = (metrics.series || []).slice(-maxPoints)
     latest.value = metrics.latest || {}
     info.value = sysInfo
+    quota.value = quotaStatus
   } catch (err) {
     error.value = err.message
   }
@@ -126,6 +130,32 @@ const system = computed(() => info.value?.system || {})
     </div>
 
     <TrafficChart :series="series" />
+
+    <!-- Verbrauch des eigenen Mandanten gegen sein Paket -->
+    <section
+      v-if="quota"
+      class="mt-4 rounded-lg border px-4 py-4"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <header class="mb-3 flex items-baseline justify-between gap-2">
+        <h2 class="text-[13px] font-medium">{{ t('quota.title') }}</h2>
+        <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          {{ quota.plan_id ? `${t('quota.plan')}: ${quota.plan_name}` : t('quota.noPlan') }}
+        </span>
+      </header>
+
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <QuotaBar
+          v-for="e in quota.entries"
+          :key="e.resource"
+          :label="t('quota.' + e.resource)"
+          :used="e.used"
+          :limit="e.limit"
+          :percent="e.percent"
+          :bytes="e.bytes"
+        />
+      </div>
+    </section>
 
     <section v-if="(latest.disks || []).length" class="mt-4">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/marion909/voltpanel/internal/api"
+	"github.com/marion909/voltpanel/internal/core"
 	"github.com/marion909/voltpanel/internal/metrics"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,11 @@ func (a *app) serveCmd() *cobra.Command {
 			collector := metrics.New(2*time.Second, a.log)
 			go collector.Run(ctx)
 			go a.purgeSessions(ctx)
+
+			// Der Verbrauch wird periodisch gemessen, nicht bei jeder Anfrage:
+			// ein Durchlauf über eine große Site dauert Sekunden.
+			go core.NewQuotaService(a.store, a.agent, a.cfg, a.log).
+				RunPeriodically(ctx, time.Hour)
 
 			srv, err := api.New(api.Options{
 				Config: a.cfg, Store: a.store, Agent: a.agent,

@@ -57,13 +57,22 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Prüfsumme, Eintrag in der Datenbank, nächtlichem Timer und Restore mit
   automatischer Sicherheitskopie davor
 
-**Phase 4 — Grundlage**
+**Phase 4 — Multi-Tenant**
 
 - Rollen owner/admin/reseller/customer mit Rangordnung; niemand kann eine Rolle
   über der eigenen vergeben
 - `tenant_id` im Repository-Layer erzwungen, Nullwert schlägt fehl
-- IDOR-Testsuite über alle Leseoperationen
-- Hosting-Pakete als Datenmodell, Site-Quota wird geprüft
+- IDOR-Testsuite auf drei Ebenen: Repository, Service und HTTP
+- Hosting-Pakete anlegen, zuordnen, als Standard markieren; ein neuer Mandant
+  bekommt das Standardpaket automatisch
+- Quotas für Websites, Datenbanken, Cronjobs, FTP-Zugänge und Speicherplatz;
+  0 bedeutet überall "unbegrenzt", damit ein lückenhaft gepflegtes Paket keine
+  stille Sperre ist
+- Verbrauchsmessung stündlich im Hintergrund: belegte Blöcke statt nomineller
+  Größe, Hardlinks nur einmal gezählt, Symlinks nicht verfolgt
+- Mandanten sperren und entsperren; Löschen nur, wenn nichts mehr daran hängt
+- Reduzierte Oberfläche für Kunden: keine Server-Dienste, keine
+  Mandantenverwaltung
 
 ## Offen
 
@@ -93,9 +102,14 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 
 **Phase 4**
 
-- Disk-Quotas über Project Quota, Traffic-Zähler
-  (Anzahl-Quotas für Sites, Datenbanken und Cronjobs greifen bereits)
-- Getrennter Kundenbereich mit reduzierter UI
+- Echte Dateisystem-Quotas (XFS/ext4 Project Quota). Die Grenzen wirken derzeit
+  auf Anwendungsebene: eine Aktion über der Quota wird abgelehnt. Ein Prozess,
+  der am Panel vorbei schreibt — etwa PHP-Code der Site selbst —, wird davon
+  nicht gebremst. Dafür bräuchte es Mount-Optionen und Quota-Werkzeuge.
+- Traffic-Zähler aus den Nginx-Access-Logs. Die Spalten und die Fortschreibung
+  je Abrechnungszeitraum stehen, das Einlesen der Logs fehlt.
+- Eigene Anmeldeseite und Domain für den Kundenbereich (die reduzierte
+  Navigation steht bereits)
 
 **Phasen 5–8**
 
@@ -105,6 +119,9 @@ Härtungsphase stehen vollständig aus.
 ## Bekannte Einschränkungen
 
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
+- Die Speicherquota greift gegen den Stand der letzten Messung (stündlich).
+  Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
+  Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
 - SSRF-Filterung für ausgehende Aufrufe fehlt (relevant ab Phase 5).
 - Die Release-Signatur wird erzeugt, aber vom Client noch nicht geprüft — dort
   wirkt bisher nur der SHA-256-Vergleich.

@@ -20,6 +20,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 	return map[Op]Handler{
 		OpPing:        s.opPing,
 		OpSystemInfo:  s.opSystemInfo,
+		OpDiskUsage:   s.opDiskUsage,
 		OpServiceList: s.opServiceList,
 
 		OpServiceStatus:  s.opServiceStatus,

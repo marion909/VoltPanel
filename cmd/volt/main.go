@@ -60,6 +60,8 @@ func main() {
 		a.backupCmd(),
 		a.dbCmd(),
 		a.cronCmd(),
+		a.tenantCmd(),
+		a.planCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -97,6 +99,8 @@ func (a *app) init(migrate bool) error {
 		if from != to {
 			a.log.Info("schema migriert", "von", from, "auf", to)
 		}
+	} else if err := a.requireCurrentSchema(); err != nil {
+		return err
 	}
 
 	if a.secrets, err = authn.LoadSecretBox(cfg.SecretKeyPath); err != nil {
@@ -104,6 +108,32 @@ func (a *app) init(migrate bool) error {
 	}
 	a.agent = agent.NewClient(cfg.SocketPath)
 	return nil
+}
+
+// checkSchema meldet ein veraltetes Schema mit einem brauchbaren Hinweis.
+//
+// Lesende Befehle migrieren bewusst nicht — eine Migration soll nur dort
+// laufen, wo sie erwartet wird. Ohne diese Prüfung bekäme der Benutzer nach
+// einem Update aber einen rohen SQL-Fehler über eine fehlende Spalte.
+func (a *app) requireCurrentSchema() error {
+	current, err := a.store.SchemaVersion(context.Background())
+	if err != nil {
+		return err
+	}
+	switch {
+	case current == version.SchemaVersion:
+		return nil
+	case current < version.SchemaVersion:
+		return fmt.Errorf(
+			"die datenbank steht auf schema v%d, dieses binary erwartet v%d — "+
+				"`volt serve` oder `volt update` bringt sie auf den stand",
+			current, version.SchemaVersion)
+	default:
+		return fmt.Errorf(
+			"die datenbank steht auf schema v%d, dieses binary kennt nur v%d — "+
+				"bitte volt aktualisieren statt es herunterzustufen",
+			current, version.SchemaVersion)
+	}
 }
 
 func (a *app) close() {

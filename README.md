@@ -58,7 +58,7 @@ Details: [docs/architektur.md](docs/architektur.md) ·
 | 1 | Auth mit 2FA, Audit-Log, Metriken, Dashboard, Dienstverwaltung, Dark Mode, i18n | **fertig** (ohne Web-Terminal) |
 | 2 | Vhost-Generator, Site-Typen, PHP-FPM-Pools, ACME mit HTTP-01 und Cloudflare-DNS-01 | **weitgehend** (ohne Extension-Manager, Rewrite-Editor-UI) |
 | 3 | MySQL, File Manager, Cronjobs, Backups | **weitgehend** (FTP und SQL-Browser offen) |
-| 4 | Rollen, Quotas, Kundenbereich | Scope und Rollen stehen, Quotas für Sites, DBs und Cronjobs |
+| 4 | Rollen, Quotas, Kundenbereich | **weitgehend** (Disk-Quota auf Anwendungsebene, nicht im Dateisystem) |
 | 5–7 | Docker, Node, Git-Deploy, Mail, App Store | offen |
 | 8 | Härtung, Doku, Beta | laufend |
 
@@ -112,6 +112,13 @@ volt db passwd alice_wp               Passwort neu setzen
 volt cron add scheduler --site example.at \
   --schedule "* * * * *" --command "/usr/bin/php8.3 …/artisan schedule:run"
 volt cron list | log <id> | sync
+
+volt plan add Klein --sites 5 --databases 5 --disk 5000 --default
+volt plan list                        0 bedeutet überall "unbegrenzt"
+volt tenant add "Kunde Meier"         bekommt das Standardpaket
+volt tenant set-plan 2 1              Paket zuordnen (0 = keines)
+volt tenant usage [id]                Verbrauch gegen die Grenzen
+volt tenant suspend 2 [--resume]
 ```
 
 ## Sicherheit

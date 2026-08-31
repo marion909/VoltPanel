@@ -17,4 +17,4 @@ func Full() string {
 
 // SchemaVersion ist die höchste Migration, die dieses Binary kennt. Startet das
 // Binary gegen eine neuere DB, bricht es ab statt das Schema zu beschädigen.
-const SchemaVersion = 1
+const SchemaVersion = 2

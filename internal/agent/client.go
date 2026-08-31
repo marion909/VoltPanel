@@ -178,6 +178,12 @@ func (c *Client) SystemInfo(ctx context.Context) (*SystemInfo, error) {
 	return &info, c.Call(ctx, OpSystemInfo, nil, &info)
 }
 
+// DiskUsage misst den Platzverbrauch eines Verzeichnisses.
+func (c *Client) DiskUsage(ctx context.Context, path string) (*DiskUsageResult, error) {
+	var res DiskUsageResult
+	return &res, c.Call(ctx, OpDiskUsage, DiskUsageParams{Path: path}, &res)
+}
+
 func (c *Client) Services(ctx context.Context) ([]ServiceStatus, error) {
 	var out []ServiceStatus
 	return out, c.Call(ctx, OpServiceList, nil, &out)

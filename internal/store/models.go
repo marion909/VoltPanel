@@ -22,9 +22,16 @@ type Plan struct {
 	MaxCronjobs    int    `json:"max_cronjobs"`
 	DiskQuotaMB    int64  `json:"disk_quota_mb"`
 	TrafficQuotaMB int64  `json:"traffic_quota_mb"`
+	Description    string `json:"description"`
+	IsDefault      bool   `json:"is_default"`
 	CreatedAt      int64  `json:"created_at"`
 	UpdatedAt      int64  `json:"updated_at"`
 }
+
+// Unlimited sagt, ob ein Grenzwert unbegrenzt bedeutet. 0 heißt bewusst
+// "kein Limit" und nicht "nichts erlaubt" — sonst wäre ein Paket ohne
+// gepflegte Werte eine Sperre.
+func Unlimited(limit int64) bool { return limit <= 0 }
 
 type User struct {
 	ID           int64  `json:"id"`
@@ -93,8 +100,17 @@ type Site struct {
 	ForceHTTPS   bool     `json:"force_https"`
 	HSTS         bool     `json:"hsts"`
 	Status       string   `json:"status"`
-	CreatedAt    int64    `json:"created_at"`
-	UpdatedAt    int64    `json:"updated_at"`
+
+	// Gemessener Verbrauch. Wird vom Quota-Job aktualisiert, nicht bei
+	// jeder Anfrage neu berechnet.
+	DiskBytes      int64  `json:"disk_bytes"`
+	DiskFiles      int64  `json:"disk_files"`
+	DiskMeasuredAt *int64 `json:"disk_measured_at"`
+	TrafficBytes   int64  `json:"traffic_bytes"`
+	TrafficPeriod  string `json:"traffic_period"`
+
+	CreatedAt int64 `json:"created_at"`
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 // WebRoot ist das Verzeichnis, das Nginx ausliefert.

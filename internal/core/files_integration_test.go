@@ -272,7 +272,7 @@ func TestFileServiceRoundTrip(t *testing.T) {
 		payload := bytes.Repeat([]byte("VoltPanel"), 600_000)
 
 		written, err := env.files.Upload(ctx, sys, site.ID, "public/gross.bin",
-			bytes.NewReader(payload), 0)
+			bytes.NewReader(payload), UploadOptions{Size: int64(len(payload))})
 		if err != nil {
 			t.Fatalf("Upload: %v", err)
 		}
@@ -293,7 +293,7 @@ func TestFileServiceRoundTrip(t *testing.T) {
 	t.Run("upload respektiert das limit", func(t *testing.T) {
 		payload := bytes.Repeat([]byte("x"), 1<<20)
 		if _, err := env.files.Upload(ctx, sys, site.ID, "public/zugross.bin",
-			bytes.NewReader(payload), 1024); err == nil {
+			bytes.NewReader(payload), UploadOptions{MaxBytes: 1024}); err == nil {
 			t.Fatal("Upload überschritt das Limit ohne Fehler")
 		}
 		// Eine halbe Datei darf nicht zurückbleiben.
@@ -304,7 +304,7 @@ func TestFileServiceRoundTrip(t *testing.T) {
 
 	t.Run("leere datei", func(t *testing.T) {
 		if _, err := env.files.Upload(ctx, sys, site.ID, "public/leer.txt",
-			strings.NewReader(""), 0); err != nil {
+			strings.NewReader(""), UploadOptions{}); err != nil {
 			t.Fatal(err)
 		}
 		info, err := os.Stat(filepath.Join(site.RootPath, "public", "leer.txt"))

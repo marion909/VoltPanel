@@ -20,10 +20,14 @@ type DatabaseService struct {
 	agent   *agent.Client
 	cfg     *config.Config
 	secrets *authn.SecretBox
+	quota   *QuotaService
 }
 
 func NewDatabaseService(st *store.Store, ag *agent.Client, cfg *config.Config, secrets *authn.SecretBox) *DatabaseService {
-	return &DatabaseService{store: st, agent: ag, cfg: cfg, secrets: secrets}
+	return &DatabaseService{
+		store: st, agent: ag, cfg: cfg, secrets: secrets,
+		quota: NewQuotaService(st, ag, cfg, nil),
+	}
 }
 
 type CreateDatabaseInput struct {
@@ -57,7 +61,7 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, sc store.Scope, in
 	if err != nil {
 		return nil, err
 	}
-	if err := s.checkQuota(ctx, tenantScope, in.TenantID); err != nil {
+	if err := s.quota.CheckCount(ctx, sc, in.TenantID, ResourceDatabases); err != nil {
 		return nil, err
 	}
 
@@ -309,29 +313,6 @@ func (s *DatabaseService) Dump(ctx context.Context, sc store.Scope, databaseID i
 	path := filepath.Join(s.cfg.BackupDir, "dumps", fmt.Sprintf("%s-%s.sql", db.Name, stamp))
 	size, err := s.agent.DumpDatabase(ctx, db.Name, path)
 	return path, size, err
-}
-
-func (s *DatabaseService) checkQuota(ctx context.Context, sc store.Scope, tenantID int64) error {
-	plan, err := s.store.PlanForTenant(ctx, sc, tenantID)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if plan.MaxDatabases <= 0 {
-		return nil
-	}
-
-	count, err := s.store.CountDatabases(ctx, sc)
-	if err != nil {
-		return err
-	}
-	if count >= plan.MaxDatabases {
-		return fmt.Errorf("paket %q erlaubt %d datenbanken, %d sind bereits angelegt",
-			plan.Name, plan.MaxDatabases, count)
-	}
-	return nil
 }
 
 // tenantPrefix liefert den Namensraum eines Mandanten in MySQL.
