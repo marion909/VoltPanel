@@ -54,6 +54,26 @@ export const api = {
   patch: (path, body) => request('PATCH', path, body ?? {}),
   del: (path) => request('DELETE', path),
 
+  // Vollständige URL zu einem API-Pfad. Für Downloads, die der Browser selbst
+  // holt — das Session-Cookie geht dabei mit.
+  url: (path) => `${base}/api/v1${path}`,
+
+  // Multipart passt nicht in den JSON-Wrapper: der Browser muss den
+  // Content-Type mit seiner boundary selbst setzen.
+  async upload(path, form) {
+    const res = await fetch(`${base}/api/v1${path}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRF-Token': csrfToken() },
+      body: form,
+    })
+    const payload = (res.headers.get('content-type') || '').includes('application/json')
+      ? await res.json().catch(() => null)
+      : null
+    if (!res.ok) throw new ApiError(payload?.error || `HTTP ${res.status}`, res.status)
+    return payload
+  },
+
   // WebSocket für den Metrik-Strom. Das Session-Cookie geht beim Upgrade
   // automatisch mit, der Server prüft zusätzlich den Origin.
   metricsSocket() {

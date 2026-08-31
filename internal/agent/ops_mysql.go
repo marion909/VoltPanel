@@ -2,10 +2,13 @@ package agent
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -339,6 +342,13 @@ func (s *Server) opMySQLDump(ctx context.Context, raw json.RawMessage) (any, err
 }
 
 // opMySQLImport spielt eine SQL-Datei ein.
+//
+// Der Import läuft NICHT als root, sondern unter einem Wegwerf-Konto, das nur
+// auf die Zieldatenbank Rechte hat. Der Grund ist die Mandantentrennung: eine
+// SQL-Datei ist Programmtext, kein Datenblock. Ein "USE fremde_db;" mitten im
+// Dump würde als root anstandslos ausgeführt — der Kunde könnte also über den
+// Import in die Datenbank eines anderen Kunden schreiben. Mit dem begrenzten
+// Konto scheitert genau diese Zeile, und der Rest läuft normal durch.
 func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, error) {
 	p, err := decode[MySQLDumpParams](raw, OpMySQLImport)
 	if err != nil {
@@ -358,13 +368,149 @@ func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, e
 	}
 	defer f.Close()
 
+	db, err := mysqlConn()
+	if err != nil {
+		return nil, err
+	}
+
+	cnf, drop, err := s.importAccount(ctx, db, p.Database)
+	if err != nil {
+		return nil, err
+	}
+	defer drop()
+	defer os.Remove(cnf)
+
 	if err := runInto(ctx, longTimeout, nil, f, "mysql",
-		"--defaults-file=/dev/null", "--protocol=socket",
-		"--socket=/var/run/mysqld/mysqld.sock", "--user=root",
+		"--defaults-file="+cnf, "--protocol=socket",
+		"--socket=/var/run/mysqld/mysqld.sock",
 		"--default-character-set=utf8mb4", p.Database); err != nil {
-		return nil, opErr(OpMySQLImport, "%v", err)
+		// Als Eingabefehler: scheitert der Import, liegt es fast immer an der
+		// Datei. Der Aufrufer soll die Meldung von mysql lesen können und
+		// keinen Gateway-Fehler bekommen, der den Server verdächtigt.
+		return nil, opInputErr(OpMySQLImport, "%s", importHint(err, p.Database))
 	}
 	return TextResult{Text: "import in " + p.Database + " abgeschlossen"}, nil
+}
+
+// importAccount legt das Wegwerf-Konto an und schreibt die Optionsdatei, über
+// die der mysql-Client sein Passwort bekommt.
+//
+// Die Optionsdatei statt "-p<passwort>": Argumente stehen in der Prozessliste,
+// jeder Benutzer des Servers könnte das Passwort dort mitlesen. Sie liegt im
+// Laufzeitverzeichnis des Agents, das nur root beschreiben kann — dort ist auch
+// kein Symlink-Trick möglich.
+func (s *Server) importAccount(ctx context.Context, db *sql.DB, database string) (string, func(), error) {
+	// Reste eines abgestürzten Laufs zuerst weg. Sonst sammeln sich Konten an,
+	// deren Passwort niemand mehr kennt, die aber weiter Rechte hätten.
+	s.dropStaleImportAccounts(ctx, db)
+
+	suffix, err := randomHex(6)
+	if err != nil {
+		return "", nil, opErr(OpMySQLImport, "zufall: %v", err)
+	}
+	password, err := randomHex(16)
+	if err != nil {
+		return "", nil, opErr(OpMySQLImport, "zufall: %v", err)
+	}
+
+	username := importUserPrefix + suffix
+	account := fmt.Sprintf("'%s'@'localhost'", username)
+	drop := func() {
+		// Eigener Kontext: läuft der Import in einen Timeout, ist der
+		// übergebene Kontext abgelaufen — das Konto muss trotzdem weg.
+		c, cancel := context.WithTimeout(context.Background(), shortTimeout)
+		defer cancel()
+		if _, err := db.ExecContext(c, "DROP USER IF EXISTS "+account); err != nil {
+			s.log.Error("import-konto nicht entfernt", "konto", username, "err", err)
+		}
+	}
+
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("CREATE USER %s IDENTIFIED BY '%s'", account, password)); err != nil {
+		return "", nil, opErr(OpMySQLImport, "import-konto: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", quoteIdent(database), account)); err != nil {
+		drop()
+		return "", nil, opErr(OpMySQLImport, "rechte für das import-konto: %v", err)
+	}
+
+	cnf, err := s.writeClientConfig(username, password)
+	if err != nil {
+		drop()
+		return "", nil, err
+	}
+	return cnf, drop, nil
+}
+
+// importUserPrefix kennzeichnet die Wegwerf-Konten, damit sie sich wiederfinden
+// lassen. Er darf sich nicht ändern, sonst bleiben alte Konten liegen.
+const importUserPrefix = "volt_import_"
+
+func (s *Server) dropStaleImportAccounts(ctx context.Context, db *sql.DB) {
+	rows, err := db.QueryContext(ctx,
+		"SELECT user FROM mysql.user WHERE host = 'localhost' AND user LIKE ?", importUserPrefix+"%")
+	if err != nil {
+		return
+	}
+	var stale []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err == nil && reMyUser.MatchString(name) {
+			stale = append(stale, name)
+		}
+	}
+	rows.Close()
+
+	for _, name := range stale {
+		if _, err := db.ExecContext(ctx,
+			fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", name)); err != nil {
+			s.log.Warn("altes import-konto nicht entfernt", "konto", name, "err", err)
+		}
+	}
+}
+
+// writeClientConfig legt eine Optionsdatei für den mysql-Client an.
+func (s *Server) writeClientConfig(username, password string) (string, error) {
+	dir := filepath.Dir(s.socketPath)
+	f, err := os.CreateTemp(dir, "import-*.cnf")
+	if err != nil {
+		return "", opErr(OpMySQLImport, "optionsdatei: %v", err)
+	}
+	defer f.Close()
+
+	if err := f.Chmod(0o600); err != nil {
+		os.Remove(f.Name())
+		return "", opErr(OpMySQLImport, "optionsdatei: %v", err)
+	}
+	// Beide Werte sind durch reMyUser und randomHex auf [a-z0-9_] begrenzt —
+	// in dieser Datei kann damit keine zweite Option entstehen.
+	body := fmt.Sprintf("[client]\nuser=%s\npassword=%s\n", username, password)
+	if _, err := f.WriteString(body); err != nil {
+		os.Remove(f.Name())
+		return "", opErr(OpMySQLImport, "optionsdatei: %v", err)
+	}
+	return f.Name(), nil
+}
+
+// importHint erklärt den einen Fehler, der beim begrenzten Konto neu ist.
+func importHint(err error, database string) string {
+	msg := err.Error()
+	if !strings.Contains(msg, "Access denied") && !strings.Contains(msg, "command denied") {
+		return msg
+	}
+	return msg + fmt.Sprintf("\n\nDer Import läuft mit einem Zugang, der nur auf %s Rechte hat. "+
+		"Die Datei enthält vermutlich Anweisungen außerhalb dieser Datenbank — "+
+		"typisch sind CREATE DATABASE, USE oder ein DEFINER in einer Prozedur. "+
+		"Bitte diese Zeilen aus dem Dump entfernen.", database)
+}
+
+func randomHex(n int) (string, error) {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func checkMySQLUser(p MySQLUserParams) error {

@@ -87,10 +87,18 @@ func New(opts Options) (*Server, error) {
 	return s, nil
 }
 
+// largeBody hebt die Größengrenze für die Routen an, auf denen Nutzdaten
+// ankommen. Der Wert deckt sich mit maxUploadBytes im Dateimanager.
+var largeBody = middleware.BodyLimit("512M")
+
 func (s *Server) setupMiddleware(devOrigin string) {
 	s.echo.Use(middleware.Recover())
 	s.echo.Use(requestLogger(s.log))
 	s.echo.Use(securityHeaders())
+	// Global eng: eine JSON-Anfrage an dieses Panel ist nie groß. Die beiden
+	// Wege, auf denen wirklich Daten ankommen — Datei-Upload und SQL-Import —
+	// heben die Grenze an ihrer Route selbst an. Ohne das griff hier still die
+	// 32 MiB, obwohl der Upload 512 MiB annehmen wollte.
 	s.echo.Use(middleware.BodyLimit("32M"))
 
 	if len(s.cfg.IPWhitelist) > 0 {
@@ -187,12 +195,14 @@ func (s *Server) setupRoutes() {
 	auth.POST("/sites/:id/files/chmod", s.handleFileChmod)
 	auth.POST("/sites/:id/files/archive", s.handleFileArchive)
 	auth.POST("/sites/:id/files/extract", s.handleFileExtract)
-	auth.POST("/sites/:id/files/upload", s.handleFileUpload)
+	auth.POST("/sites/:id/files/upload", s.handleFileUpload, largeBody)
 
 	auth.GET("/databases", s.handleListDatabases)
 	auth.POST("/databases", s.handleCreateDatabase)
 	auth.DELETE("/databases/:id", s.handleDeleteDatabase)
 	auth.POST("/databases/:id/dump", s.handleDumpDatabase)
+	auth.GET("/databases/:id/dump/download", s.handleDownloadDump)
+	auth.POST("/databases/:id/import", s.handleImportDatabase, largeBody)
 	auth.GET("/databases/:id/users", s.handleListDBUsers)
 	auth.POST("/databases/:id/users", s.handleCreateDBUser)
 	auth.PATCH("/db-users/:id", s.handleUpdateDBUser)

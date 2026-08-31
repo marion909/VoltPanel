@@ -26,6 +26,7 @@ type testEnv struct {
 	cfg        *config.Config
 	files      *FileService
 	sitesDir   string
+	backupDir  string
 	systemUser string
 }
 
@@ -44,6 +45,10 @@ func newTestEnv(t *testing.T) *testEnv {
 	if err := os.MkdirAll(sitesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	backupDir := filepath.Join(dir, "backups")
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
 
 	srv, err := agent.NewServer(agent.ServerOptions{
 		SocketPath: filepath.Join(dir, "a.sock"),
@@ -53,6 +58,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		PHPDir:     filepath.Join(dir, "php"),
 		CertDir:    filepath.Join(dir, "certs"),
 		LogDir:     filepath.Join(dir, "log"),
+		BackupDir:  backupDir,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -88,9 +94,10 @@ func newTestEnv(t *testing.T) *testEnv {
 	cfg := config.Default()
 	cfg.SitesDir = sitesDir
 	cfg.DataDir = dir
+	cfg.BackupDir = backupDir
 
 	return &testEnv{
-		store: st, agent: client, cfg: cfg, sitesDir: sitesDir,
+		store: st, agent: client, cfg: cfg, sitesDir: sitesDir, backupDir: backupDir,
 		systemUser: testSystemUser(t),
 		files:      NewFileService(st, client, cfg),
 	}

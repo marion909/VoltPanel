@@ -216,6 +216,7 @@ volt backup restore <archiv>
 volt db add wordpress --tenant 4      Datenbank samt Benutzer anlegen
 volt db list                          mit Live-Größe und Rechten
 volt db dump wordpress                SQL-Dump ins Backup-Verzeichnis
+volt db import wordpress dump.sql.gz  SQL-Datei einspielen (.sql oder .sql.gz)
 volt db passwd alice_wp               Passwort neu setzen
 
 volt cron add scheduler --site example.at \

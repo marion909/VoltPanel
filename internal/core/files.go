@@ -303,13 +303,20 @@ func (s *FileService) Download(ctx context.Context, sc store.Scope, siteID int64
 		return 0, fmt.Errorf("%s ist ein verzeichnis — bitte erst archivieren", rel)
 	}
 
+	return streamFromAgent(ctx, s.agent, abs, w)
+}
+
+// streamFromAgent holt eine Datei blockweise über den Socket und schreibt sie
+// weiter. Auch der Dump einer Datenbank nimmt diesen Weg: er gehört root und
+// ist für den Web-Prozess sonst nicht lesbar.
+func streamFromAgent(ctx context.Context, ag *agent.Client, abs string, w io.Writer) (int64, error) {
 	var written int64
 	for {
 		if err := ctx.Err(); err != nil {
 			return written, err
 		}
 
-		chunk, err := s.agent.ReadChunk(ctx, abs, written, agent.ChunkSize)
+		chunk, err := ag.ReadChunk(ctx, abs, written, agent.ChunkSize)
 		if err != nil {
 			return written, err
 		}

@@ -165,6 +165,35 @@ der Job hängt. Ein Job ohne Site gibt es nicht.
 Ein abgeschalteter Job wird aus `/etc/cron.d` **entfernt**, nicht nur im Panel
 als inaktiv markiert.
 
+## 4f. SQL-Import
+
+**Risiko:** Eine hochgeladene SQL-Datei ist Programmtext, kein Datenblock. Sie
+kann Anweisungen enthalten, die die Zieldatenbank verlassen — `USE`,
+`CREATE DATABASE`, `GRANT`. Als root eingespielt, würde jede davon ausgeführt:
+ein Kunde könnte über seinen eigenen Import in die Datenbank eines anderen
+Kunden schreiben. Die Prüfungen aus 4d greifen hier nicht, denn geprüft wird
+der Name der Zieldatenbank — nicht der Inhalt der Datei.
+
+**Maßnahmen:** Der Import läuft **nicht** als root. Der Agent legt für jeden
+Lauf ein Wegwerf-Konto an, gibt ihm Rechte auf genau die Zieldatenbank und
+entfernt es danach wieder — auch wenn der Import scheitert oder in einen
+Timeout läuft. Eine Anweisung außerhalb dieser Datenbank scheitert dann mit
+"Access denied", und die Fehlermeldung erklärt, woran es lag.
+
+Das Passwort des Kontos geht nicht über die Kommandozeile, sondern über eine
+Optionsdatei mit 0600 im Laufzeitverzeichnis des Agents: Argumente stehen in
+der Prozessliste und wären für jeden Benutzer des Servers lesbar. Reste eines
+abgestürzten Laufs werden vor jedem Import aufgeräumt.
+
+Die Datei selbst wird ausgepackt, wenn sie gzip-komprimiert ankommt — erkannt
+an den ersten beiden Bytes, nicht an der Endung, die vom Browser kommt. Die
+Größengrenze gilt für die **entpackte** Größe, sonst wäre ein kleines Archiv
+mit riesigem Inhalt ein Weg, die Platte vollzuschreiben.
+
+Der Export geht den umgekehrten Weg: der Dump wird beim Abruf erzeugt, über den
+Socket blockweise zum Browser gestreamt und danach entfernt. Er enthält alle
+Daten der Site im Klartext und soll nicht als Datei liegen bleiben.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

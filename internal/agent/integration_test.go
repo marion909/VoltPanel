@@ -156,6 +156,25 @@ func TestAgentRejectsUnknownOp(t *testing.T) {
 	}
 }
 
+// TestFehlermeldungNenntDieOperationEinmal: der Agent schickt nur die Meldung,
+// den Namen der Operation setzt der Client davor. Schickte der Agent seinen
+// eigenen Error()-Text, stünde er zweimal da — "mysql.import: mysql.import: …",
+// und das landet unverändert in der Oberfläche.
+func TestFehlermeldungNenntDieOperationEinmal(t *testing.T) {
+	client, sitesDir := startTestAgent(t)
+
+	// Ein Pfad innerhalb der Wurzel, den es nicht gibt: der scheitert erst
+	// hinter jail() und damit in einem OpError — genau der Fall, in dem der
+	// Name sonst doppelt entsteht.
+	_, err := client.ReadFile(t.Context(), filepath.Join(sitesDir, "gibtesnicht.txt"))
+	if err == nil {
+		t.Fatal("eine nicht vorhandene Datei wurde gelesen")
+	}
+	if n := strings.Count(err.Error(), string(OpFileRead)); n != 1 {
+		t.Errorf("die Operation steht %dmal in der Meldung: %v", n, err)
+	}
+}
+
 // TestAgentEnforcesJailOverSocket: das Pfad-Gefängnis muss auch über die
 // Socket-Schnittstelle greifen, nicht nur in der internen Funktion.
 func TestAgentEnforcesJailOverSocket(t *testing.T) {

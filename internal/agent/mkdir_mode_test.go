@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -16,6 +17,14 @@ import (
 // Lesbarkeit an der umask des FPM-Pools. setuid dagegen bewirkt auf einem
 // Verzeichnis unter Linux nichts und hat hier nichts verloren.
 func TestMkdirKeepsSetgidAndDropsSetuid(t *testing.T) {
+	// Nur Linux: dort trägt chmod das setgid-Bit auf einem Verzeichnis ein.
+	// macOS verwirft es, wenn der Aufrufer nicht in der Gruppe des
+	// Verzeichnisses ist — der Test wäre auf einem Entwicklungsrechner also
+	// dauerhaft rot, ohne dass am Zielsystem etwas falsch wäre.
+	if runtime.GOOS != "linux" {
+		t.Skip("setgid auf Verzeichnissen ist hier Linux-Semantik")
+	}
+
 	dir := t.TempDir()
 	srv := &Server{roots: []string{dir}}
 

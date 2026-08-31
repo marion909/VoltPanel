@@ -58,9 +58,14 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 **Phase 3 — Daten, Dateien, Cronjobs**
 
 - MySQL/MariaDB: Datenbanken und Benutzer anlegen, Rechte in drei Stufen
-  (ALL, READWRITE, READONLY), Passwort setzen und anzeigen, Live-Größen,
-  Dump und Import. Der Agent spricht direkt über den Unix-Socket mit MariaDB,
-  nicht über eine Shell.
+  (ALL, READWRITE, READONLY), Passwort setzen und anzeigen, Live-Größen.
+  Der Agent spricht direkt über den Unix-Socket mit MariaDB, nicht über eine
+  Shell.
+- Export und Import über die Oberfläche: der Export erzeugt den Dump erst beim
+  Abruf und lässt ihn nicht liegen. Der Import nimmt .sql und gzip-gepackte
+  Dateien an — erkannt am Inhalt, nicht an der Endung — und läuft unter einem
+  Wegwerf-Konto, das nur auf die Zieldatenbank Rechte hat. Ein "USE fremde_db"
+  im Dump scheitert damit, statt als root durchzulaufen.
 - File Manager: Auflisten, Lesen, Schreiben, Anlegen, Umbenennen, Kopieren,
   Löschen, Rechte setzen, Archivieren und Entpacken (tar.gz und zip),
   blockweiser Up- und Download für große Dateien, Editor im Browser
@@ -106,8 +111,6 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - FTP mit Pure-FTPd und virtuellen Benutzern
 - Remote-Whitelist für Datenbankzugriffe von außen
 - Backup-Ziele S3, B2, FTP
-- Import einer hochgeladenen SQL-Datei über die Oberfläche
-  (die Agent-Operation steht, die UI fehlt)
 
 **Phase 4**
 

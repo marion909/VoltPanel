@@ -1,6 +1,7 @@
 package api
 
 import (
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -97,6 +98,92 @@ func (s *Server) handleDumpDatabase(c echo.Context) error {
 	s.audit(ctx, currentUser(c), "database.dump", "database", strconv.FormatInt(id, 10),
 		"ok", c.RealIP(), map[string]int64{"bytes": size})
 	return c.JSON(http.StatusOK, map[string]any{"path": path, "size_bytes": size})
+}
+
+// handleDownloadDump erzeugt einen Dump und schickt ihn direkt zum Browser.
+//
+// Bewusst ohne Zwischenablage auf dem Server: ein Dump enthält alle Daten der
+// Site im Klartext. Er soll nicht als Datei liegen bleiben, die später jemand
+// anderes findet.
+func (s *Server) handleDownloadDump(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, sc := c.Request().Context(), currentScope(c)
+	db, err := s.store.GetDatabase(ctx, sc, id)
+	if err != nil {
+		return storeError(err)
+	}
+
+	// Die Kopfzeilen gehen erst mit dem ersten Byte raus. Scheitert mysqldump,
+	// steht noch nichts in der Leitung und der Fehler kommt als JSON an —
+	// sonst bekäme der Browser eine leere Datei mit Status 200.
+	sink := &headerOnce{c: c, name: core.DumpName(db.Name)}
+	size, err := s.databases.DumpTo(ctx, sc, id, sink)
+	if err != nil {
+		if !sink.sent {
+			return storeError(err)
+		}
+		s.log.Warn("dump-download abgebrochen", "datenbank", db.Name, "err", err)
+		return nil
+	}
+
+	s.audit(ctx, currentUser(c), "database.dump", "database", db.Name,
+		"ok", c.RealIP(), map[string]any{"bytes": size, "download": true})
+	return nil
+}
+
+// headerOnce setzt die Download-Kopfzeilen beim ersten Byte. Vorher steht der
+// Dateiname noch nicht fest, und ein Fehler soll noch als JSON ankommen können.
+type headerOnce struct {
+	c    echo.Context
+	name string
+	sent bool
+}
+
+func (h *headerOnce) Write(p []byte) (int, error) {
+	if !h.sent {
+		h.sent = true
+		head := h.c.Response().Header()
+		head.Set(echo.HeaderContentDisposition,
+			mime.FormatMediaType("attachment", map[string]string{"filename": h.name}))
+		head.Set(echo.HeaderContentType, "application/sql")
+		head.Set("X-Content-Type-Options", "nosniff")
+		h.c.Response().WriteHeader(http.StatusOK)
+	}
+	return h.c.Response().Write(p)
+}
+
+// handleImportDatabase spielt eine hochgeladene SQL-Datei ein.
+func (s *Server) handleImportDatabase(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "es wurde keine datei übertragen")
+	}
+	src, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	ctx := c.Request().Context()
+	written, err := s.databases.Import(ctx, currentScope(c), id, src)
+	user := currentUser(c)
+	if err != nil {
+		s.audit(ctx, user, "database.import", "database", strconv.FormatInt(id, 10),
+			"error", c.RealIP(), map[string]string{"fehler": err.Error()})
+		return storeError(err)
+	}
+
+	s.audit(ctx, user, "database.import", "database", strconv.FormatInt(id, 10),
+		"ok", c.RealIP(), map[string]any{"bytes": written, "datei": file.Filename})
+	return c.JSON(http.StatusOK, map[string]any{"size_bytes": written})
 }
 
 // --- Datenbankbenutzer -----------------------------------------------------

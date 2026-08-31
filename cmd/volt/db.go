@@ -13,7 +13,8 @@ import (
 
 func (a *app) dbCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "db", Short: "Datenbanken verwalten"}
-	cmd.AddCommand(a.dbListCmd(), a.dbAddCmd(), a.dbRemoveCmd(), a.dbDumpCmd(), a.dbPasswdCmd())
+	cmd.AddCommand(a.dbListCmd(), a.dbAddCmd(), a.dbRemoveCmd(), a.dbDumpCmd(),
+		a.dbImportCmd(), a.dbPasswdCmd())
 	return cmd
 }
 
@@ -147,6 +148,42 @@ func (a *app) dbDumpCmd() *cobra.Command {
 			return nil
 		}),
 	}
+}
+
+func (a *app) dbImportCmd() *cobra.Command {
+	var yes bool
+
+	cmd := &cobra.Command{
+		Use:   "import <name> <datei>",
+		Short: "Spielt eine SQL-Datei ein (.sql oder .sql.gz)",
+		Args:  cobra.ExactArgs(2),
+		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			db, err := a.findDatabase(ctx, args[0])
+			if err != nil {
+				return err
+			}
+			if !yes && !confirm(fmt.Sprintf(
+				"%s in %s einspielen? Gleichnamige Tabellen werden überschrieben", args[1], db.Name)) {
+				return nil
+			}
+
+			f, err := os.Open(args[1])
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			size, err := a.dbService().Import(ctx, store.SystemScope(), db.ID, f)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("%s in %s eingespielt\n", humanBytes(size), db.Name)
+			return nil
+		}),
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "Nicht nachfragen")
+	return cmd
 }
 
 func (a *app) dbPasswdCmd() *cobra.Command {

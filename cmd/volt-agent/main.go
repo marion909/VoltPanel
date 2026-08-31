@@ -61,6 +61,7 @@ func run(configPath, peerUser string, log *slog.Logger) error {
 		CertDir:     cfg.CertDir,
 		SitesDir:    cfg.SitesDir,
 		LogDir:      cfg.LogDir,
+		BackupDir:   cfg.BackupDir,
 		PanelDomain: cfg.PanelDomain,
 	})
 	if err != nil {

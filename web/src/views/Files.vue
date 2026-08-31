@@ -182,9 +182,8 @@ async function archive(entry) {
 
 function download(entry) {
   // Der Browser lädt selbst; das Session-Cookie geht dabei mit.
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
   window.location.href =
-    `${base}/api/v1/sites/${siteId.value}/files/download?path=${encodeURIComponent(entry.path)}`
+    api.url(`/sites/${siteId.value}/files/download?path=${encodeURIComponent(entry.path)}`)
 }
 
 async function upload(event) {
@@ -198,20 +197,7 @@ async function upload(event) {
       const body = new FormData()
       body.append('file', file)
       body.append('path', path.value)
-
-      // FormData geht nicht durch den JSON-Wrapper, deshalb hier direkt.
-      const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-      const csrf = document.cookie.match(/(?:^|;\s*)volt_csrf=([^;]*)/)
-      const res = await fetch(`${base}/api/v1/sites/${siteId.value}/files/upload`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'X-CSRF-Token': csrf ? decodeURIComponent(csrf[1]) : '' },
-        body,
-      })
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null)
-        throw new Error(payload?.error || `HTTP ${res.status}`)
-      }
+      await api.upload(`/sites/${siteId.value}/files/upload`, body)
     }
     await load()
   } catch (err) {

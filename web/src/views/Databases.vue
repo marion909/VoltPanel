@@ -16,6 +16,11 @@ const busy = ref(false)
 // danach nur noch verschlüsselt in der Panel-Datenbank.
 const credentials = ref(null)
 
+const notice = ref('')
+const importInput = ref(null)
+const importTarget = ref(null)
+const importing = ref(null)
+
 const showForm = ref(false)
 const form = ref({ name: '', site_id: null, with_user: true, username: '', password: '' })
 
@@ -88,14 +93,37 @@ async function remove(db) {
   }
 }
 
-async function dump(db) {
+function exportDump(db) {
+  // Der Browser lädt selbst. Der Server erzeugt den Dump erst beim Abruf und
+  // lässt ihn danach nicht liegen — er enthält alle Daten im Klartext.
+  window.location.href = api.url(`/databases/${db.id}/dump/download`)
+}
+
+function chooseImport(db) {
+  importTarget.value = db
+  importInput.value.click()
+}
+
+async function runImport(event) {
+  const file = event.target.files?.[0]
+  const db = importTarget.value
+  event.target.value = ''
+  if (!file || !db) return
+  if (!confirm(t('db.confirmImport', { file: file.name, name: db.name }))) return
+
+  importing.value = db.id
+  error.value = ''
+  notice.value = ''
   try {
-    const res = await api.post(`/databases/${db.id}/dump`)
-    error.value = ''
-    credentials.value = null
-    alert(`${res.path}\n${formatBytes(res.size_bytes)}`)
+    const body = new FormData()
+    body.append('file', file)
+    const res = await api.upload(`/databases/${db.id}/import`, body)
+    notice.value = t('db.imported', { name: db.name, size: formatBytes(res.size_bytes) })
+    await load()
   } catch (err) {
     error.value = err.message
+  } finally {
+    importing.value = null
   }
 }
 
@@ -177,6 +205,11 @@ onMounted(load)
     <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
       {{ error }}
     </p>
+    <p v-if="notice" class="mb-4 text-[13px]" :style="{ color: 'var(--status-good)' }" role="status">
+      {{ notice }}
+    </p>
+
+    <input ref="importInput" type="file" accept=".sql,.gz,.sql.gz" class="hidden" @change="runImport" />
 
     <!-- Zugangsdaten stehen bewusst hervorgehoben und nur einmal. -->
     <div
@@ -284,8 +317,14 @@ onMounted(load)
               </td>
               <td class="px-4 py-2.5 text-right whitespace-nowrap">
                 <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
-                        @click="dump(db)">
-                  {{ t('db.dump') }}
+                        @click="exportDump(db)">
+                  {{ t('db.export') }}
+                </button>
+                <button class="ml-3 text-[12px] underline disabled:opacity-50"
+                        :style="{ color: 'var(--ink-secondary)' }"
+                        :disabled="importing === db.id"
+                        @click="chooseImport(db)">
+                  {{ importing === db.id ? t('db.importing') : t('db.import') }}
                 </button>
                 <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--status-critical)' }"
                         @click="remove(db)">

@@ -1,9 +1,14 @@
 package core
 
 import (
+	"bufio"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -302,17 +307,148 @@ func (s *DatabaseService) SyncSizes(ctx context.Context) error {
 	return nil
 }
 
+// maxImportBytes deckelt die eingespielte SQL-Datei nach dem Auspacken.
+//
+// Die Grenze gilt für die entpackte Größe, nicht für den Upload: sonst wäre ein
+// kleines gzip mit riesigem Inhalt ein Weg, die Platte vollzuschreiben.
+const maxImportBytes = 1 << 30 // 1 GiB
+
+// dumpPath baut den Ablageort für einen Dump. Der Name kommt aus der Datenbank
+// und dem Zeitstempel, nie aus der Anfrage.
+func (s *DatabaseService) dumpPath(name string) (string, string, error) {
+	dir := filepath.Join(s.cfg.BackupDir, "dumps")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", "", fmt.Errorf("dump-verzeichnis: %w", err)
+	}
+	file := DumpName(name)
+	return filepath.Join(dir, file), file, nil
+}
+
 // Dump schreibt einen SQL-Dump ins Backup-Verzeichnis und gibt den Pfad zurück.
 func (s *DatabaseService) Dump(ctx context.Context, sc store.Scope, databaseID int64) (string, int64, error) {
 	db, err := s.store.GetDatabase(ctx, sc, databaseID)
 	if err != nil {
 		return "", 0, err
 	}
-
-	stamp := time.Now().UTC().Format("20060102-150405")
-	path := filepath.Join(s.cfg.BackupDir, "dumps", fmt.Sprintf("%s-%s.sql", db.Name, stamp))
+	path, _, err := s.dumpPath(db.Name)
+	if err != nil {
+		return "", 0, err
+	}
 	size, err := s.agent.DumpDatabase(ctx, db.Name, path)
 	return path, size, err
+}
+
+// DumpTo erzeugt einen Dump und streamt ihn direkt weiter, ohne ihn liegen zu
+// lassen. Der Umweg über die Datei ist nötig, weil mysqldump auf ein Handle
+// schreibt und der Agent das Ergebnis nur blockweise zurückgeben kann.
+func (s *DatabaseService) DumpTo(ctx context.Context, sc store.Scope, databaseID int64, w io.Writer) (int64, error) {
+	db, err := s.store.GetDatabase(ctx, sc, databaseID)
+	if err != nil {
+		return 0, err
+	}
+	path, _, err := s.dumpPath(db.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	if _, err := s.agent.DumpDatabase(ctx, db.Name, path); err != nil {
+		return 0, err
+	}
+	// Die Datei gehört root und mit 0600 niemandem sonst — sie muss über den
+	// Agent wieder abgeräumt werden, nicht mit os.Remove.
+	defer func() {
+		if err := s.agent.RemovePath(context.WithoutCancel(ctx), path, false); err != nil {
+			slog.Warn("dump nicht aufgeräumt", "pfad", path, "err", err)
+		}
+	}()
+
+	return streamFromAgent(ctx, s.agent, path, w)
+}
+
+// DumpName ist der Dateiname, unter dem ein Dump beim Aufrufer ankommt.
+func DumpName(database string) string {
+	return fmt.Sprintf("%s-%s.sql", database, time.Now().UTC().Format("20060102-150405"))
+}
+
+// Import spielt eine hochgeladene SQL-Datei in eine Datenbank ein.
+//
+// Der Strom wird erst auf die Platte geschrieben und dann eingelesen. Ihn
+// direkt in den mysql-Client zu leiten ginge nicht: zwischen Web-Prozess und
+// Agent liegt das Socket-Protokoll, das einzelne Nachrichten deckelt.
+func (s *DatabaseService) Import(ctx context.Context, sc store.Scope, databaseID int64, src io.Reader) (int64, error) {
+	db, err := s.store.GetDatabase(ctx, sc, databaseID)
+	if err != nil {
+		return 0, err
+	}
+
+	dir := filepath.Join(s.cfg.BackupDir, "imports")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return 0, fmt.Errorf("import-verzeichnis: %w", err)
+	}
+	tmp, err := os.CreateTemp(dir, "import-*.sql")
+	if err != nil {
+		return 0, fmt.Errorf("zwischendatei: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+
+	written, err := copyUnpacked(tmp, src, maxImportBytes)
+	if err != nil {
+		return written, err
+	}
+	if written == 0 {
+		return 0, fmt.Errorf("die datei ist leer")
+	}
+	if err := tmp.Close(); err != nil {
+		return written, fmt.Errorf("zwischendatei: %w", err)
+	}
+
+	return written, s.agent.ImportDatabase(ctx, db.Name, tmp.Name())
+}
+
+// copyUnpacked schreibt den Strom weiter und packt ihn dabei aus, falls er
+// gzip-komprimiert ankommt. Erkannt wird das an den ersten beiden Bytes, nicht
+// an der Dateiendung — die kommt vom Browser und sagt nichts.
+func copyUnpacked(dst io.Writer, src io.Reader, limit int64) (int64, error) {
+	buf := bufio.NewReader(src)
+	head, err := buf.Peek(2)
+	if err != nil || head[0] != 0x1f || head[1] != 0x8b {
+		return copyLimited(dst, buf, limit)
+	}
+
+	written, err := unpackGzip(dst, buf, limit)
+	// Die Größengrenze erklärt sich selbst; alles andere ist ein Fehler im
+	// Archiv und braucht einen Satz davor. "flate: corrupt input before
+	// offset 9" allein sagt niemandem, was zu tun ist.
+	if err != nil && !errors.Is(err, errTooLarge) {
+		return written, fmt.Errorf(
+			"die datei ist gzip-gepackt, lässt sich aber nicht auspacken: %w", err)
+	}
+	return written, err
+}
+
+func unpackGzip(dst io.Writer, src io.Reader, limit int64) (int64, error) {
+	gz, err := gzip.NewReader(src)
+	if err != nil {
+		return 0, err
+	}
+	defer gz.Close()
+	return copyLimited(dst, gz, limit)
+}
+
+// errTooLarge trennt die Größengrenze von einem kaputten Archiv. Nur die
+// Grenze hat schon eine verständliche Meldung.
+var errTooLarge = errors.New("größengrenze erreicht")
+
+func copyLimited(dst io.Writer, src io.Reader, limit int64) (int64, error) {
+	n, err := io.Copy(dst, io.LimitReader(src, limit+1))
+	if err != nil {
+		return n, err
+	}
+	if n > limit {
+		return limit, fmt.Errorf("die datei ist entpackt größer als %d bytes: %w", limit, errTooLarge)
+	}
+	return n, nil
 }
 
 // tenantPrefix liefert den Namensraum eines Mandanten in MySQL.

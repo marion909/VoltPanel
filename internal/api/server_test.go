@@ -272,6 +272,26 @@ func TestCrossTenantReturnsNotFound(t *testing.T) {
 	}
 }
 
+// TestDatenbankExportUndImportSindEingegrenzt: beide Wege gehen über
+// GetDatabase mit dem Scope des Aufrufers. Eine fremde oder nicht vorhandene
+// Datenbank ist deshalb nicht unterscheidbar — beides ist 404.
+func TestDatenbankExportUndImportSindEingegrenzt(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at")
+
+	rec := ts.do(http.MethodGet, "/api/v1/databases/999/dump/download", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Export einer fremden Datenbank: Status %d, erwartet 404 — %s",
+			rec.Code, rec.Body.String())
+	}
+
+	// Ohne Datei ist die Anfrage unbrauchbar, aber kein Serverfehler.
+	rec = ts.do(http.MethodPost, "/api/v1/databases/999/import", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Import ohne Datei: Status %d, erwartet 400 — %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestCustomerCannotReachAdminRoutes prüft die Rollenprüfung.
 func TestCustomerCannotReachAdminRoutes(t *testing.T) {
 	ts := newTestServer(t)

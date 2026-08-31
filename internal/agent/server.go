@@ -59,6 +59,7 @@ type ServerOptions struct {
 	CertDir    string
 	SitesDir   string
 	LogDir     string
+	BackupDir  string
 	// PanelDomain ist die Domain des Panels selbst. Ihr Schlüssel bekommt den
 	// Peer als Eigentümer, weil volt-web ihn lesen muss.
 	PanelDomain string
@@ -76,6 +77,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	setDefault(&opts.CertDir, "/var/lib/volt/certs")
 	setDefault(&opts.SitesDir, "/var/www")
 	setDefault(&opts.LogDir, "/var/log")
+	setDefault(&opts.BackupDir, "/var/backups/volt")
 
 	peerUID, peerGID := -1, -1
 	if opts.PeerUser != "" {
@@ -102,7 +104,13 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		logDir:      opts.LogDir,
 		panelDomain: opts.PanelDomain,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
-		roots: []string{opts.SitesDir, opts.NginxDir, opts.PHPDir, opts.CertDir, opts.LogDir},
+		//
+		// BackupDir gehört dazu, weil Dump und Import dort ihre Datei ablegen.
+		// Ohne diesen Eintrag wäre `mysql.dump` geschriebener, aber nicht
+		// erreichbarer Code: die Operation gab es, der Pfad kam aber nie durch
+		// jail().
+		roots: []string{opts.SitesDir, opts.NginxDir, opts.PHPDir, opts.CertDir,
+			opts.LogDir, opts.BackupDir},
 	}
 	s.registry = s.newRegistry()
 	return s, nil
@@ -267,12 +275,20 @@ func (s *Server) dispatch(ctx context.Context, req *Request) *Response {
 
 	result, err := handler(ctx, req.Params)
 	if err != nil {
-		resp.Error = err.Error()
 		// errBadInput deckt die Prüfungen ab, die es schon gab
 		// (checkDomain, checkUsername, checkPHPVersion …); OpError.Input die
 		// neueren. Beide meinen dasselbe: der Aufrufer hat Unsinn geschickt.
 		var opE *OpError
-		resp.Input = errors.Is(err, errBadInput) || (errors.As(err, &opE) && opE.Input)
+		isOp := errors.As(err, &opE)
+		resp.Input = errors.Is(err, errBadInput) || (isOp && opE.Input)
+
+		// Nur die Meldung, nicht err.Error(): der Client setzt den Namen der
+		// Operation selbst davor. Sonst stünde er zweimal da —
+		// "mysql.import: mysql.import: …".
+		resp.Error = err.Error()
+		if isOp {
+			resp.Error = opE.Message
+		}
 		s.log.Warn("operation fehlgeschlagen",
 			"op", req.Op, "actor", req.Actor, "dauer", time.Since(start), "err", err)
 		return resp
