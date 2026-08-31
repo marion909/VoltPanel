@@ -103,6 +103,13 @@ const (
 	OpSystemProcesses   Op = "system.processes"
 	OpSystemProcessKill Op = "system.process_kill"
 
+	// FTP: virtuelle Pure-FTPd-Zugaenge, kein zusaetzlicher Linux-Benutzer.
+	OpFTPSetup      Op = "ftp.setup"
+	OpFTPStatus     Op = "ftp.status"
+	OpFTPUserSet    Op = "ftp.user_set"
+	OpFTPUserDelete Op = "ftp.user_delete"
+	OpFTPUserList   Op = "ftp.user_list"
+
 	// Terminal: eine Shell als Systembenutzer einer Site, nie als root.
 	OpTerminalOpen   Op = "terminal.open"
 	OpTerminalResize Op = "terminal.resize"
@@ -311,6 +318,31 @@ type TerminalParams struct {
 	Session string `json:"session"`
 }
 
+// FTPUserParams beschreibt einen virtuellen Zugang.
+//
+// UID und GID stehen hier bewusst nicht: der Agent schlaegt sie selbst zum
+// Systembenutzer nach. Kaemen sie aus der Anfrage, waere "lege einen
+// FTP-Zugang an" ein Weg, einen Zugang mit der UID von root zu bekommen — und
+// damit vollen Zugriff auf den Server ueber ein FTP-Programm.
+type FTPUserParams struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	// SystemUser ist der Site-Benutzer, unter dem der Zugang arbeitet. Er muss
+	// mit site_ beginnen; der Agent prueft das noch einmal selbst.
+	SystemUser string `json:"system_user"`
+	HomeDir    string `json:"home_dir"`
+	QuotaMB    int64  `json:"quota_mb"`
+}
+
+// FTPUserResult meldet zurueck, was tatsaechlich eingetragen wurde.
+type FTPUserResult struct {
+	Username string `json:"username"`
+	UID      int    `json:"uid"`
+	GID      int    `json:"gid"`
+	HomeDir  string `json:"home_dir"`
+	Created  bool   `json:"created"`
+}
+
 type CertInstallParams struct {
 	Domain  string `json:"domain"`
 	CertPEM string `json:"cert_pem"`
@@ -318,6 +350,19 @@ type CertInstallParams struct {
 }
 
 // --- Ergebnisstrukturen ----------------------------------------------------
+
+// FTPSetupResult beschreibt den Zustand des Dienstes.
+type FTPSetupResult struct {
+	Installed   bool   `json:"installed"`
+	Active      bool   `json:"active"`
+	Ready       bool   `json:"ready"`
+	PassiveFrom int    `json:"passive_from"`
+	PassiveTo   int    `json:"passive_to"`
+	TLSCert     string `json:"tls_cert"`
+	// FirewallHint sagt, was mit den Ports geschehen ist oder noch geschehen
+	// muss. Bei nftables kann der Agent nichts tun und sagt das auch.
+	FirewallHint string `json:"firewall_hint"`
+}
 
 type ProcessInfo struct {
 	PID        int     `json:"pid"`

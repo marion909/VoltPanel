@@ -16,6 +16,7 @@ const nav = computed(() =>
     { to: "/sites", key: "nav.sites", icon: "globe" },
     { to: "/files", key: "nav.files", icon: "folder" },
     { to: "/databases", key: "nav.databases", icon: "database" },
+    { to: "/ftp", key: "nav.ftp", icon: "folder" },
     { to: "/cronjobs", key: "nav.cron", icon: "clock" },
     { to: "/services", key: "nav.services", icon: "server", minRole: "admin" },
     { to: "/tenants", key: "nav.tenants", icon: "users", minRole: "admin" },

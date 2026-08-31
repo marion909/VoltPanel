@@ -165,7 +165,7 @@ scheitert etwas, ist der alte Stand wieder da, bevor die Dienste neu starten.
 | 0 | Fundament: Datenmodell, Migrationen, Agent/Web-Trennung, `install.sh`, `volt update` | **fertig** |
 | 1 | Auth mit 2FA, Audit-Log, Metriken, Dashboard, Dienstverwaltung, Prozessliste, Web-Terminal, Dark Mode, i18n | **fertig** |
 | 2 | Vhost-Generator, Site-Typen, PHP-FPM-Pools, PHP-Erweiterungen, HSTS, ACME mit HTTP-01 und Cloudflare-DNS-01 | **fertig** |
-| 3 | MySQL, File Manager, Cronjobs, Backups | **weitgehend** (FTP und SQL-Browser offen) |
+| 3 | MySQL, File Manager, FTP, Cronjobs, Backups | **weitgehend** (SQL-Browser und Backup-Ziele offen) |
 | 4 | Rollen, Quotas, Kundenbereich | **weitgehend** (Disk-Quota auf Anwendungsebene, nicht im Dateisystem) |
 | 5–7 | Docker, Node, Git-Deploy, Mail, App Store | offen |
 | 8 | Härtung, Doku, Beta | laufend |

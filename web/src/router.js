@@ -8,6 +8,7 @@ import SiteDetail from './views/SiteDetail.vue'
 import Databases from './views/Databases.vue'
 import Files from './views/Files.vue'
 import Cronjobs from './views/Cronjobs.vue'
+import FTP from './views/FTP.vue'
 import Tenants from './views/Tenants.vue'
 import Services from './views/Services.vue'
 import Audit from './views/Audit.vue'
@@ -20,6 +21,7 @@ const routes = [
   { path: '/sites/:id', name: 'site-detail', component: SiteDetail },
   { path: '/databases', name: 'databases', component: Databases },
   { path: '/files', name: 'files', component: Files },
+  { path: '/ftp', name: 'ftp', component: FTP },
   { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/services', name: 'services', component: Services },
   { path: '/tenants', name: 'tenants', component: Tenants, meta: { minRole: 'admin' } },

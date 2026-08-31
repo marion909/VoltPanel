@@ -81,6 +81,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - File Manager: Auflisten, Lesen, Schreiben, Anlegen, Umbenennen, Kopieren,
   Löschen, Rechte setzen, Archivieren und Entpacken (tar.gz und zip),
   blockweiser Up- und Download für große Dateien, Editor im Browser
+- FTP mit Pure-FTPd und virtuellen Benutzern: kein zusätzlicher Linux-Benutzer,
+  jeder Zugang läuft unter dem Systembenutzer seiner Site und sitzt in seinem
+  Verzeichnis fest. Verschlüsselung ist Pflicht (TLS 2), UID und GID schlägt
+  der Agent selbst nach. Der Dienst wird nicht mitinstalliert, sondern auf
+  Wunsch eingerichtet.
 - Cronjobs: je Job eine Datei in /etc/cron.d, laufend unter dem Systembenutzer
   der Site, mit eigener Logdatei und Anzeige der letzten Läufe im Panel
 - Backups: Datenbank plus Konfiguration plus Site-Dateien als tar.gz, mit
@@ -112,7 +117,6 @@ genannten Punkte.
 **Phase 3 — Daten, Dateien, Cronjobs**
 
 - SQL-Browser (oder phpMyAdmin als Plugin)
-- FTP mit Pure-FTPd und virtuellen Benutzern
 - Remote-Whitelist für Datenbankzugriffe von außen
 - Backup-Ziele S3, B2, FTP
 

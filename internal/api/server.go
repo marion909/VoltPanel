@@ -32,6 +32,7 @@ type Server struct {
 	sites     *core.SiteService
 	databases *core.DatabaseService
 	files     *core.FileService
+	ftp       *core.FTPService
 	cron      *core.CronService
 	quota     *core.QuotaService
 	certs     *core.CertService
@@ -72,6 +73,7 @@ func New(opts Options) (*Server, error) {
 		sites:     core.NewSiteService(opts.Store, opts.Agent, opts.Config),
 		databases: core.NewDatabaseService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		files:     core.NewFileService(opts.Store, opts.Agent, opts.Config),
+		ftp:       core.NewFTPService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
 		quota:     core.NewQuotaService(opts.Store, opts.Agent, opts.Config, opts.Logger),
 		certs:     core.NewCertService(opts.Config, opts.Store, opts.Agent, opts.Secrets, opts.Logger),
@@ -211,6 +213,18 @@ func (s *Server) setupRoutes() {
 	auth.POST("/sites/:id/files/archive", s.handleFileArchive)
 	auth.POST("/sites/:id/files/extract", s.handleFileExtract)
 	auth.POST("/sites/:id/files/upload", s.handleFileUpload, largeBody)
+
+	// FTP: die Zugänge hängen an einer Site und laufen unter deren
+	// Systembenutzer. Einrichten darf nur, wer auch Dienste steuern darf —
+	// es holt ein Paket auf den Server und öffnet Ports.
+	auth.GET("/ftp", s.handleListFTPAccounts)
+	auth.POST("/ftp", s.handleCreateFTPAccount)
+	auth.PATCH("/ftp/:id", s.handleUpdateFTPAccount)
+	auth.POST("/ftp/:id/reveal", s.handleRevealFTPPassword)
+	auth.DELETE("/ftp/:id", s.handleDeleteFTPAccount)
+	auth.GET("/ftp/status", s.handleFTPStatus)
+	auth.POST("/ftp/setup", s.handleFTPSetup, s.requireRole(store.RoleAdmin))
+	auth.GET("/ftp/orphans", s.handleFTPOrphans, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/databases", s.handleListDatabases)
 	auth.POST("/databases", s.handleCreateDatabase)

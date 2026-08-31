@@ -225,19 +225,26 @@ func (c *Cert) DaysLeft() int {
 // NeedsRenewal folgt der Let's-Encrypt-Empfehlung: erneuern ab 30 Tagen Restlaufzeit.
 func (c *Cert) NeedsRenewal() bool { return c.AutoRenew && c.DaysLeft() <= 30 }
 
+// FTPAccount ist ein virtueller Pure-FTPd-Zugang. Virtuell heißt: es entsteht
+// kein zusätzlicher Linux-Benutzer. Der Zugang meldet sich gegen die PureDB an
+// und arbeitet unter der UID des Systembenutzers seiner Site — genau der, unter
+// dem auch PHP und die Cronjobs dieser Site laufen.
 type FTPAccount struct {
-	ID           int64  `json:"id"`
-	TenantID     int64  `json:"tenant_id"`
-	SiteID       *int64 `json:"site_id"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"-"`
-	HomeDir      string `json:"home_dir"`
-	UID          int    `json:"uid"`
-	GID          int    `json:"gid"`
-	QuotaMB      int64  `json:"quota_mb"`
-	Status       string `json:"status"`
-	CreatedAt    int64  `json:"created_at"`
-	UpdatedAt    int64  `json:"updated_at"`
+	ID       int64  `json:"id"`
+	TenantID int64  `json:"tenant_id"`
+	SiteID   *int64 `json:"site_id"`
+	Username string `json:"username"`
+	// PasswordEnc ist verschlüsselt und geht nie über die Liste hinaus —
+	// nur über das ausdrückliche Anzeigen.
+	PasswordEnc string `json:"-"`
+	HomeDir     string `json:"home_dir"`
+	UID         int    `json:"uid"`
+	GID         int    `json:"gid"`
+	QuotaMB     int64  `json:"quota_mb"`
+	Status      string `json:"status"`
+	LastError   string `json:"last_error"`
+	CreatedAt   int64  `json:"created_at"`
+	UpdatedAt   int64  `json:"updated_at"`
 }
 
 type Cronjob struct {

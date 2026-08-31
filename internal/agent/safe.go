@@ -53,6 +53,10 @@ var allowedBinaries = map[string]string{
 	"apt-get":   "/usr/bin/apt-get",
 	"phpenmod":  "/usr/sbin/phpenmod",
 	"phpdismod": "/usr/sbin/phpdismod",
+	// Fuer FTP: pure-pw pflegt die virtuellen Zugaenge, ufw gibt die Ports
+	// frei. Beide bekommen ausschliesslich feste Argumente.
+	"pure-pw": "/usr/bin/pure-pw",
+	"ufw":     "/usr/sbin/ufw",
 }
 
 var (

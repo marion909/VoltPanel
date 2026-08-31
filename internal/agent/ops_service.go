@@ -47,6 +47,12 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpSystemProcesses:   s.opSystemProcesses,
 		OpSystemProcessKill: s.opSystemProcessKill,
 
+		OpFTPSetup:      s.opFTPSetup,
+		OpFTPStatus:     s.opFTPStatus,
+		OpFTPUserSet:    s.opFTPUserSet,
+		OpFTPUserDelete: s.opFTPUserDelete,
+		OpFTPUserList:   s.opFTPUserList,
+
 		OpTerminalOpen:   s.opTerminalOpen,
 		OpTerminalResize: s.opTerminalResize,
 		OpTerminalClose:  s.opTerminalClose,

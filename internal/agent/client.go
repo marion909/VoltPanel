@@ -514,6 +514,42 @@ func (c *Client) StopProcess(ctx context.Context, pid int, user, signal string) 
 		ProcessKillParams{PID: pid, User: user, Signal: signal}, nil)
 }
 
+// --- FTP -------------------------------------------------------------------
+
+func (c *Client) FTPSetup(ctx context.Context) (*FTPSetupResult, error) {
+	var res FTPSetupResult
+	err := c.Call(ctx, OpFTPSetup, nil, &res)
+	return &res, err
+}
+
+func (c *Client) FTPStatus(ctx context.Context) (*FTPSetupResult, error) {
+	var res FTPSetupResult
+	err := c.Call(ctx, OpFTPStatus, nil, &res)
+	return &res, err
+}
+
+// SetFTPUser legt einen virtuellen Zugang an oder ändert ihn.
+//
+// UID und GID stehen nicht in den Parametern: der Agent schlägt sie zum
+// Systembenutzer nach und meldet im Ergebnis zurück, womit der Zugang nun
+// wirklich läuft.
+func (c *Client) SetFTPUser(ctx context.Context, p FTPUserParams) (*FTPUserResult, error) {
+	var res FTPUserResult
+	err := c.Call(ctx, OpFTPUserSet, p, &res)
+	return &res, err
+}
+
+func (c *Client) DeleteFTPUser(ctx context.Context, username string) error {
+	return c.Call(ctx, OpFTPUserDelete, FTPUserParams{Username: username}, nil)
+}
+
+// FTPUsers liest, was der Dienst wirklich kennt — nicht, was das Panel glaubt.
+func (c *Client) FTPUsers(ctx context.Context) ([]string, error) {
+	var res []string
+	err := c.Call(ctx, OpFTPUserList, nil, &res)
+	return res, err
+}
+
 // --- Terminal --------------------------------------------------------------
 
 // OpenTerminal startet eine Shell als user und liefert den Socket, über den die

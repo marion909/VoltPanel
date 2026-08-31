@@ -194,7 +194,39 @@ Der Export geht den umgekehrten Weg: der Dump wird beim Abruf erzeugt, über den
 Socket blockweise zum Browser gestreamt und danach entfernt. Er enthält alle
 Daten der Site im Klartext und soll nicht als Datei liegen bleiben.
 
-## 4g. Shell im Browser
+## 4g. FTP-Zugänge
+
+**Risiko:** Ein FTP-Zugang ist ein Login von außen, ohne Panel und ohne
+Sitzung. Läuft er unter einem Systemkonto, ist er ein Vollzugriff auf den
+Server über ein gewöhnliches FTP-Programm. Und FTP schickt das Passwort im
+Klartext, wenn niemand es verhindert.
+
+**Maßnahmen:** Die Zugänge sind virtuell — es entsteht kein Eintrag in
+`/etc/passwd`. Jeder läuft unter dem Systembenutzer seiner Site, also mit genau
+den Rechten, die dort ohnehin gelten.
+
+UID und GID stehen **nicht** in der Anfrage: der Agent schlägt sie selbst zum
+Systembenutzer nach. Kämen sie von außen, wäre "lege einen FTP-Zugang an" der
+Weg zu einem Zugang mit der UID 0. Dazu drei Schranken, die sich überlappen:
+der Name muss ein `site_`-Konto sein, die aufgelöste UID muss über dem Bereich
+der Systemkonten liegen, und Pure-FTPd weist über `MinUID` jeden Login unter
+1000 noch einmal ab.
+
+`ChrootEveryone` hält jeden Zugang in seinem Verzeichnis fest; das
+Heimatverzeichnis geht vorher durch dieselbe `jail()`-Prüfung wie jeder andere
+Pfad. `TLS 2` heißt: ohne Verschlüsselung keine Verbindung — bei einem Panel,
+das sonst jede Kleinigkeit absichert, wäre Klartext ein Widerspruch.
+
+Benutzername und Passwort werden auf eine enge Zeichenmenge geprüft. Der Grund
+ist die PureDB: dort trennt der Doppelpunkt die Felder, und der Zeilenumbruch
+beendet die Eingabe an `pure-pw`. Das Passwort geht über die Standardeingabe,
+nicht als Argument — Argumente stehen in der Prozessliste.
+
+Der Dienst wird nicht mitinstalliert, sondern auf Wunsch eingerichtet. Ein
+Dienst, der nur läuft, weil er beim Installieren dabei war, ist Angriffsfläche
+ohne Nutzen.
+
+## 4h. Shell im Browser
 
 **Risiko:** Ein Terminal im Panel ist die naheliegendste Art, die Trennung
 zwischen Web-Prozess und Agent zu unterlaufen. Läuft die Shell als root, ist
@@ -223,7 +255,7 @@ erreichen kann. Nach 30 Minuten ohne Eingabe endet sie ebenfalls, und beim
 Herunterfahren des Agents wird die ganze Prozessgruppe beendet, nicht nur die
 Shell.
 
-## 4h. Prozesse beenden
+## 4i. Prozesse beenden
 
 **Risiko:** Eine Operation, die ein Signal an eine beliebige PID schickt, ist
 ein Weg, sshd, den Agent oder die Datenbank abzuschießen.
