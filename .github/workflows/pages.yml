@@ -7,6 +7,17 @@ name: Bezugsquelle
 # Der manuelle Start ist kein Notnagel, sondern der Weg, die Seite neu
 # aufzubauen, ohne ein Release zu wiederholen.
 on:
+  # Der Installer wird von der Seite geladen. Aendert er sich auf main und
+  # niemand denkt an den Knopf, laedt jeder Server weiter die alte Fassung -
+  # genau das ist einmal passiert. Ein Push auf main laeuft auf dem
+  # Standardzweig und erfuellt die Regel der Umgebung ebenso.
+  push:
+    branches: [main]
+    paths:
+      - packaging/install.sh
+      - packaging/systemd/**
+      - scripts/build-pages.sh
+      - .github/workflows/pages.yml
   workflow_run:
     workflows: ["Release"]
     types: [completed]
@@ -33,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     # Ein abgebrochenes Release darf die Bezugsquelle nicht anfassen: sonst
     # zeigte sie auf Binaries, die es nicht gibt.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

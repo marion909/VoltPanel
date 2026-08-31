@@ -37,6 +37,11 @@ OUT="dist/pages"
 CHANNEL=stable
 case "$VERSION" in *-*) CHANNEL=beta ;; esac
 
+# Aus welchem Stand die Seite gebaut wurde. Ohne diese Angabe laesst sich von
+# aussen nicht feststellen, ob der ausgelieferte Installer aktuell ist.
+COMMIT="${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo unbekannt)}"
+COMMIT="${COMMIT:0:12}"
+
 rm -rf "$OUT"
 mkdir -p "$OUT/$CHANNEL/systemd"
 
@@ -87,6 +92,8 @@ cat > "$OUT/index.html" <<HTML
 <pre>bash &lt;(curl -fsSL https://$DOMAIN/install.sh)</pre>
 <p>Aktuelle Version im Kanal <code>$CHANNEL</code>: <strong>$VERSION</strong> &middot;
    <a href="https://github.com/$REPO">Quellcode und Dokumentation</a></p>
+<!-- Stand dieser Seite: $COMMIT. Damit laesst sich nachsehen, ob der hier
+     ausgelieferte Installer dem Repository entspricht. -->
 HTML
 
 echo
