@@ -7,9 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/bits"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,7 +31,6 @@ const mysqlDSN = "root@unix(/var/run/mysqld/mysqld.sock)/?timeout=10s&readTimeou
 var (
 	reMyDBName  = regexp.MustCompile(`^[a-z][a-z0-9_]{2,47}$`)
 	reMyUser    = regexp.MustCompile(`^[a-z][a-z0-9_]{2,30}$`)
-	reMyHost    = regexp.MustCompile(`^(localhost|%|[0-9.%]{1,45}|[a-z0-9.\-%]{1,60})$`)
 	reMyCharset = regexp.MustCompile(`^[a-z0-9_]{2,32}$`)
 	reMyCollate = regexp.MustCompile(`^[a-z0-9_]{2,64}$`)
 
@@ -68,6 +70,72 @@ func checkMySQLName(kind, value string, re *regexp.Regexp) error {
 	}
 	return nil
 }
+
+// checkMySQLHost prüft die Herkunft eines Kontos: 'benutzer'@'HIER'.
+//
+// Diese Prüfung wiederholt die aus dem Store — und das ist ihr Zweck. Der Agent
+// ist der einzige Prozess, der root an MariaDB ist; er darf sich nicht darauf
+// verlassen, dass der Web-Prozess vorher geprüft hat. Wäre der Web-Prozess über
+// eine Lücke übernommen, wäre `'kunde'@'%'` sonst ein Konto, das von jeder
+// Adresse der Welt Verbindungen annimmt.
+//
+// Erlaubt sind localhost, eine IP-Adresse und ein Netz in genau den beiden
+// Formen, die der Store erzeugt: IPv4 mit Netzmaske (10.0.0.0/255.255.255.0)
+// und IPv6 mit Präfixlänge (2001:db8::/64). Kein %, keine Hostnamen.
+func checkMySQLHost(host string) error {
+	if host == "localhost" {
+		return nil
+	}
+	if host == "" || len(host) > 60 || strings.ContainsAny(host, "%'`\\ ") {
+		return fmt.Errorf("%w: host-muster %q", errBadInput, host)
+	}
+
+	addrPart, maskPart, hasMask := strings.Cut(host, "/")
+	addr, err := netip.ParseAddr(addrPart)
+	if err != nil || addr.IsUnspecified() {
+		return fmt.Errorf("%w: host-muster %q ist keine ip-adresse", errBadInput, host)
+	}
+	if !hasMask {
+		return nil
+	}
+
+	if addr.Is4() {
+		mask, err := netip.ParseAddr(maskPart)
+		if err != nil || !mask.Is4() {
+			return fmt.Errorf("%w: netzmaske %q", errBadInput, maskPart)
+		}
+		octets := mask.As4()
+		v := uint32(octets[0])<<24 | uint32(octets[1])<<16 |
+			uint32(octets[2])<<8 | uint32(octets[3])
+		// Eine Maske mit Löchern (255.0.255.0) ist keine; MariaDB würde sie
+		// stillschweigend anders auslegen als gemeint.
+		if v != 0 && (^v+1)&(^v) != 0 {
+			return fmt.Errorf("%w: netzmaske %q ist nicht zusammenhängend", errBadInput, maskPart)
+		}
+		// Die Länge, nicht nur die Form. 1.2.3.4/0.0.0.0 ist eine
+		// wohlgeformte, zusammenhängende Maske — und bedeutet in MariaDB
+		// jede Adresse, also dasselbe wie %.
+		// Nach der Prüfung oben ist die Maske zusammenhängend; die Zahl der
+		// gesetzten Bits ist damit die Präfixlänge.
+		if bits.OnesCount32(v) < minMySQLPrefixV4 {
+			return fmt.Errorf("%w: netzmaske %q fasst zu weit", errBadInput, maskPart)
+		}
+		return nil
+	}
+
+	length, err := strconv.Atoi(maskPart)
+	if err != nil || length < minMySQLPrefixV6 || length > 128 {
+		return fmt.Errorf("%w: präfixlänge %q", errBadInput, maskPart)
+	}
+	return nil
+}
+
+// Dieselben Untergrenzen wie im Store. Ein Netz, das darunter liegt, ist keine
+// Herkunft mehr, sondern deren Abwesenheit.
+const (
+	minMySQLPrefixV4 = 16
+	minMySQLPrefixV6 = 64
+)
 
 // quoteIdent setzt einen bereits validierten Bezeichner in Backticks.
 //
@@ -232,7 +300,7 @@ func (s *Server) opMySQLSetPassword(ctx context.Context, raw json.RawMessage) (a
 	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+	if err := checkMySQLHost(p.HostPattern); err != nil {
 		return nil, err
 	}
 	if !reMyPassword.MatchString(p.Password) {
@@ -259,7 +327,7 @@ func (s *Server) opMySQLDropUser(ctx context.Context, raw json.RawMessage) (any,
 	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+	if err := checkMySQLHost(p.HostPattern); err != nil {
 		return nil, err
 	}
 
@@ -517,7 +585,7 @@ func checkMySQLUser(p MySQLUserParams) error {
 	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
 		return err
 	}
-	if err := checkMySQLName("host-muster", p.HostPattern, reMyHost); err != nil {
+	if err := checkMySQLHost(p.HostPattern); err != nil {
 		return err
 	}
 	return checkMySQLName("datenbankname", p.Database, reMyDBName)

@@ -514,6 +514,20 @@ func (c *Client) StopProcess(ctx context.Context, pid int, user, signal string) 
 		ProcessKillParams{PID: pid, User: user, Signal: signal}, nil)
 }
 
+// --- Datenbankzugriff von außen --------------------------------------------
+
+func (c *Client) MySQLRemoteStatus(ctx context.Context) (*MySQLRemoteResult, error) {
+	var res MySQLRemoteResult
+	err := c.Call(ctx, OpMySQLRemoteStatus, nil, &res)
+	return &res, err
+}
+
+func (c *Client) SetMySQLRemote(ctx context.Context, enabled bool) (*MySQLRemoteResult, error) {
+	var res MySQLRemoteResult
+	err := c.Call(ctx, OpMySQLRemoteSet, MySQLRemoteParams{Enabled: enabled}, &res)
+	return &res, err
+}
+
 // --- FTP -------------------------------------------------------------------
 
 func (c *Client) FTPSetup(ctx context.Context) (*FTPSetupResult, error) {

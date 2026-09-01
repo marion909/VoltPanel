@@ -86,6 +86,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Verzeichnis fest. Verschlüsselung ist Pflicht (TLS 2), UID und GID schlägt
   der Agent selbst nach. Der Dienst wird nicht mitinstalliert, sondern auf
   Wunsch eingerichtet.
+- Datenbankzugriff von außen: je Datenbankbenutzer eine Herkunftsliste. Ein
+  Eintrag ist eine IP-Adresse oder ein Netz, nie ein Hostname und nie %. Alle
+  Konten eines Benutzers tragen dasselbe Passwort und dieselben Rechte; das
+  Panel ändert sie zusammen. Ob MariaDB überhaupt im Netz horcht, ist eine
+  eigene, serverweite Entscheidung des Administrators.
 - Cronjobs: je Job eine Datei in /etc/cron.d, laufend unter dem Systembenutzer
   der Site, mit eigener Logdatei und Anzeige der letzten Läufe im Panel
 - Backups: Datenbank plus Konfiguration plus Site-Dateien als tar.gz, mit
@@ -117,7 +122,6 @@ genannten Punkte.
 **Phase 3 — Daten, Dateien, Cronjobs**
 
 - SQL-Browser (oder phpMyAdmin als Plugin)
-- Remote-Whitelist für Datenbankzugriffe von außen
 - Backup-Ziele S3, B2, FTP
 
 **Phase 4 — Multi-Tenant**

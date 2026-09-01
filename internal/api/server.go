@@ -237,6 +237,11 @@ func (s *Server) setupRoutes() {
 	auth.PATCH("/db-users/:id", s.handleUpdateDBUser)
 	auth.POST("/db-users/:id/reveal", s.handleRevealDBUserPassword)
 	auth.DELETE("/db-users/:id", s.handleDeleteDBUser)
+	auth.GET("/db-users/:id/hosts", s.handleListRemoteHosts)
+	auth.POST("/db-users/:id/hosts", s.handleAddRemoteHost)
+	auth.DELETE("/db-hosts/:id", s.handleRemoveRemoteHost)
+	auth.GET("/databases-remote", s.handleRemoteStatus)
+	auth.POST("/databases-remote", s.handleSetRemoteAccess, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/cronjobs", s.handleListCronjobs)
 	auth.POST("/cronjobs", s.handleCreateCronjob)

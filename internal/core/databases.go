@@ -206,10 +206,25 @@ func (s *DatabaseService) SetGrants(ctx context.Context, sc store.Scope, userID 
 	if err := s.store.UpdateDBUser(ctx, sc, user); err != nil {
 		return err
 	}
-	return s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
-		Username: user.Username, HostPattern: user.HostPattern,
-		Database: db.Name, Grants: user.Grants,
-	})
+
+	hosts, err := s.remoteHostsOf(ctx, sc, user.ID)
+	if err != nil {
+		return err
+	}
+	var failed []string
+	for _, host := range append([]string{user.HostPattern}, hosts...) {
+		if err := s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
+			Username: user.Username, HostPattern: host,
+			Database: db.Name, Grants: user.Grants,
+		}); err != nil {
+			failed = append(failed, host+": "+err.Error())
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("die rechte gelten nicht für alle herkünfte: %s",
+			strings.Join(failed, "; "))
+	}
+	return nil
 }
 
 // SetPassword setzt das Passwort eines Datenbankbenutzers neu.
@@ -224,6 +239,8 @@ func (s *DatabaseService) SetPassword(ctx context.Context, sc store.Scope, userI
 		}
 	}
 
+	// Das Konto auf localhost zuerst und für sich: scheitert es, hat sich
+	// nichts geändert, und das gespeicherte Passwort bleibt das gültige.
 	if err := s.agent.SetDBUserPassword(ctx, user.Username, user.HostPattern, password); err != nil {
 		return "", err
 	}
@@ -234,6 +251,26 @@ func (s *DatabaseService) SetPassword(ctx context.Context, sc store.Scope, userI
 	}
 	if err := s.store.UpdateDBUser(ctx, sc, user); err != nil {
 		return "", err
+	}
+
+	// Die Konten der Herkünfte danach. Ein Fehler hier ist keiner, der das
+	// Gespeicherte falsch macht — er bedeutet, dass ein Zugang von außen noch
+	// auf dem alten Passwort steht. Das muss gesagt werden, und weil das neue
+	// Passwort schon in der Datenbank steht, hilft ein zweiter Versuch.
+	hosts, err := s.remoteHostsOf(ctx, sc, user.ID)
+	if err != nil {
+		return "", err
+	}
+	var failed []string
+	for _, host := range hosts {
+		if err := s.agent.SetDBUserPassword(ctx, user.Username, host, password); err != nil {
+			failed = append(failed, host+": "+err.Error())
+		}
+	}
+	if len(failed) > 0 {
+		return "", fmt.Errorf("das passwort gilt für %s, aber nicht für alle herkünfte: %s. "+
+			"das neue passwort ist gespeichert und lässt sich anzeigen; ein zweiter versuch "+
+			"holt die fehlenden nach", user.HostPattern, strings.Join(failed, "; "))
 	}
 	return password, nil
 }
@@ -255,9 +292,19 @@ func (s *DatabaseService) DeleteUser(ctx context.Context, sc store.Scope, userID
 	if err != nil {
 		return err
 	}
-	if err := s.agent.DropDBUser(ctx, user.Username, user.HostPattern); err != nil {
+	// Die Herkünfte zuerst: sie sind die Konten, über die eine Verbindung von
+	// außen möglich ist. Bliebe eines stehen, wäre der Zugang weiter offen,
+	// während das Panel den Benutzer als gelöscht führt.
+	hosts, err := s.remoteHostsOf(ctx, sc, userID)
+	if err != nil {
 		return err
 	}
+	for _, host := range append(hosts, user.HostPattern) {
+		if err := s.agent.DropDBUser(ctx, user.Username, host); err != nil {
+			return fmt.Errorf("konto %s@%s entfernen: %w", user.Username, host, err)
+		}
+	}
+	// db_remote_hosts hängt per ON DELETE CASCADE am Benutzer.
 	return s.store.DeleteDBUser(ctx, sc, userID)
 }
 
@@ -274,8 +321,14 @@ func (s *DatabaseService) DeleteDatabase(ctx context.Context, sc store.Scope, da
 	}
 	var problems []string
 	for _, user := range users {
-		if err := s.agent.DropDBUser(ctx, user.Username, user.HostPattern); err != nil {
-			problems = append(problems, user.Username+": "+err.Error())
+		hosts, err := s.remoteHostsOf(ctx, sc, user.ID)
+		if err != nil {
+			return err
+		}
+		for _, host := range append(hosts, user.HostPattern) {
+			if err := s.agent.DropDBUser(ctx, user.Username, host); err != nil {
+				problems = append(problems, user.Username+"@"+host+": "+err.Error())
+			}
 		}
 	}
 

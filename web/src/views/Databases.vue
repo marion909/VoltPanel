@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import { isAdmin } from '../stores/session'
 import { formatBytes } from '../format'
 
 const databases = ref([])
@@ -18,6 +19,11 @@ const credentials = ref(null)
 
 const notice = ref('')
 const importInput = ref(null)
+
+// Herkunftslisten je Datenbankbenutzer, und der Zustand des Servers dazu.
+const hostsByUser = ref({})
+const hostForms = ref({})
+const remote = ref(null)
 const importTarget = ref(null)
 const importing = ref(null)
 
@@ -170,6 +176,69 @@ async function setGrants(user, grants) {
     }
   } catch (err) {
     error.value = err.message
+  }
+}
+
+async function loadHosts(user) {
+  hostsByUser.value = {
+    ...hostsByUser.value,
+    [user.id]: await api.get(`/db-users/${user.id}/hosts`),
+  }
+}
+
+// Die Liste wird erst geholt, wenn jemand sie aufklappt. Bei zehn Datenbanken
+// mit je zwei Benutzern wären es sonst zwanzig Abfragen für etwas, das die
+// meisten nie brauchen.
+async function toggleHosts(user) {
+  if (hostsByUser.value[user.id]) {
+    const rest = { ...hostsByUser.value }
+    delete rest[user.id]
+    hostsByUser.value = rest
+    return
+  }
+  try {
+    await loadHosts(user)
+    if (!remote.value) remote.value = await api.get('/databases-remote').catch(() => null)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
+async function addHost(user) {
+  const form = hostForms.value[user.id] || {}
+  if (!form.host) return
+  try {
+    await api.post(`/db-users/${user.id}/hosts`, { host: form.host, note: form.note || '' })
+    hostForms.value = { ...hostForms.value, [user.id]: {} }
+    error.value = ''
+    await loadHosts(user)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
+async function removeHost(user, host) {
+  if (!confirm(t('db.confirmDeleteHost', { host: host.host }))) return
+  try {
+    await api.del(`/db-hosts/${host.id}`)
+    await loadHosts(user)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
+// Der Schalter startet MariaDB neu. Deshalb die Rückfrage, und deshalb steht
+// er nur Administratoren zur Verfügung.
+async function setRemoteAccess(enabled) {
+  if (enabled && !confirm(t('db.confirmRemoteOn'))) return
+  busy.value = true
+  try {
+    remote.value = await api.post('/databases-remote', { enabled })
+    error.value = ''
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    busy.value = false
   }
 }
 
@@ -336,11 +405,8 @@ onMounted(load)
             <tr v-if="expanded === db.id" :style="{ background: 'var(--surface-sunken)' }">
               <td colspan="4" class="px-4 py-3">
                 <div v-if="(usersByDB[db.id] || []).length" class="space-y-2">
-                  <div
-                    v-for="user in usersByDB[db.id]"
-                    :key="user.id"
-                    class="flex flex-wrap items-center gap-3 text-[12px]"
-                  >
+                  <div v-for="user in usersByDB[db.id]" :key="user.id" class="text-[12px]">
+                   <div class="flex flex-wrap items-center gap-3">
                     <span class="tabular font-medium">{{ user.username }}@{{ user.host_pattern }}</span>
                     <select
                       :value="user.grants"
@@ -360,10 +426,92 @@ onMounted(load)
                             @click="resetPassword(user)">
                       {{ t('db.newPassword') }}
                     </button>
+                    <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+                            @click="toggleHosts(user)">
+                      {{ hostsByUser[user.id] ? '▾' : '▸' }} {{ t('db.remoteHosts') }}
+                    </button>
                     <button class="underline" :style="{ color: 'var(--status-critical)' }"
                             @click="removeUser(user)">
                       {{ t('sites.delete') }}
                     </button>
+                   </div>
+
+                  <!-- Herkunftsliste: von welchen Adressen aus dieser Zugang
+                       von außen funktioniert. -->
+                  <div
+                    v-if="hostsByUser[user.id]"
+                    class="ml-4 rounded-md border p-3"
+                    :style="{ borderColor: 'var(--line-hairline)' }"
+                  >
+                    <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                      {{ t('db.remoteHint') }}
+                    </p>
+
+                    <!-- Ohne horchenden Server bewirkt jeder Eintrag nichts.
+                         Das gehört an die Stelle, an der jemand ihn anlegt. -->
+                    <p
+                      v-if="remote && !remote.listening"
+                      class="mb-2 text-[11px]"
+                      :style="{ color: 'var(--status-warning)' }"
+                    >
+                      {{ t('db.remoteClosed') }}
+                      <button
+                        v-if="isAdmin()"
+                        :disabled="busy"
+                        class="ml-1 underline"
+                        :style="{ color: 'var(--series-1)' }"
+                        @click="setRemoteAccess(true)"
+                      >
+                        {{ t('db.remoteEnable') }}
+                      </button>
+                    </p>
+                    <p
+                      v-else-if="remote && isAdmin()"
+                      class="mb-2 text-[11px]"
+                      :style="{ color: 'var(--ink-muted)' }"
+                    >
+                      {{ t('db.remoteOpen', { bind: remote.bind_address || '0.0.0.0', port: remote.port }) }}
+                      <button :disabled="busy" class="ml-1 underline"
+                              :style="{ color: 'var(--ink-secondary)' }"
+                              @click="setRemoteAccess(false)">
+                        {{ t('db.remoteDisable') }}
+                      </button>
+                    </p>
+
+                    <div v-for="host in hostsByUser[user.id]" :key="host.id"
+                         class="flex items-center gap-3 py-0.5">
+                      <span class="tabular font-mono">{{ host.host }}</span>
+                      <span :style="{ color: 'var(--ink-muted)' }">{{ host.note }}</span>
+                      <button class="underline" :style="{ color: 'var(--status-critical)' }"
+                              @click="removeHost(user, host)">
+                        {{ t('sites.delete') }}
+                      </button>
+                    </div>
+                    <p v-if="!hostsByUser[user.id].length" :style="{ color: 'var(--ink-muted)' }">
+                      {{ t('db.remoteEmpty') }}
+                    </p>
+
+                    <form class="mt-2 flex flex-wrap items-center gap-2"
+                          @submit.prevent="addHost(user)">
+                      <input
+                        :value="(hostForms[user.id] || {}).host || ''"
+                        :placeholder="t('db.remotePlaceholder')"
+                        class="rounded-md border px-2 py-1 text-[11px]"
+                        :style="inputStyle"
+                        @input="hostForms[user.id] = { ...(hostForms[user.id] || {}), host: $event.target.value }"
+                      />
+                      <input
+                        :value="(hostForms[user.id] || {}).note || ''"
+                        :placeholder="t('db.remoteNote')"
+                        class="rounded-md border px-2 py-1 text-[11px]"
+                        :style="inputStyle"
+                        @input="hostForms[user.id] = { ...(hostForms[user.id] || {}), note: $event.target.value }"
+                      />
+                      <button type="submit" class="underline" :style="{ color: 'var(--series-1)' }">
+                        + {{ t('db.remoteAdd') }}
+                      </button>
+                    </form>
+                  </div>
                   </div>
                 </div>
                 <button class="mt-2 text-[12px] underline" :style="{ color: 'var(--series-1)' }"

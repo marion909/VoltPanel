@@ -195,6 +195,18 @@ type DBUser struct {
 	UpdatedAt   int64  `json:"updated_at"`
 }
 
+// DBRemoteHost ist eine Herkunft, von der aus sich ein Datenbankbenutzer
+// anmelden darf. Jede Zeile wird in MariaDB ein eigenes Konto — dasselbe
+// Passwort wie das zugehörige localhost-Konto, dieselben Rechte.
+type DBRemoteHost struct {
+	ID        int64  `json:"id"`
+	TenantID  int64  `json:"tenant_id"`
+	DBUserID  int64  `json:"db_user_id"`
+	Host      string `json:"host"`
+	Note      string `json:"note"`
+	CreatedAt int64  `json:"created_at"`
+}
+
 type Cert struct {
 	ID            int64    `json:"id"`
 	TenantID      int64    `json:"tenant_id"`

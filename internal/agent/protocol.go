@@ -110,6 +110,10 @@ const (
 	OpFTPUserDelete Op = "ftp.user_delete"
 	OpFTPUserList   Op = "ftp.user_list"
 
+	// Datenbankzugriff von aussen: horcht MariaDB ueberhaupt im Netz?
+	OpMySQLRemoteStatus Op = "mysql.remote_status"
+	OpMySQLRemoteSet    Op = "mysql.remote_set"
+
 	// Terminal: eine Shell als Systembenutzer einer Site, nie als root.
 	OpTerminalOpen   Op = "terminal.open"
 	OpTerminalResize Op = "terminal.resize"

@@ -53,6 +53,9 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFTPUserDelete: s.opFTPUserDelete,
 		OpFTPUserList:   s.opFTPUserList,
 
+		OpMySQLRemoteStatus: s.opMySQLRemoteStatus,
+		OpMySQLRemoteSet:    s.opMySQLRemoteSet,
+
 		OpTerminalOpen:   s.opTerminalOpen,
 		OpTerminalResize: s.opTerminalResize,
 		OpTerminalClose:  s.opTerminalClose,

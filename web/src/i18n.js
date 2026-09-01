@@ -170,6 +170,25 @@ const messages = {
     'db.confirmDeleteUser': 'Benutzer {name} entfernen?',
     'db.credentialsOnce': 'Dieses Passwort wird nur jetzt im Klartext gezeigt.',
 
+    'db.remoteHosts': 'Zugriff von außen',
+    'db.remoteHint':
+      'Von diesen Adressen aus funktioniert der Zugang auch von außerhalb des Servers — ' +
+      'mit demselben Benutzernamen und demselben Passwort. Erlaubt sind eine IP-Adresse ' +
+      'oder ein Netz wie 10.0.0.0/24. Hostnamen und % sind es nicht.',
+    'db.remoteEmpty': 'Kein Zugriff von außen — der Zugang gilt nur auf diesem Server.',
+    'db.remoteAdd': 'Adresse aufnehmen',
+    'db.remotePlaceholder': '203.0.113.5 oder 10.0.0.0/24',
+    'db.remoteNote': 'Wofür? (z. B. Büro)',
+    'db.remoteClosed':
+      'MariaDB nimmt derzeit keine Verbindungen von außen an — Einträge hier bleiben ohne Wirkung.',
+    'db.remoteOpen': 'MariaDB horcht auf {bind}:{port}.',
+    'db.remoteEnable': 'Jetzt öffnen',
+    'db.remoteDisable': 'Wieder schließen',
+    'db.confirmDeleteHost': 'Zugriff von {host} entziehen?',
+    'db.confirmRemoteOn':
+      'MariaDB wird dafür neu gestartet und nimmt danach Verbindungen aus dem Netz an. ' +
+      'Laufende Verbindungen brechen dabei ab. Fortfahren?',
+
     'files.title': 'Dateien',
     'files.site': 'Website',
     'files.chooseSite': 'Bitte eine Website wählen.',
@@ -481,6 +500,25 @@ const messages = {
     'db.confirmDelete': 'Permanently delete database {name} and all its data?',
     'db.confirmDeleteUser': 'Remove user {name}?',
     'db.credentialsOnce': 'This password is shown in clear text only now.',
+
+    'db.remoteHosts': 'Remote access',
+    'db.remoteHint':
+      'From these addresses the account also works from outside this server — same ' +
+      'username, same password. An IP address or a network such as 10.0.0.0/24 is ' +
+      'allowed. Hostnames and % are not.',
+    'db.remoteEmpty': 'No remote access — the account only works on this server.',
+    'db.remoteAdd': 'Add address',
+    'db.remotePlaceholder': '203.0.113.5 or 10.0.0.0/24',
+    'db.remoteNote': 'What for? (e.g. office)',
+    'db.remoteClosed':
+      'MariaDB currently accepts no connections from outside — entries here have no effect.',
+    'db.remoteOpen': 'MariaDB listens on {bind}:{port}.',
+    'db.remoteEnable': 'Open it now',
+    'db.remoteDisable': 'Close it again',
+    'db.confirmDeleteHost': 'Revoke access from {host}?',
+    'db.confirmRemoteOn':
+      'MariaDB will be restarted and will then accept connections from the network. ' +
+      'Open connections will drop. Continue?',
 
     'files.title': 'Files',
     'files.site': 'Website',

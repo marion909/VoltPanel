@@ -272,6 +272,46 @@ Die Liste selbst ist ebenfalls gefiltert. Nicht wegen der Zahlen, sondern wegen
 der Kommandozeilen: dort stehen Domainnamen, Pfade und gelegentlich Argumente
 eines Skripts — die Tätigkeit anderer Mandanten.
 
+## 4k. Datenbankzugriff von außen
+
+**Risiko:** Ein MySQL-Konto ist ein Paar aus Benutzer und Herkunft. Wer die
+Herkunft bestimmen darf, bestimmt, von wo aus eine Anmeldung angenommen wird —
+`'kunde'@'%'` heißt: von überall auf der Welt, ohne Panel, ohne Sitzung, ohne
+zweiten Faktor. Das Passwort dazu steht entschlüsselbar in der Panel-Datenbank.
+
+**Maßnahmen:** Ein Eintrag ist eine Adresse. Zugelassen sind eine einzelne
+IP-Adresse und ein Netz; abgewiesen werden drei Dinge, jedes aus einem eigenen
+Grund:
+
+- **`%`** in jeder Form. Der Platzhalter macht die Whitelist in dem Moment
+  leer, in dem sie angelegt wird. Für ein ganzes Netz gibt es die
+  Netzmaskenschreibweise, und eine Schreibweise für dieselbe Sache genügt.
+- **Hostnamen.** MariaDB löst sie beim Verbindungsaufbau rückwärts über DNS
+  auf. Wer den PTR-Eintrag seiner Adresse setzen kann — bei den meisten
+  Anbietern ein Formularfeld —, bestimmt damit selbst, für welchen Eintrag er
+  gehalten wird. Eine Zugriffskontrolle auf fremdverwalteten DNS-Daten ist
+  keine.
+- **Zu weite Netze.** Unterhalb von /16 bei IPv4 und /64 bei IPv6 ist ein
+  Eintrag keine Herkunft mehr, sondern deren Abwesenheit. Die Grenze fängt auch
+  `0.0.0.0/0` ab, ohne dass jede neue Schreibweise für „überall“ einzeln
+  nachgetragen werden müsste.
+
+Geprüft wird zweimal, im Store und im Agent, mit denselben Regeln und
+unabhängig voneinander. Der Agent ist der einzige Prozess, der root an MariaDB
+ist; er darf sich nicht darauf verlassen, dass der Web-Prozess vorher geprüft
+hat. Beide Prüfungen weisen `1.2.3.4/0.0.0.0` ab — eine wohlgeformte,
+zusammenhängende Netzmaske, die trotzdem jede Adresse bedeutet.
+
+**Der Server selbst** ist eine getrennte Entscheidung. Debian bindet MariaDB ab
+Werk an 127.0.0.1; das zu ändern gilt für alle Mandanten gleichzeitig, startet
+den Dienst neu und öffnet einen Port. Deshalb ist es Administratoren
+vorbehalten und geschieht nicht nebenbei beim Anlegen einer Herkunft.
+
+**Was zusammenbleiben muss:** Passwort, Rechte und Löschen treffen alle Konten
+eines Benutzers. Bliebe beim Löschen ein Konto einer Herkunft stehen, wäre der
+Zugang von außen weiter offen, während das Panel den Benutzer als entfernt
+führt.
+
 ## 4j. Pakete nachinstallieren
 
 **Risiko:** Der Agent installiert auf Anforderung aus der Oberfläche Pakete
