@@ -272,6 +272,29 @@ Die Liste selbst ist ebenfalls gefiltert. Nicht wegen der Zahlen, sondern wegen
 der Kommandozeilen: dort stehen Domainnamen, Pfade und gelegentlich Argumente
 eines Skripts — die Tätigkeit anderer Mandanten.
 
+## 4j. Pakete nachinstallieren
+
+**Risiko:** Der Agent installiert auf Anforderung aus der Oberfläche Pakete
+nach — PHP-Module und Pure-FTPd. Ein Paketname aus einer Anfrage wäre ein Weg,
+beliebige Software auf den Server zu holen.
+
+**Maßnahmen:** Es gibt keinen Paketnamen aus einer Anfrage. Bei PHP-Modulen
+setzt der Agent ihn aus geprüfter Version und geprüftem Modulnamen zusammen;
+bei FTP steht er als Konstante im Quelltext. Der Aufruf geht wie jeder andere
+über `run()` — festes argv, feste Umgebung, keine Shell.
+
+**Ein Zugeständnis:** apt wechselt zum Herunterladen auf den unprivilegierten
+Benutzer `_apt`. Dieser Wechsel braucht `CAP_SETUID`, und in manchen Umgebungen
+— Container etwa — hat der Dienst die Fähigkeit nicht. apt bricht dann mit
+`E: seteuid 42 failed` ab, nachdem es die Paketliste schon aufgelöst hat.
+
+Der Agent wiederholt den Aufruf in diesem Fall einmal mit
+`APT::Sandbox::User=root`. Das kostet die Trennung beim Download: der HTTP-Teil
+von apt liest die Antworten des Spiegels dann als root. Zwei Dinge halten den
+Preis klein — die Signaturprüfung der Pakete ändert sich dadurch nicht, und der
+zweite Versuch läuft nur nach genau diesem einen Abbruch. Wo der Wechsel
+funktioniert, bleibt er unangetastet.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

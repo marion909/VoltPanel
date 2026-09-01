@@ -87,11 +87,9 @@ func (s *Server) opPHPExtInstall(ctx context.Context, raw json.RawMessage) (any,
 	}
 
 	pkg := "php" + p.PHPVersion + "-" + p.Name
-	// aptTimeout, weil ein Paketindex-Update und der Download dahinterstehen.
-	if out, err := run(ctx, aptTimeout, "apt-get", "install", "-y",
-		"--no-install-recommends", pkg); err != nil {
+	if out, err := s.aptInstall(ctx, pkg); err != nil {
 		return nil, opErr(OpPHPExtInstall, "%s konnte nicht installiert werden: %s",
-			pkg, truncate(out, 500))
+			pkg, aptMessage(out))
 	}
 
 	if out, err := run(ctx, longTimeout, "systemctl", "restart", "php"+p.PHPVersion+"-fpm"); err != nil {

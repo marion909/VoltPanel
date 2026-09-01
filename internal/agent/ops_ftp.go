@@ -24,12 +24,26 @@ const (
 	ftpDBPath  = "/etc/pure-ftpd/pureftpd.passwd"
 	ftpTLSPath = "/etc/ssl/private/pure-ftpd.pem"
 
+	// Diese Datei liest der Startwrapper des Debian-Pakets, bevor er
+	// pure-ftpd aufruft. Sie steht außerhalb von ftpConfDir und damit
+	// außerhalb der Tabelle unten.
+	ftpDefaultsPath = "/etc/default/pure-ftpd-common"
+
 	// Der passive Bereich muss in der Firewall offen sein. Hundert Ports
 	// reichen für hundert gleichzeitige Übertragungen — mehr als
 	// MaxClientsNumber zulässt.
 	ftpPassiveFrom = 30000
 	ftpPassiveTo   = 30100
 )
+
+// ftpDefaults: eigener Dienst statt inetd, und kein Chroot in ein Verzeichnis,
+// das dem Kunden gehört. VIRTUALCHROOT würde die Sperre in das Heimatverzeichnis
+// selbst verlegen, wo ein Symlink sie aufmachen kann; ohne die Angabe sperrt
+// pure-ftpd über chroot(2), und daran ändert kein Symlink etwas.
+const ftpDefaults = `# Von VoltPanel geschrieben. Änderungen gehen beim nächsten Einrichten verloren.
+STANDALONE_OR_INETD=standalone
+VIRTUALCHROOT=false
+`
 
 // reFTPName wiederholt die Prüfung aus dem Store. Der Name wird eine Zeile in
 // der PureDB, in der der Doppelpunkt das Trennzeichen ist.
@@ -87,10 +101,16 @@ func ftpSettings() map[string]string {
 // kann also weder eine Option noch einen Pfad bestimmen.
 func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error) {
 	if !fileExists("/usr/sbin/pure-ftpd") {
-		if out, err := run(ctx, aptTimeout, "apt-get", "install", "-y",
-			"--no-install-recommends", "pure-ftpd"); err != nil {
-			return nil, opErr(OpFTPSetup, "pure-ftpd installieren: %s", truncate(out, 500))
+		if out, err := s.aptInstall(ctx, "pure-ftpd"); err != nil {
+			return nil, opErr(OpFTPSetup, "pure-ftpd installieren: %s", aptMessage(out))
 		}
+	}
+
+	// Das Paket zieht openbsd-inetd mit. Bleibt der Dienst auf inetd gestellt,
+	// beendet sich die Unit sofort wieder und Port 21 hängt an einem Dienst,
+	// der von den Einstellungen unten nichts weiß.
+	if err := os.WriteFile(ftpDefaultsPath, []byte(ftpDefaults), 0o644); err != nil {
+		return nil, opErr(OpFTPSetup, "betriebsart setzen: %v", err)
 	}
 
 	if err := os.MkdirAll(ftpConfDir, 0o755); err != nil {

@@ -121,6 +121,26 @@ func checkDomain(d string) error {
 // möglich wäre: Argumente sind immer separate argv-Einträge, nie Text, den ein
 // Interpreter noch einmal zerlegt.
 func run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+	return runEnv(ctx, timeout, nil, name, args...)
+}
+
+// baseEnv ist das Environment jedes Kindprozesses: minimal, fest, nichts vom
+// Agent geerbt. Ein Kommando sieht damit auf jedem Server dasselbe.
+func baseEnv() []string {
+	return []string{
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+		"LC_ALL=C",
+	}
+}
+
+// runEnv ist run() mit zusätzlichen Umgebungsvariablen.
+//
+// „Zusätzlich“ heißt: zum Minimum aus baseEnv, nie zum Environment des Agents.
+// Die Werte stehen im Quelltext des Aufrufers — nichts davon kommt je aus einer
+// Anfrage, sonst wäre LD_PRELOAD ein Weg an jeder Prüfung vorbei.
+func runEnv(ctx context.Context, timeout time.Duration, env []string, name string,
+	args ...string) (string, error) {
+
 	bin, ok := allowedBinaries[name]
 	if !ok {
 		return "", fmt.Errorf("%w: binary %q", errNotAllow, name)
@@ -130,11 +150,7 @@ func run(ctx context.Context, timeout time.Duration, name string, args ...string
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, bin, args...)
-	// Minimales, festes Environment. Nichts wird vom aufrufenden Prozess geerbt.
-	cmd.Env = []string{
-		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
-		"LC_ALL=C",
-	}
+	cmd.Env = append(baseEnv(), env...)
 
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
@@ -230,12 +246,7 @@ func runInto(ctx context.Context, timeout time.Duration, stdout io.Writer, stdin
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Env = []string{
-		"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C",
-		// apt darf unter keinen Umständen nachfragen: ein wartender Dialog
-		// hinge bis zum Timeout und hinterliesse eine halbe Installation.
-		"DEBIAN_FRONTEND=noninteractive",
-	}
+	cmd.Env = append(baseEnv(), aptEnv...)
 	cmd.Stdout = stdout
 	cmd.Stdin = stdin
 
