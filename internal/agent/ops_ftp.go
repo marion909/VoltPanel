@@ -100,9 +100,21 @@ func ftpSettings() map[string]string {
 // Tabelle oben oder kommt aus der Konfiguration des Agents — der Web-Prozess
 // kann also weder eine Option noch einen Pfad bestimmen.
 func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error) {
+	var installHinweis string
 	if !fileExists("/usr/sbin/pure-ftpd") {
 		if out, err := s.aptInstall(ctx, "pure-ftpd"); err != nil {
-			return nil, opErr(OpFTPSetup, "pure-ftpd installieren: %s", aptMessage(out))
+			// apt meldet auch dann einen Fehler, wenn nur das Postinstall
+			// eines abhängigen Pakets gescheitert ist. pure-ftpd hängt an
+			// openbsd-inetd, und das braucht VoltPanel nicht — Pure-FTPd läuft
+			// hier als eigener Dienst. Ist das gewünschte Paket also heil,
+			// wird weitergemacht statt abgebrochen.
+			if !packageInstalled(ctx, "pure-ftpd") {
+				return nil, opErr(OpFTPSetup, "pure-ftpd installieren: %s", aptMessage(out))
+			}
+			installHinweis = "Ein mitinstalliertes Paket meldete einen Fehler; " +
+				"pure-ftpd selbst ist vollständig eingerichtet. Meldung: " + aptMessage(out)
+			s.log.Warn("paketinstallation mit fehler, pure-ftpd trotzdem vollständig",
+				"apt", aptMessage(out))
 		}
 	}
 
@@ -146,13 +158,17 @@ func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error)
 		return nil, opErr(OpFTPSetup, "dienst neu starten: %s", truncate(out, 300))
 	}
 
-	return FTPSetupResult{
+	res := FTPSetupResult{
 		Ready:        true,
+		Installed:    true,
+		Active:       true,
 		PassiveFrom:  ftpPassiveFrom,
 		PassiveTo:    ftpPassiveTo,
 		FirewallHint: s.openFTPPorts(ctx),
 		TLSCert:      ftpTLSPath,
-	}, nil
+		Notice:       installHinweis,
+	}
+	return res, nil
 }
 
 // writeFTPCert legt das Zertifikat ab, das Pure-FTPd erwartet: Schlüssel und

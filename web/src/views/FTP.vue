@@ -168,6 +168,15 @@ onMounted(load)
       </p>
     </div>
 
+    <!-- Ein Erfolg mit Fussnote: eingerichtet, aber etwas ging dabei schief. -->
+    <p
+      v-if="status?.notice"
+      class="mb-4 rounded-md border p-3 text-[12px]"
+      :style="{ borderColor: 'var(--status-warning)', color: 'var(--ink-secondary)' }"
+    >
+      {{ status.notice }}
+    </p>
+
     <p
       v-if="status?.firewall_hint"
       class="mb-4 text-[12px]"

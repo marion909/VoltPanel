@@ -50,9 +50,11 @@ var allowedBinaries = map[string]string{
 	"volt": "/usr/local/bin/volt",
 	// Fuer PHP-Module: apt installiert das Paket, phpenmod/phpdismod setzen
 	// nur Symlinks. Abschalten bleibt damit umkehrbar.
-	"apt-get":   "/usr/bin/apt-get",
-	"phpenmod":  "/usr/sbin/phpenmod",
-	"phpdismod": "/usr/sbin/phpdismod",
+	"apt-get": "/usr/bin/apt-get",
+	// Nur lesend: sagt, ob ein Paket wirklich konfiguriert ist.
+	"dpkg-query": "/usr/bin/dpkg-query",
+	"phpenmod":   "/usr/sbin/phpenmod",
+	"phpdismod":  "/usr/sbin/phpdismod",
 	// Fuer FTP: pure-pw pflegt die virtuellen Zugaenge, ufw gibt die Ports
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",

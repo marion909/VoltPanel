@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"os"
 	"strings"
 	"unicode/utf8"
 )
@@ -28,6 +29,8 @@ var aptEnv = []string{"DEBIAN_FRONTEND=noninteractive"}
 // leicht eine halbe Minute, und in den allermeisten Fällen ist der Index frisch
 // genug — der Installer hat ihn beim Einrichten des Servers geholt.
 func (s *Server) aptInstall(ctx context.Context, packages ...string) (string, error) {
+	defer s.blockServiceStarts()()
+
 	args := append([]string{
 		"install", "-y", "--no-install-recommends",
 		// Fragt dpkg zu einer bestehenden Konfigurationsdatei, bleibt die
@@ -48,6 +51,70 @@ func (s *Server) aptInstall(ctx context.Context, packages ...string) (string, er
 		return out, err
 	}
 	return s.aptRun(ctx, args...)
+}
+
+// policyPath ist der Weg, auf dem Debian einem Paket sagt, dass es seinen
+// Dienst beim Installieren nicht starten soll: invoke-rc.d ruft dieses Skript
+// und bricht bei Rückgabewert 101 ab.
+//
+// Als Variable, damit der Test das Verhalten an einer echten Datei prüfen kann
+// statt an einer Nachbildung. Verändert wird sie ausschliesslich dort.
+var policyPath = "/usr/sbin/policy-rc.d"
+
+// policyMarker steht in der Datei, damit eine liegengebliebene eigene von einer
+// fremden zu unterscheiden ist. Eine fremde wird nie angefasst.
+const policyMarker = "# von volt-agent, nur waehrend einer paketinstallation"
+
+const policyBody = "#!/bin/sh\n" + policyMarker + "\nexit 101\n"
+
+// blockServiceStarts verhindert, dass Paket-Postinstalls Dienste hochfahren,
+// und gibt die Funktion zurück, die das wieder zurücknimmt.
+//
+// Der Grund ist ein konkreter Fehlschlag: pure-ftpd hängt zwingend an
+// openbsd-inetd, und dessen Postinst startet inetd. Gelingt das nicht — in
+// einem Container etwa, oder weil Port 21 schon belegt ist —, gibt dpkg einen
+// Fehler zurück, und apt bricht die ganze Installation ab. Dabei braucht
+// VoltPanel inetd überhaupt nicht: Pure-FTPd läuft hier als eigener Dienst.
+//
+// Der Agent startet jeden Dienst, den er wirklich braucht, danach selbst und
+// ausdrücklich. Was ein Paket beim Auspacken hochfahren möchte, ist für ihn
+// ohnehin nie die Entscheidung gewesen.
+//
+// Eine fremde policy-rc.d bleibt unangetastet — sie kann eine bewusste
+// Einstellung des Serverbetreibers sein.
+func (s *Server) blockServiceStarts() func() {
+	if data, err := os.ReadFile(policyPath); err == nil {
+		if !strings.Contains(string(data), policyMarker) {
+			s.log.Info("policy-rc.d liegt bereits vor und bleibt unverändert")
+			return func() {}
+		}
+		// Eine eigene von einem abgebrochenen Lauf. Sie darf weg.
+		s.log.Warn("liegengebliebene policy-rc.d vom letzten mal wird ersetzt")
+	}
+
+	if err := os.WriteFile(policyPath, []byte(policyBody), 0o755); err != nil {
+		// Kein Grund abzubrechen: ohne die Datei läuft die Installation wie
+		// vorher, nur eben mit dem Risiko oben.
+		s.log.Warn("policy-rc.d nicht schreibbar", "err", err)
+		return func() {}
+	}
+	return func() {
+		if err := os.Remove(policyPath); err != nil && !os.IsNotExist(err) {
+			s.log.Error("policy-rc.d nicht entfernt — dienste starten sonst bei "+
+				"jeder paketinstallation nicht mehr", "pfad", policyPath, "err", err)
+		}
+	}
+}
+
+// packageInstalled fragt dpkg, ob genau dieses Paket ausgepackt und
+// konfiguriert ist.
+//
+// Nötig, weil apt auch dann einen Fehler zurückgibt, wenn nur das Postinstall
+// eines abhängigen Pakets gescheitert ist. Ob das gewünschte Paket dabei
+// heil geblieben ist, sagt allein dpkg.
+func packageInstalled(ctx context.Context, name string) bool {
+	out, err := run(ctx, shortTimeout, "dpkg-query", "-W", "-f", "${Status}", name)
+	return err == nil && strings.TrimSpace(out) == "install ok installed"
 }
 
 // aptRun führt apt aus und wiederholt den Aufruf, wenn apt seine eigenen Rechte
@@ -121,18 +188,69 @@ func aptIndexStale(out string) bool {
 // nennt den Grund am Ende. Ein Abschneiden von vorne trifft deshalb genau die
 // Zeile, wegen der jemand die Meldung überhaupt liest — in der ersten Fassung
 // endete die Fehlermeldung mitten in „After this opera…“.
+//
+// Nur auf E:-Zeilen zu filtern war aber zu eng, und zwar an der Stelle, an der
+// es am meisten weh tut: scheitert die Installation in dpkg, ist die einzige
+// E:-Zeile die nichtssagende Zusammenfassung
+//
+//	E: Sub-process /usr/bin/dpkg returned an error code (1)
+//
+// Der Grund steht darüber, in Zeilen ohne Präfix — „dpkg: error processing
+// package …“ und die eingerückte Zeile darunter. Deshalb sammelt diese
+// Funktion beides ein.
 func aptMessage(out string) string {
 	var problems []string
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "E:") || strings.HasPrefix(line, "W:") {
-			problems = append(problems, line)
+	var folgt bool
+
+	for _, raw := range strings.Split(out, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			folgt = false
+			continue
 		}
+
+		if aptProblemLine(line) {
+			problems = append(problems, line)
+			// Auf „dpkg: error processing“ und „Errors were encountered“
+			// folgt eingerückt die eigentliche Begründung.
+			folgt = strings.Contains(line, "dpkg: error") ||
+				strings.HasPrefix(line, "Errors were encountered")
+			continue
+		}
+		// Eingerückte Fortsetzung einer Problemzeile.
+		if folgt && strings.HasPrefix(raw, " ") {
+			problems = append(problems, line)
+			continue
+		}
+		folgt = false
 	}
+
 	if len(problems) > 0 {
-		return truncate(strings.Join(problems, " · "), 500)
+		return truncate(strings.Join(problems, " · "), 700)
 	}
 	return tail(out, 500)
+}
+
+// aptProblemLine erkennt die Zeilen, die einen Fehler benennen.
+//
+// apt, dpkg und invoke-rc.d schreiben jeweils in ihrer eigenen Form; keine
+// davon ist die der anderen.
+func aptProblemLine(line string) bool {
+	if strings.HasPrefix(line, "E:") || strings.HasPrefix(line, "W:") {
+		return true
+	}
+	for _, marker := range []string{
+		"dpkg: error",
+		"dpkg: warning",
+		"invoke-rc.d:",
+		"Job for ",
+		"Errors were encountered",
+	} {
+		if strings.Contains(line, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // tail ist truncate von hinten: es behält das Ende und schneidet den Anfang ab.

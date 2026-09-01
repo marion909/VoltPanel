@@ -323,6 +323,18 @@ setzt der Agent ihn aus geprüfter Version und geprüftem Modulnamen zusammen;
 bei FTP steht er als Konstante im Quelltext. Der Aufruf geht wie jeder andere
 über `run()` — festes argv, feste Umgebung, keine Shell.
 
+**Dienste starten nicht nebenbei.** Während einer Installation liegt eine
+`policy-rc.d` bereit, die `invoke-rc.d` mit 101 abweist — kein Paket fährt beim
+Auspacken seinen Dienst hoch. Was der Agent wirklich braucht, startet er danach
+selbst und ausdrücklich; was ein Paket nebenbei starten möchte, war nie seine
+Entscheidung. Eine bereits vorhandene `policy-rc.d` bleibt unangetastet: sie
+kann eine bewusste Einstellung des Serverbetreibers sein.
+
+Das ist keine reine Vorsichtsmaßnahme. `pure-ftpd` hängt zwingend an
+`openbsd-inetd`, dessen Postinstall den Dienst startet; gelingt das nicht — in
+einem Container, oder weil Port 21 belegt ist —, bricht apt die gesamte
+Installation ab. VoltPanel braucht inetd überhaupt nicht.
+
 **Ein Zugeständnis:** apt wechselt zum Herunterladen auf den unprivilegierten
 Benutzer `_apt`. Dieser Wechsel braucht `CAP_SETUID`, und in manchen Umgebungen
 — Container etwa — hat der Dienst die Fähigkeit nicht. apt bricht dann mit

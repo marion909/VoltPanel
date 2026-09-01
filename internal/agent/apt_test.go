@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -119,5 +121,110 @@ func TestTailBehaeltDasEnde(t *testing.T) {
 	}
 	if got != "…yz" {
 		t.Errorf("tail = %q, erwartet \"…yz\"", got)
+	}
+}
+
+// aptDpkgFehler ist die Form, in der eine Installation in dpkg scheitert.
+// Die einzige E:-Zeile ist die Zusammenfassung; der Grund steht darüber.
+const aptDpkgFehler = `Reading package lists...
+Building dependency tree...
+Setting up libevent-2.1-7t64:amd64 (2.1.12-stable-10) ...
+Setting up openbsd-inetd (0.20221205-1+b1) ...
+Job for openbsd-inetd.service failed because the control process exited with error code.
+invoke-rc.d: initscript openbsd-inetd, action "start" failed.
+dpkg: error processing package openbsd-inetd (--configure):
+ installed openbsd-inetd package post-installation script subprocess returned error exit status 1
+Errors were encountered while processing:
+ openbsd-inetd
+E: Sub-process /usr/bin/dpkg returned an error code (1)`
+
+// TestAptMeldungNenntDpkgsGrund: dpkg schreibt seine Fehler ohne E: davor.
+//
+// Die erste Fassung filterte nur auf E:-Zeilen. Bei einem dpkg-Fehlschlag ist
+// das genau eine Zeile — die nichtssagende Zusammenfassung —, und die
+// Meldung im Panel lautete vollständig "E: Sub-process /usr/bin/dpkg returned
+// an error code (1)". Damit lässt sich nichts anfangen.
+func TestAptMeldungNenntDpkgsGrund(t *testing.T) {
+	msg := aptMessage(aptDpkgFehler)
+
+	müssen := []string{
+		"dpkg: error processing package openbsd-inetd",
+		"post-installation script subprocess returned error exit status 1",
+		"invoke-rc.d",
+	}
+	for _, teil := range müssen {
+		if !strings.Contains(msg, teil) {
+			t.Errorf("%q fehlt in der Meldung: %q", teil, msg)
+		}
+	}
+	if strings.Contains(msg, "Setting up libevent") {
+		t.Errorf("die Meldung führt gelungene Schritte mit auf: %q", msg)
+	}
+}
+
+// TestFremdePolicyBleibtUnangetastet ist die wichtigste Zusage rund um
+// policy-rc.d.
+//
+// Die Datei entscheidet serverweit, ob Pakete beim Installieren ihre Dienste
+// starten dürfen. Eine vorhandene kann eine bewusste Einstellung des
+// Serverbetreibers sein — sie zu überschreiben oder am Ende wegzuräumen wäre
+// ein stiller Eingriff in eine fremde Entscheidung.
+func TestFremdePolicyBleibtUnangetastet(t *testing.T) {
+	srv, _ := testServer(t)
+	pfad := filepath.Join(t.TempDir(), "policy-rc.d")
+
+	alt := policyPath
+	policyPath = pfad
+	t.Cleanup(func() { policyPath = alt })
+
+	fremd := "#!/bin/sh\n# vom serverbetreiber\nexit 0\n"
+	if err := os.WriteFile(pfad, []byte(fremd), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	zurück := srv.blockServiceStarts()
+	inhalt, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatalf("die fremde Datei ist während der Installation verschwunden: %v", err)
+	}
+	if string(inhalt) != fremd {
+		t.Errorf("die fremde Datei wurde überschrieben:\n%s", inhalt)
+	}
+
+	zurück()
+	if inhalt, err := os.ReadFile(pfad); err != nil || string(inhalt) != fremd {
+		t.Errorf("die fremde Datei wurde am Ende weggeräumt (err=%v)", err)
+	}
+}
+
+// TestEigenePolicyKommtUndGeht: ohne vorhandene Datei legt der Agent seine an
+// und nimmt sie wieder weg. Bliebe sie liegen, würde auf diesem Server kein
+// Paket mehr seinen Dienst starten — und niemand wüsste, warum.
+func TestEigenePolicyKommtUndGeht(t *testing.T) {
+	srv, _ := testServer(t)
+	pfad := filepath.Join(t.TempDir(), "policy-rc.d")
+
+	alt := policyPath
+	policyPath = pfad
+	t.Cleanup(func() { policyPath = alt })
+
+	zurück := srv.blockServiceStarts()
+
+	inhalt, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatalf("policy-rc.d wurde nicht angelegt: %v", err)
+	}
+	// 101 ist der Wert, auf den invoke-rc.d hört. Ein anderer bewirkt nichts.
+	if !strings.Contains(string(inhalt), "exit 101") {
+		t.Errorf("policy-rc.d verhindert keinen Dienststart:\n%s", inhalt)
+	}
+	info, err := os.Stat(pfad)
+	if err != nil || info.Mode().Perm()&0o111 == 0 {
+		t.Errorf("policy-rc.d ist nicht ausführbar (%v) — invoke-rc.d übergeht sie dann", err)
+	}
+
+	zurück()
+	if _, err := os.Stat(pfad); !os.IsNotExist(err) {
+		t.Errorf("policy-rc.d blieb liegen (err=%v)", err)
 	}
 }

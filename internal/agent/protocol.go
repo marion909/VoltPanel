@@ -366,6 +366,9 @@ type FTPSetupResult struct {
 	// FirewallHint sagt, was mit den Ports geschehen ist oder noch geschehen
 	// muss. Bei nftables kann der Agent nichts tun und sagt das auch.
 	FirewallHint string `json:"firewall_hint"`
+	// Notice steht da, wenn das Einrichten geklappt hat, dabei aber etwas
+	// erwähnenswert schiefging — ein Erfolg mit Fussnote.
+	Notice string `json:"notice"`
 }
 
 type ProcessInfo struct {
