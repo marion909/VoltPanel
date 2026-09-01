@@ -109,6 +109,8 @@ const messages = {
     'tenants.noPlan': 'kein Paket',
     'tenants.suspend': 'Sperren',
     'tenants.resume': 'Entsperren',
+    'tenants.loginDomain': 'Eigene Anmeldedomain',
+    'tenants.loginCert': 'Zertifikat holen',
     'tenants.suspended': 'gesperrt',
     'tenants.confirmDelete': 'Mandant {name} entfernen? Das geht nur, wenn er nichts mehr enthält.',
 
@@ -305,6 +307,7 @@ const messages = {
     'login.password': 'Passwort',
     'login.totp': 'Code aus der Authenticator-App',
     'login.submit': 'Anmelden',
+    'login.tenantOnly': 'Anmeldung für Konten dieses Kundenbereichs.',
     'login.setupHint': 'Es ist noch kein Benutzer eingerichtet. Auf dem Server: volt setup',
 
     'dash.cpu': 'CPU',
@@ -506,6 +509,8 @@ const messages = {
     'tenants.noPlan': 'no plan',
     'tenants.suspend': 'Suspend',
     'tenants.resume': 'Resume',
+    'tenants.loginDomain': 'Own login domain',
+    'tenants.loginCert': 'Get certificate',
     'tenants.suspended': 'suspended',
     'tenants.confirmDelete': 'Remove tenant {name}? Only possible when it is empty.',
 
@@ -698,6 +703,7 @@ const messages = {
     'login.password': 'Password',
     'login.totp': 'Authenticator code',
     'login.submit': 'Sign in',
+    'login.tenantOnly': 'Sign in for accounts of this customer area.',
     'login.setupHint': 'No user has been set up yet. On the server: volt setup',
 
     'dash.cpu': 'CPU',

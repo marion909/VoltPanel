@@ -3,12 +3,16 @@ package api
 import (
 	"crypto/tls"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/store"
 )
 
 func testConfig(t *testing.T) *config.Config {
@@ -85,7 +89,7 @@ func TestReloaderPrefersRealCert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := &certReloader{cfg: cfg, log: log}
+	r := &certReloader{chain: cfg.PanelTLSChain, label: "panel", log: log}
 	first, err := r.load()
 	if err != nil {
 		t.Fatalf("erstes laden: %v", err)
@@ -129,7 +133,7 @@ func TestReloaderKeepsCertWhenFilesVanish(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := &certReloader{cfg: cfg, log: log}
+	r := &certReloader{chain: cfg.PanelTLSChain, label: "panel", log: log}
 	if _, err := r.load(); err != nil {
 		t.Fatal(err)
 	}
@@ -166,8 +170,26 @@ func TestFrontendBase(t *testing.T) {
 		cfg := config.Default()
 		cfg.AccessPath = tc.access
 		s := &Server{cfg: cfg}
-		if got := s.frontendBase(); got != tc.want {
+		c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, "/", nil), httptest.NewRecorder())
+		if got := s.frontendBase(c); got != tc.want {
 			t.Errorf("access_path %q → %q, erwartet %q", tc.access, got, tc.want)
 		}
+	}
+}
+
+// TestBasePfadBleibtAufDerKundendomainVerborgen: der Zugriffspfad ist das
+// Geheimnis des Betreibers. Stünde er im <base href>, hinge er an jeder
+// Adresse, die die App bildet — und der Kunde kennte den Weg zum Panel des
+// Betreibers, obwohl er ihn nie brauchte.
+func TestBasePfadBleibtAufDerKundendomainVerborgen(t *testing.T) {
+	cfg := config.Default()
+	cfg.AccessPath = "68f5131f"
+	s := &Server{cfg: cfg}
+
+	c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, "/", nil), httptest.NewRecorder())
+	c.Set(loginTenantKey, &store.Tenant{ID: 2, Name: "bob"})
+
+	if got := s.frontendBase(c); got != "/" {
+		t.Errorf("auf der Kundendomain wurde %q ausgeliefert", got)
 	}
 }

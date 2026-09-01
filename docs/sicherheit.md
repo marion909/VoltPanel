@@ -490,6 +490,47 @@ Server, der nicht mehr hochkommt — für ein Feature, das den Betrieb nicht
 aufhält, wenn es fehlt. Stattdessen steht im Paketebereich, was der Server kann
 und was dafür zu tun wäre.
 
+## 4o. Eigene Anmeldedomain je Mandant
+
+**Risiko:** Eine zweite Adresse, unter der dieselbe Anmeldung erscheint, ist ein
+zweiter Eingang. Steht sie unter einem Namen, den der Kunde selbst bestimmt, und
+an einer Stelle, an der niemand sie vermutet, ist sie der bequemere.
+
+**Maßnahmen:** Unter der Anmeldedomain eines Mandanten kommt nur herein, wer zu
+diesem Mandanten gehört. Das ist die Zusage, an der die ganze Funktion hängt —
+ohne sie wäre die Domain des Kunden ein Weg zum Konto des Betreibers.
+
+Die Antwort auf ein fremdes, aber richtiges Konto ist dieselbe wie auf ein
+erfundenes. Sonst wäre die Anmeldeseite eines Kunden ein Werkzeug, um
+herauszufinden, wer sonst noch ein Konto auf diesem Server hat.
+
+Der Host kommt aus `Request.Host`, nie aus `X-Forwarded-Host`. Den Kopf setzt,
+wer die Anfrage schickt; würde er hier gelten, bestimmte der Absender, als
+welcher Mandant die Anmeldeseite auftritt — und damit, wer sich anmelden darf.
+Der optionale Reverse-Proxy reicht den echten Host durch.
+
+Der Zugriffspfad bleibt verborgen. Auf der Kundendomain liegt das Panel unter
+`/`, und zwar durch Ergänzen des Pfads nach innen, nicht durch eine
+Weiterleitung: die verriete mit der neuen Adresse genau den Pfad, den der Kunde
+nicht kennen soll. Aus demselben Grund steht auf dieser Domain `<base href="/">`
+statt des Präfixes.
+
+Kein Wildcard als Anmeldedomain. `*.kunde.de` beantwortete jede Adresse darunter
+und wäre ein bequemer Ort für eine gefälschte Anmeldung — mit gültigem
+Zertifikat, weil das Panel es für diesen Namen ausliefern würde.
+
+Die öffentliche Auskunft vor der Anmeldung nennt nur den Namen des Mandanten.
+Nichts über sein Paket, seine Sites oder seine Leute.
+
+Im TLS-Handshake wird nur für eingetragene Anmeldedomains ein eigenes
+Zertifikat gesucht. Ohne diese Schranke wäre der Name aus dem Handshake ein
+Verzeichnisname unter `certDir` — und die Frage, welche Zertifikate auf diesem
+Server liegen, ließe sich durch Ausprobieren beantworten.
+
+**Und eine Sperre, die sperrt.** Ein gesperrter Mandant kommt nicht mehr herein;
+bis dahin setzte „sperren" nur ein Feld. Den eigenen Mandanten zu sperren lehnt
+das Panel ab — danach käme niemand mehr herein, der es zurücknimmt.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

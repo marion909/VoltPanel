@@ -14,10 +14,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/store"
 )
 
 // panelTLS baut die TLS-Konfiguration für das Panel.
@@ -25,28 +27,95 @@ import (
 // Das Panel terminiert selbst, statt sich hinter nginx zu stellen. Der Grund
 // ist der Notfall: wer eine kaputte nginx-Konfiguration reparieren will,
 // braucht das Panel gerade dann, wenn nginx nicht mehr ausliefert.
-func panelTLS(cfg *config.Config, log *slog.Logger) (*tls.Config, error) {
+func panelTLS(cfg *config.Config, log *slog.Logger, isLoginDomain func(string) bool) (*tls.Config, error) {
 	if err := ensureSelfSigned(cfg, log); err != nil {
 		return nil, err
 	}
 
-	r := &certReloader{cfg: cfg, log: log}
+	r := &certReloader{chain: cfg.PanelTLSChain, label: "panel", log: log}
 	if _, err := r.load(); err != nil {
 		return nil, err
 	}
 
+	sni := &sniCerts{cfg: cfg, log: log, known: isLoginDomain, by: map[string]*certReloader{}}
+
 	return &tls.Config{
-		MinVersion:     tls.VersionTLS12,
-		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return r.load() },
+		MinVersion: tls.VersionTLS12,
+		GetCertificate: func(hi *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			// Erst der Name aus dem Handshake: auf der Anmeldedomain eines
+			// Mandanten lautet das Zertifikat des Betreibers auf einen anderen
+			// Namen, und der Browser des Kunden warnte bei jedem Aufruf. Eine
+			// Anmeldeseite, die mit einer Warnung beginnt, erzieht genau zu der
+			// Gewohnheit, die eine gefälschte später ausnutzt.
+			if cert := sni.certFor(hi.ServerName); cert != nil {
+				return cert, nil
+			}
+			return r.load()
+		},
 	}, nil
+}
+
+// sniCerts wählt das Zertifikat anhand des Namens, den der Browser im
+// Handshake nennt.
+//
+// Nur für eingetragene Anmeldedomains. Ohne diese Schranke wäre der Name aus
+// dem Handshake ein Verzeichnisname unter certDir — und die Frage, welche
+// Zertifikate auf diesem Server liegen, ließe sich durch Ausprobieren
+// beantworten.
+type sniCerts struct {
+	cfg   *config.Config
+	log   *slog.Logger
+	known func(host string) bool
+
+	mu sync.Mutex
+	by map[string]*certReloader
+}
+
+func (s *sniCerts) certFor(name string) *tls.Certificate {
+	name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
+	// ValidDomain zusätzlich zu known(): der Name wird gleich ein Pfadteil, und
+	// eine Prüfung, die nur mittelbar über die Datenbank greift, ist an dieser
+	// Stelle eine zu wenig.
+	if name == "" || !store.ValidDomain(name) || s.known == nil || !s.known(name) {
+		return nil
+	}
+
+	s.mu.Lock()
+	r, ok := s.by[name]
+	if !ok {
+		dir := filepath.Join(s.cfg.CertDir, name)
+		r = &certReloader{
+			label: name,
+			log:   s.log,
+			chain: func() []config.CertPair {
+				return []config.CertPair{{
+					Cert: filepath.Join(dir, "fullchain.pem"),
+					Key:  filepath.Join(dir, "privkey.pem"),
+				}}
+			},
+		}
+		s.by[name] = r
+	}
+	s.mu.Unlock()
+
+	cert, err := r.load()
+	if err != nil {
+		// Kein Zertifikat für diesen Namen: dann das des Panels. Eine Warnung
+		// im Browser ist unschön, ein abgebrochener Handshake ist eine Seite,
+		// die gar nicht lädt.
+		return nil
+	}
+	return cert
 }
 
 // certReloader liest das Zertifikat bei jedem Handshake neu, solange sich die
 // Datei geändert hat. Zwei stat-Aufrufe pro Verbindung sind billiger als der
 // Neustart, den man sonst nach jeder Erneuerung bräuchte.
 type certReloader struct {
-	cfg *config.Config
-	log *slog.Logger
+	// chain sind die Kandidaten in absteigender Güte, label nur für das Log.
+	chain func() []config.CertPair
+	label string
+	log   *slog.Logger
 
 	mu     sync.Mutex
 	cached *tls.Certificate
@@ -60,7 +129,7 @@ func (r *certReloader) load() (*tls.Certificate, error) {
 	defer r.mu.Unlock()
 
 	var firstErr error
-	for _, pair := range r.cfg.PanelTLSChain() {
+	for _, pair := range r.chain() {
 		info, err := os.Stat(pair.Cert)
 		if err != nil {
 			if firstErr == nil {
@@ -92,7 +161,7 @@ func (r *certReloader) load() (*tls.Certificate, error) {
 		}
 
 		if r.from != pair.Cert {
-			r.log.Info("panel-zertifikat übernommen", "datei", pair.Cert)
+			r.log.Info("zertifikat übernommen", "für", r.label, "datei", pair.Cert)
 		}
 		r.cached, r.from, r.stamp, r.size = &cert, pair.Cert, info.ModTime(), info.Size()
 		return r.cached, nil
@@ -102,7 +171,8 @@ func (r *certReloader) load() (*tls.Certificate, error) {
 		// Lieber das alte Zertifikat weiterbenutzen als das Panel unerreichbar
 		// machen — sonst sperrt ein misslungenes Erneuern genau den aus, der
 		// es reparieren müsste.
-		r.log.Warn("kein lesbares panel-zertifikat, behalte das bisherige", "err", firstErr)
+		r.log.Warn("kein lesbares zertifikat, behalte das bisherige",
+			"für", r.label, "err", firstErr)
 		return r.cached, nil
 	}
 	if firstErr == nil {

@@ -135,16 +135,21 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - Mandanten sperren und entsperren; Löschen nur, wenn nichts mehr daran hängt
 - Reduzierte Oberfläche für Kunden: keine Server-Dienste, keine
   Mandantenverwaltung
+- Eigene Anmeldedomain je Mandant. Dort trägt die Anmeldeseite seinen Namen,
+  das Panel liegt unter `/` statt hinter dem Zugriffspfad des Betreibers — und
+  herein kommt nur, wer zu diesem Mandanten gehört. Das Zertifikat für diesen
+  Namen wählt das Panel im Handshake selbst; holen lässt es sich mit einem
+  Klick über dieselbe ACME-Strecke wie jedes andere.
+- Ein gesperrter Mandant kommt nicht mehr herein. Bis dahin setzte „sperren"
+  nur ein Feld: die Oberfläche zeigte ihn als gesperrt, seine Leute meldeten
+  sich weiter an. Den eigenen Mandanten zu sperren lehnt das Panel ab — das
+  wäre der kürzeste Weg, sich selbst auszusperren.
 
-Phase 0 bis 2 sind damit abgeschlossen, Phase 4 bis auf den unten genannten
-Punkt.
+Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
 ## Offen
 
 **Phase 4 — Multi-Tenant**
-
-- Eigene Anmeldeseite und Domain für den Kundenbereich (die reduzierte
-  Navigation steht bereits)
 
 **Phase 5 — Docker, Node.js, Git-Deploy**
 

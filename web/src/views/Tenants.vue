@@ -11,6 +11,10 @@ const quotas = ref({})
 // Ob die Grenzen auch im Dateisystem stehen. Nur für Administratoren zu holen —
 // die Antwort nennt Gerät und Einhängepunkt des Servers.
 const fsQuota = ref(null)
+// Die Anmeldedomain wird je Mandant im Feld bearbeitet; der Zwischenstand
+// gehört nicht in die Liste, sonst überschriebe ein Neuladen die Eingabe.
+const domainDraft = ref({})
+const domainMsg = ref({})
 const loading = ref(true)
 const error = ref('')
 const busy = ref(false)
@@ -97,6 +101,37 @@ async function setPlan(tenant, planId) {
     await load()
   } catch (err) {
     error.value = err.message
+  }
+}
+
+async function saveLoginDomain(tenant) {
+  const domain = (domainDraft.value[tenant.id] ?? tenant.login_domain ?? '').trim()
+  domainMsg.value = { ...domainMsg.value, [tenant.id]: '' }
+  busy.value = true
+  try {
+    const res = await api.put(`/tenants/${tenant.id}/login-domain`, { domain })
+    tenant.login_domain = res.login_domain
+    domainDraft.value = { ...domainDraft.value, [tenant.id]: res.login_domain }
+  } catch (err) {
+    domainMsg.value = { ...domainMsg.value, [tenant.id]: err.message }
+  } finally {
+    busy.value = false
+  }
+}
+
+// Ohne Zertifikat auf diesen Namen zeigt der Browser des Kunden bei jedem
+// Aufruf eine Warnung — das Panel liefert dann das Zertifikat des Betreibers
+// aus, und das lautet auf einen anderen Namen.
+async function issueLoginCert(tenant) {
+  domainMsg.value = { ...domainMsg.value, [tenant.id]: '' }
+  busy.value = true
+  try {
+    const res = await api.post(`/tenants/${tenant.id}/login-domain/cert`, {})
+    domainMsg.value = { ...domainMsg.value, [tenant.id]: `${res.domain}: ${res.days_left} d` }
+  } catch (err) {
+    domainMsg.value = { ...domainMsg.value, [tenant.id]: err.message }
+  } finally {
+    busy.value = false
   }
 }
 
@@ -289,6 +324,50 @@ onMounted(load)
               :percent="e.percent"
               :bytes="e.bytes"
             />
+          </div>
+
+          <!--
+            Eigene Anmeldeseite. Unter dieser Domain liegt das Panel unter "/",
+            ohne den Zugriffspfad des Betreibers — und herein kommt nur, wer zu
+            diesem Mandanten gehört.
+          -->
+          <div class="mt-3 border-t pt-3" :style="{ borderColor: 'var(--border-ring)' }">
+            <label class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+              {{ t('tenants.loginDomain') }}
+            </label>
+            <div class="flex gap-2">
+              <input
+                :value="domainDraft[tenant.id] ?? tenant.login_domain"
+                placeholder="panel.kunde.de"
+                class="min-w-0 flex-1 rounded-md border px-2 py-1 text-[11px]"
+                :style="inputStyle"
+                @input="domainDraft[tenant.id] = $event.target.value"
+              />
+              <button
+                class="rounded-md border px-2 py-1 text-[11px]"
+                :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+                :disabled="busy"
+                @click="saveLoginDomain(tenant)"
+              >
+                {{ t('common.save') }}
+              </button>
+              <button
+                v-if="tenant.login_domain"
+                class="rounded-md border px-2 py-1 text-[11px]"
+                :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+                :disabled="busy"
+                @click="issueLoginCert(tenant)"
+              >
+                {{ t('tenants.loginCert') }}
+              </button>
+            </div>
+            <p
+              v-if="domainMsg[tenant.id]"
+              class="mt-1 text-[11px]"
+              :style="{ color: 'var(--ink-muted)' }"
+            >
+              {{ domainMsg[tenant.id] }}
+            </p>
           </div>
 
           <footer class="mt-3 flex gap-3 text-[11px]">

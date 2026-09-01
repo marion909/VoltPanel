@@ -40,6 +40,8 @@ type Server struct {
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
+	// logins hält die Zuordnung Anmeldedomain → Mandant im Speicher.
+	logins    *loginDomains
 	devOrigin string
 }
 
@@ -84,6 +86,7 @@ func New(opts Options) (*Server, error) {
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
 		// sperrt zusätzlich das Konto; dieser hier bremst schon davor.
 		loginRate: newRateLimiter(5, time.Minute),
+		logins:    newLoginDomains(opts.Store),
 	}
 
 	s.setupMiddleware(opts.DevOrigin)
@@ -131,9 +134,13 @@ func (s *Server) setupRoutes() {
 	// der Installer ausgibt.
 	if s.cfg.AccessPath != "" {
 		s.echo.GET("/"+strings.Trim(s.cfg.AccessPath, "/"), func(c echo.Context) error {
-			return c.Redirect(http.StatusMovedPermanently, s.frontendBase())
+			return c.Redirect(http.StatusMovedPermanently, s.frontendBase(c))
 		})
 	}
+
+	// Vor dem Routing: auf der Anmeldedomain eines Mandanten liegt das Panel
+	// unter "/", ohne den Zugriffspfad des Betreibers.
+	s.echo.Pre(s.tenantDomainRoot)
 
 	root.GET("/healthz", s.handleHealth)
 
@@ -141,6 +148,7 @@ func (s *Server) setupRoutes() {
 
 	// Öffentlich: Login und der Zustand der Ersteinrichtung.
 	api.GET("/auth/state", s.handleAuthState)
+	api.GET("/auth/branding", s.handleBranding)
 	api.POST("/auth/login", s.handleLogin)
 
 	// Alles Weitere braucht eine gültige Session.
@@ -267,6 +275,9 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/tenants/:id", s.handleDeleteTenant, s.requireRole(store.RoleAdmin))
 	auth.GET("/tenants/:id/quota", s.handleTenantQuota)
 	auth.PUT("/tenants/:id/cloudflare", s.handleSetCloudflareToken, s.requireRole(store.RoleReseller))
+	auth.PUT("/tenants/:id/login-domain", s.handleSetLoginDomain, s.requireRole(store.RoleReseller))
+	auth.POST("/tenants/:id/login-domain/cert", s.handleIssueLoginDomainCert,
+		s.requireRole(store.RoleReseller))
 
 	auth.GET("/quota", s.handleQuota)
 	auth.GET("/quota/filesystem", s.handleQuotaFilesystem, s.requireRole(store.RoleAdmin))
@@ -351,7 +362,7 @@ func (s *Server) serveIndex(c echo.Context, fsys http.FileSystem) error {
 
 	html := string(raw)
 	if !strings.Contains(html, "<base ") {
-		tag := fmt.Sprintf("<base href=%q>", s.frontendBase())
+		tag := fmt.Sprintf("<base href=%q>", s.frontendBase(c))
 		switch {
 		case strings.Contains(html, "<head>"):
 			html = strings.Replace(html, "<head>", "<head>"+tag, 1)
@@ -366,10 +377,28 @@ func (s *Server) serveIndex(c echo.Context, fsys http.FileSystem) error {
 	return c.HTMLBlob(http.StatusOK, []byte(html))
 }
 
+// isLoginDomain sagt, ob ein Name die Anmeldedomain eines Mandanten ist.
+//
+// Gerufen im TLS-Handshake, deshalb über den Zwischenspeicher und mit knapper
+// Frist: eine hängende Abfrage darf keine Verbindung aufhalten.
+func (s *Server) isLoginDomain(host string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return s.logins.lookup(ctx, host) != nil
+}
+
 // frontendBase ist der Pfad, unter dem die App liegt, immer mit Schrägstrich
 // am Ende — ohne ihn löst der Browser relative Adressen gegen das
 // übergeordnete Verzeichnis auf.
-func (s *Server) frontendBase() string {
+//
+// Auf der Anmeldedomain eines Mandanten ist das "/": dort ergänzt
+// tenantDomainRoot den Zugriffspfad nach innen, und der Browser darf ihn nicht
+// zu sehen bekommen. Stünde er im <base href>, hinge er an jeder Adresse, die
+// die App bildet — und der Kunde kennte den Weg zum Panel des Betreibers.
+func (s *Server) frontendBase(c echo.Context) string {
+	if _, ok := c.Get(loginTenantKey).(*store.Tenant); ok {
+		return "/"
+	}
 	if s.cfg.AccessPath == "" {
 		return "/"
 	}
@@ -416,7 +445,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	scheme := "http"
 	if s.cfg.TLSEnabled {
-		tlsCfg, err := panelTLS(s.cfg, s.log)
+		tlsCfg, err := panelTLS(s.cfg, s.log, s.isLoginDomain)
 		if err != nil {
 			return fmt.Errorf("panel-tls: %w", err)
 		}

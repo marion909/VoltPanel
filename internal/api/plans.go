@@ -167,6 +167,17 @@ func (s *Server) handleUpdateTenant(c echo.Context) error {
 	if req.Status != nil {
 		switch *req.Status {
 		case "active", "suspended":
+			// Den eigenen Mandanten nicht sperren. Seit eine Sperre die
+			// Anmeldung wirklich verhindert, wäre das der kürzeste Weg, sich
+			// selbst aus dem Panel auszusperren — und niemand wäre mehr da, der
+			// sie zurücknehmen könnte.
+			if *req.Status == "suspended" {
+				if u := currentUser(c); u != nil && u.TenantID == tenant.ID {
+					return echo.NewHTTPError(http.StatusBadRequest,
+						"den eigenen mandanten kann man nicht sperren — "+
+							"danach käme niemand mehr herein, der es zurücknimmt")
+				}
+			}
 			tenant.Status = *req.Status
 		default:
 			return echo.NewHTTPError(http.StatusBadRequest,

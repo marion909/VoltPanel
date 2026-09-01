@@ -12,6 +12,10 @@ type Tenant struct {
 	PlanID *int64 `json:"plan_id"`
 	Status string `json:"status"`
 
+	// LoginDomain ist die eigene Anmeldeseite dieses Mandanten. Leer heißt:
+	// seine Leute melden sich am Panel des Betreibers an wie alle anderen.
+	LoginDomain string `json:"login_domain"`
+
 	// CloudflareToken liegt verschlüsselt vor und wird nie serialisiert.
 	// Ob einer hinterlegt ist, sagt HasCloudflareToken.
 	CloudflareToken string `json:"-"`

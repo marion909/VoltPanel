@@ -14,9 +14,18 @@ const totpCode = ref('')
 const totpRequired = ref(false)
 const error = ref('')
 const busy = ref(false)
+// Der Name des Mandanten, wenn die Seite unter dessen eigener Domain aufgerufen
+// wurde. Sonst null — dann ist es das Panel des Betreibers.
+const brand = ref(null)
 
-onMounted(() => {
-  if (session.user) router.replace('/')
+onMounted(async () => {
+  if (session.user) return router.replace('/')
+  // Ein Fehler hier darf die Anmeldung nicht aufhalten: ohne den Namen fehlt
+  // eine Zeile, ohne das Formular fehlt alles.
+  brand.value = await api
+    .get('/auth/branding')
+    .then((res) => res.tenant)
+    .catch(() => null)
 })
 
 async function submit() {
@@ -55,7 +64,9 @@ async function submit() {
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z" fill="var(--series-1)" />
         </svg>
-        <span class="text-[19px] font-semibold tracking-tight">VoltPanel</span>
+        <span class="text-[19px] font-semibold tracking-tight">
+          {{ brand ? brand.name : 'VoltPanel' }}
+        </span>
       </div>
 
       <form
@@ -63,7 +74,20 @@ async function submit() {
         :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
         @submit.prevent="submit"
       >
-        <h1 class="mb-5 text-[15px] font-medium">{{ t('login.title') }}</h1>
+        <h1 class="mb-1 text-[15px] font-medium">{{ t('login.title') }}</h1>
+        <!--
+          Auf der eigenen Domain eines Mandanten kommt nur herein, wer zu ihm
+          gehört. Das gehört dazugeschrieben: sonst probiert jemand hier sein
+          Konto vom Panel des Betreibers und hält es für gesperrt.
+        -->
+        <p
+          v-if="brand"
+          class="mb-4 text-[12px]"
+          :style="{ color: 'var(--ink-secondary)' }"
+        >
+          {{ t('login.tenantOnly') }}
+        </p>
+        <div v-else class="mb-4"></div>
 
         <p
           v-if="session.setupRequired"

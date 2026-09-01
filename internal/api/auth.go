@@ -65,6 +65,31 @@ func (s *Server) handleLogin(c echo.Context) error {
 		return errInvalidCredentials()
 	}
 
+	// Auf der Anmeldedomain eines Mandanten kommt nur herein, wer zu diesem
+	// Mandanten gehört.
+	//
+	// Ohne diese Zeile wäre die Domain des Kunden ein zweiter Eingang zum Konto
+	// des Betreibers — unter einem Namen, den der Kunde selbst bestimmt, und an
+	// einer Stelle, an der niemand ihn vermutet.
+	//
+	// Die Antwort ist dieselbe wie bei einer unbekannten Adresse. Sonst wäre
+	// die Anmeldeseite eines Kunden ein Werkzeug, um herauszufinden, wer sonst
+	// noch ein Konto auf diesem Server hat.
+	if t := s.loginTenant(c); t != nil && t.ID != user.TenantID {
+		s.auditLogin(ctx, user, req.Email, ip, "fremder mandant auf "+t.LoginDomain)
+		return errInvalidCredentials()
+	}
+
+	// Ein gesperrter Mandant kommt nicht herein. Bis hierher setzte "sperren"
+	// nur ein Feld: die Oberfläche zeigte den Mandanten als gesperrt an, und
+	// seine Leute meldeten sich weiter an, als wäre nichts.
+	if tenant, err := s.store.GetTenant(ctx, store.SystemScope(), user.TenantID); err == nil &&
+		tenant.Status != "active" {
+
+		s.auditLogin(ctx, user, req.Email, ip, "mandant gesperrt")
+		return echo.NewHTTPError(http.StatusForbidden, "dieser zugang ist gesperrt")
+	}
+
 	if user.Locked() {
 		s.auditLogin(ctx, user, req.Email, ip, "konto gesperrt")
 		return echo.NewHTTPError(http.StatusForbidden,
