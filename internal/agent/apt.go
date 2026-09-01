@@ -137,7 +137,7 @@ func packageInstalled(ctx context.Context, name string) bool {
 // sondern nur im zweiten Versuch — solange der Wechsel funktioniert, bleibt er
 // unangetastet.
 func (s *Server) aptRun(ctx context.Context, args ...string) (string, error) {
-	out, err := runEnv(ctx, aptTimeout, aptEnv, "apt-get", args...)
+	out, err := s.aptExec(ctx, args)
 	if err == nil || !aptSandboxBroken(out) {
 		return out, err
 	}
@@ -146,8 +146,75 @@ func (s *Server) aptRun(ctx context.Context, args ...string) (string, error) {
 		"grund", "dem dienst fehlt CAP_SETUID",
 		"apt", aptMessage(out))
 
-	return runEnv(ctx, aptTimeout, aptEnv, "apt-get",
-		append([]string{"-o", "APT::Sandbox::User=root"}, args...)...)
+	return s.aptExec(ctx, append([]string{"-o", "APT::Sandbox::User=root"}, args...))
+}
+
+// aptExec startet apt möglichst nicht als Kindprozess des Agents, sondern als
+// eigene, kurzlebige systemd-Unit.
+//
+// Der Grund ist die Härtung des Agents selbst. volt-agent.service läuft mit
+// ProtectSystem=true — /usr ist für den Dienst schreibgeschützt, und das ist
+// gewollt: ein übernommener Agent soll keine Systembinaries austauschen können.
+// Ein Kindprozess erbt diese Sicht. dpkg scheitert dann beim Auspacken mit
+//
+//	unable to create '/usr/lib/…/libevent-2.1.so.7.0.1.dpkg-new': Read-only file system
+//
+// Die naheliegende Antwort — ReadWritePaths=/usr — wäre die falsche: dann wäre
+// /usr dauerhaft beschreibbar, für jede Operation, nicht nur für die eine, die
+// es braucht.
+//
+// systemd-run bittet stattdessen PID 1, das Kommando in einer eigenen Unit zu
+// starten. Die hat mit der Sandbox des Agents nichts zu tun; der Agent selbst
+// bleibt eingesperrt. Die Ausnahme gilt für die Dauer der Installation und für
+// nichts sonst.
+//
+// Gibt es systemd-run nicht, läuft apt wie bisher direkt. Dann greift die
+// Sandbox — aber die Fehlermeldung sagt inzwischen, woran es liegt.
+func (s *Server) aptExec(ctx context.Context, args []string) (string, error) {
+	if !fileExists(allowedBinaries["systemd-run"]) {
+		return runEnv(ctx, aptTimeout, aptEnv, "apt-get", args...)
+	}
+
+	full := append([]string{
+		"--wait",    // bis das Kommando fertig ist
+		"--pipe",    // Ausgabe hierher, statt ins Journal
+		"--collect", // Unit auch nach einem Fehler wieder abräumen
+		"--quiet",   // ohne "Running as unit …"
+		"--setenv=DEBIAN_FRONTEND=noninteractive",
+		"--setenv=LC_ALL=C",
+		allowedBinaries["apt-get"],
+	}, args...)
+
+	out, err := run(ctx, aptTimeout, "systemd-run", full...)
+	if err == nil || !systemdRunUnavailable(out) {
+		return out, err
+	}
+	// Kein laufendes systemd (Container ohne PID 1, Chroot): dann eben direkt.
+	s.log.Warn("systemd-run nicht nutzbar, apt läuft in der sandbox des dienstes",
+		"hinweis", "schreibt das paket nach /usr, scheitert es an ProtectSystem",
+		"meldung", aptMessage(out))
+	return runEnv(ctx, aptTimeout, aptEnv, "apt-get", args...)
+}
+
+// systemdRunUnavailable erkennt, dass systemd selbst nicht ansprechbar ist —
+// nicht, dass das gestartete Kommando fehlgeschlagen wäre.
+func systemdRunUnavailable(out string) bool {
+	low := strings.ToLower(out)
+	// Meldungen von systemd-run selbst, nicht vom gestarteten Kommando. Ein
+	// blosses "operation not permitted" stand hier schon einmal und war zu
+	// weit gefasst: genau so endet auch apts seteuid-Fehler, und der gehört in
+	// die andere Behandlung.
+	for _, marker := range []string{
+		"failed to connect to bus",
+		"failed to create bus connection",
+		"failed to start transient service",
+		"system has not been booted with systemd",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // aptSandboxBroken erkennt genau den Abbruch oben — nicht „irgendein Fehler“.
@@ -225,10 +292,21 @@ func aptMessage(out string) string {
 		folgt = false
 	}
 
-	if len(problems) > 0 {
-		return truncate(strings.Join(problems, " · "), 700)
+	if len(problems) == 0 {
+		return tail(out, 500)
 	}
-	return tail(out, 500)
+	msg := truncate(strings.Join(problems, " · "), 700)
+
+	// Ein Schreibverbot auf /usr ist nicht das Problem des Pakets, sondern die
+	// Härtung des Agents. Ohne diesen Satz sucht jemand den Fehler beim Paket.
+	if strings.Contains(strings.ToLower(msg), "read-only file system") {
+		msg += "\n\nDas Verzeichnis ist für den Agent schreibgeschützt " +
+			"(ProtectSystem in volt-agent.service). Paketinstallationen laufen " +
+			"deshalb über systemd-run in einer eigenen Unit — hier hat das " +
+			"offenbar nicht geklappt. `systemctl status volt-agent` und " +
+			"`systemd-run --version` zeigen, woran es liegt."
+	}
+	return msg
 }
 
 // aptProblemLine erkennt die Zeilen, die einen Fehler benennen.

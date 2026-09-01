@@ -232,6 +232,7 @@ func (s *Server) setupRoutes() {
 	auth.POST("/databases/:id/dump", s.handleDumpDatabase)
 	auth.GET("/databases/:id/dump/download", s.handleDownloadDump)
 	auth.POST("/databases/:id/import", s.handleImportDatabase, largeBody)
+	auth.POST("/databases/:id/query", s.handleRunQuery)
 	auth.GET("/databases/:id/users", s.handleListDBUsers)
 	auth.POST("/databases/:id/users", s.handleCreateDBUser)
 	auth.PATCH("/db-users/:id", s.handleUpdateDBUser)

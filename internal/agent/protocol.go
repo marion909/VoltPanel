@@ -110,6 +110,9 @@ const (
 	OpFTPUserDelete Op = "ftp.user_delete"
 	OpFTPUserList   Op = "ftp.user_list"
 
+	// SQL aus der Oberflaeche, unter einem auf eine Datenbank begrenzten Konto.
+	OpMySQLQuery Op = "mysql.query"
+
 	// Datenbankzugriff von aussen: horcht MariaDB ueberhaupt im Netz?
 	OpMySQLRemoteStatus Op = "mysql.remote_status"
 	OpMySQLRemoteSet    Op = "mysql.remote_set"

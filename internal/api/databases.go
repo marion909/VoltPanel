@@ -186,6 +186,44 @@ func (s *Server) handleImportDatabase(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"size_bytes": written})
 }
 
+// --- SQL-Browser -----------------------------------------------------------
+
+type queryRequest struct {
+	Statement string `json:"statement"`
+	MaxRows   int    `json:"max_rows"`
+}
+
+// handleRunQuery führt eine SQL-Anweisung gegen eine Datenbank aus.
+//
+// POST und nicht GET: die Anweisung kann schreiben. Über eine URL wäre sie aus
+// einer fremden Seite heraus auslösbar, und sie stünde in jedem Proxy-Log.
+func (s *Server) handleRunQuery(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	var req queryRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+
+	ctx := c.Request().Context()
+	res, err := s.databases.RunQuery(ctx, currentScope(c), id, req.Statement, req.MaxRows)
+	user, kurz := currentUser(c), core.AuditStatement(req.Statement)
+	if err != nil {
+		s.audit(ctx, user, "database.query", "database", strconv.FormatInt(id, 10),
+			"error", c.RealIP(), map[string]string{"sql": kurz, "fehler": err.Error()})
+		return storeError(err)
+	}
+
+	// Jede Anweisung steht im Log — gekürzt, damit keine Kundendaten darin
+	// landen. Wer wann was an einer Datenbank geändert hat, ist genau die
+	// Frage, die hinterher gestellt wird.
+	s.audit(ctx, user, "database.query", "database", res.Database, "ok", c.RealIP(),
+		map[string]any{"sql": kurz, "zeilen": len(res.Rows), "geaendert": res.RowsAffected})
+	return c.JSON(http.StatusOK, res)
+}
+
 // --- Datenbankbenutzer -----------------------------------------------------
 
 func (s *Server) handleListDBUsers(c echo.Context) error {

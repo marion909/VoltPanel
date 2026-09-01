@@ -122,6 +122,8 @@ const messages = {
     'nav.files': 'Dateien',
     'nav.cron': 'Cronjobs',
 
+    'nav.sql': 'SQL',
+    'nav.sql': 'SQL',
     'nav.ftp': 'FTP',
     'ftp.title': 'FTP-Zugänge',
     'ftp.new': 'Neuer Zugang',
@@ -169,6 +171,20 @@ const messages = {
     'db.confirmDelete': 'Datenbank {name} mit allen Daten unwiderruflich löschen?',
     'db.confirmDeleteUser': 'Benutzer {name} entfernen?',
     'db.credentialsOnce': 'Dieses Passwort wird nur jetzt im Klartext gezeigt.',
+
+    'sql.title': 'SQL',
+    'sql.tables': 'Tabellen',
+    'sql.noTables': 'Diese Datenbank ist noch leer.',
+    'sql.structure': 'Aufbau',
+    'sql.run': 'Ausführen',
+    'sql.running': 'Läuft …',
+    'sql.shortcut': 'Strg + Eingabe',
+    'sql.against': 'gegen {name}',
+    'sql.placeholder': 'SELECT * FROM kunden LIMIT 20',
+    'sql.rows': '{count} Zeilen in {ms} ms',
+    'sql.affected': '{count} Zeilen geändert, {ms} ms',
+    'sql.noRows': 'Kein Treffer.',
+    'sql.history': 'Zuletzt ausgeführt',
 
     'db.remoteHosts': 'Zugriff von außen',
     'db.remoteHint':
@@ -500,6 +516,20 @@ const messages = {
     'db.confirmDelete': 'Permanently delete database {name} and all its data?',
     'db.confirmDeleteUser': 'Remove user {name}?',
     'db.credentialsOnce': 'This password is shown in clear text only now.',
+
+    'sql.title': 'SQL',
+    'sql.tables': 'Tables',
+    'sql.noTables': 'This database is still empty.',
+    'sql.structure': 'Structure',
+    'sql.run': 'Run',
+    'sql.running': 'Running …',
+    'sql.shortcut': 'Ctrl + Enter',
+    'sql.against': 'against {name}',
+    'sql.placeholder': 'SELECT * FROM customers LIMIT 20',
+    'sql.rows': '{count} rows in {ms} ms',
+    'sql.affected': '{count} rows changed, {ms} ms',
+    'sql.noRows': 'No match.',
+    'sql.history': 'Recently run',
 
     'db.remoteHosts': 'Remote access',
     'db.remoteHint':

@@ -86,6 +86,10 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Verzeichnis fest. Verschlüsselung ist Pflicht (TLS 2), UID und GID schlägt
   der Agent selbst nach. Der Dienst wird nicht mitinstalliert, sondern auf
   Wunsch eingerichtet.
+- SQL-Browser: Tabellenliste, Konsole und Ergebnisanzeige je Datenbank. Die
+  Anweisung läuft nicht über die Root-Verbindung des Agents, sondern über ein
+  Wegwerf-Konto, das nur auf diese eine Datenbank Rechte hat, und es geht genau
+  eine Anweisung auf einmal. Jede steht gekürzt im Audit-Log.
 - Datenbankzugriff von außen: je Datenbankbenutzer eine Herkunftsliste. Ein
   Eintrag ist eine IP-Adresse oder ein Netz, nie ein Hostname und nie %. Alle
   Konten eines Benutzers tragen dasselbe Passwort und dieselben Rechte; das
@@ -121,7 +125,6 @@ genannten Punkte.
 
 **Phase 3 — Daten, Dateien, Cronjobs**
 
-- SQL-Browser (oder phpMyAdmin als Plugin)
 - Backup-Ziele S3, B2, FTP
 
 **Phase 4 — Multi-Tenant**

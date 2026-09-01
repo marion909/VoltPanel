@@ -312,6 +312,36 @@ eines Benutzers. Bliebe beim Löschen ein Konto einer Herkunft stehen, wäre der
 Zugang von außen weiter offen, während das Panel den Benutzer als entfernt
 führt.
 
+## 4l. SQL aus der Oberfläche
+
+**Risiko:** Der SQL-Browser nimmt eine ganze, vom Kunden getippte Anweisung
+entgegen. Prüfen lässt sie sich nicht — eine Whitelist erlaubter SQL wäre
+entweder nutzlos oder ein zweiter SQL-Parser. Liefe sie über die
+Root-Verbindung des Agents, wäre sie ein Vollzugriff auf alle Datenbanken aller
+Mandanten, dazu `CREATE USER`, `SELECT … INTO OUTFILE` und `LOAD_FILE()`.
+
+**Maßnahmen:** Nicht die Anweisung wird eingeschränkt, sondern das Konto, unter
+dem sie läuft.
+
+- Der Agent legt über seine Root-Verbindung ein Wegwerf-Konto an, das
+  ausschliesslich auf die eine Datenbank Rechte hat, öffnet damit eine zweite
+  Verbindung und wirft beides danach weg. Über die Root-Verbindung läuft die
+  Anweisung nie. Reste eines abgebrochenen Laufs räumt der nächste auf.
+- Rechte auf eine einzelne Datenbank schliessen die globalen aus: FILE, PROCESS
+  und SUPER lassen sich in MariaDB gar nicht so vergeben. Der Dateizugriff ist
+  damit keine Frage der Vorsicht, sondern nicht vorhanden.
+- `multiStatements` steht nicht im DSN. Der Treiber weist damit alles ab, was
+  mehr als eine Anweisung ist — ein angehängtes `; DROP TABLE …` scheitert
+  schon dort. Ein Test hält das fest, weil es nur eine Zeichenkette ist.
+- Der **Name der Datenbank kommt nicht aus der Anfrage.** Der Aufrufer nennt
+  eine ID, der Name wird im Zugriffsbereich des Mandanten nachgeschlagen. Käme
+  er mit, wäre "führe diese Abfrage aus" der direkte Weg in fremde Daten.
+- Zeilen, Zellengrösse, Länge der Anweisung und Laufzeit sind begrenzt; wird
+  abgeschnitten, sagt die Antwort es. Eine abgeschnittene Menge für die
+  vollständige zu halten wäre ein stiller Fehler.
+- Jede Anweisung steht gekürzt im Audit-Log — gekürzt, damit keine Kundendaten
+  hineingeraten.
+
 ## 4j. Pakete nachinstallieren
 
 **Risiko:** Der Agent installiert auf Anforderung aus der Oberfläche Pakete
@@ -322,6 +352,18 @@ beliebige Software auf den Server zu holen.
 setzt der Agent ihn aus geprüfter Version und geprüftem Modulnamen zusammen;
 bei FTP steht er als Konstante im Quelltext. Der Aufruf geht wie jeder andere
 über `run()` — festes argv, feste Umgebung, keine Shell.
+
+**Die Installation läuft ausserhalb der Sandbox des Agents.**
+`volt-agent.service` läuft mit `ProtectSystem=true`; /usr ist für den Dienst
+schreibgeschützt, damit ein übernommener Agent keine Systembinaries austauschen
+kann. Ein Kindprozess erbt diese Sicht, und dpkg scheitert dann beim Auspacken
+mit `Read-only file system`. Die naheliegende Antwort — `ReadWritePaths=/usr` —
+wäre die falsche: /usr wäre dann dauerhaft beschreibbar, für jede Operation.
+
+Stattdessen bittet der Agent über `systemd-run` PID 1, apt in einer eigenen,
+kurzlebigen Unit zu starten. Die hat mit der Sandbox des Agents nichts zu tun;
+der Agent selbst bleibt eingesperrt, und die Ausnahme gilt für die Dauer der
+Installation und für nichts sonst.
 
 **Dienste starten nicht nebenbei.** Während einer Installation liegt eine
 `policy-rc.d` bereit, die `invoke-rc.d` mit 101 abweist — kein Paket fährt beim

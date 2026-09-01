@@ -53,8 +53,11 @@ var allowedBinaries = map[string]string{
 	"apt-get": "/usr/bin/apt-get",
 	// Nur lesend: sagt, ob ein Paket wirklich konfiguriert ist.
 	"dpkg-query": "/usr/bin/dpkg-query",
-	"phpenmod":   "/usr/sbin/phpenmod",
-	"phpdismod":  "/usr/sbin/phpdismod",
+	// Startet apt in einer eigenen Unit, ausserhalb der Sandbox des Agents.
+	// Ohne das scheitert dpkg an ProtectSystem=true, siehe apt.go.
+	"systemd-run": "/usr/bin/systemd-run",
+	"phpenmod":    "/usr/sbin/phpenmod",
+	"phpdismod":   "/usr/sbin/phpdismod",
 	// Fuer FTP: pure-pw pflegt die virtuellen Zugaenge, ufw gibt die Ports
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",

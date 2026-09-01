@@ -514,6 +514,17 @@ func (c *Client) StopProcess(ctx context.Context, pid int, user, signal string) 
 		ProcessKillParams{PID: pid, User: user, Signal: signal}, nil)
 }
 
+// RunQuery führt eine SQL-Anweisung gegen eine Datenbank aus.
+func (c *Client) RunQuery(ctx context.Context, database, statement string,
+	maxRows int) (*MySQLQueryResult, error) {
+
+	var res MySQLQueryResult
+	err := c.Call(ctx, OpMySQLQuery, MySQLQueryParams{
+		Database: database, Statement: statement, MaxRows: maxRows,
+	}, &res)
+	return &res, err
+}
+
 // --- Datenbankzugriff von außen --------------------------------------------
 
 func (c *Client) MySQLRemoteStatus(ctx context.Context) (*MySQLRemoteResult, error) {

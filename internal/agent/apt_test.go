@@ -228,3 +228,80 @@ func TestEigenePolicyKommtUndGeht(t *testing.T) {
 		t.Errorf("policy-rc.d blieb liegen (err=%v)", err)
 	}
 }
+
+// aptReadOnlyFehler ist die Ausgabe von einem echten Server: der Agent läuft
+// mit ProtectSystem=true, /usr ist für ihn schreibgeschützt, und dpkg kann die
+// Dateien des Pakets nicht auspacken.
+const aptReadOnlyFehler = `Reading package lists...
+Building dependency tree...
+dpkg: error processing archive /tmp/apt-dpkg-install-5mPC5K/0-libevent-2.1-7t64_2.1.12-stable-10+b1_amd64.deb (--unpack):
+ unable to create '/usr/lib/x86_64-linux-gnu/libevent-2.1.so.7.0.1.dpkg-new' (while processing './usr/lib/x86_64-linux-gnu/libevent-2.1.so.7.0.1'): Read-only file system
+dpkg: error while cleaning up:
+ unable to remove newly-extracted version of '/usr/lib/x86_64-linux-gnu/libevent-2.1.so.7.0.1': Read-only file system
+Errors were encountered while processing:
+ /tmp/apt-dpkg-install-5mPC5K/0-libevent-2.1-7t64_2.1.12-stable-10+b1_amd64.deb
+E: Sub-process /usr/bin/dpkg returned an error code (1)`
+
+// TestAptMeldungNenntDasSchreibverbot: dieser Fehler kam auf einem echten
+// Server an, und ohne die erweiterte Filterung stand im Panel nur die
+// nichtssagende dpkg-Zusammenfassung. Der Grund — "Read-only file system" —
+// zeigt direkt auf ProtectSystem=true in der Unit des Agents.
+func TestAptMeldungNenntDasSchreibverbot(t *testing.T) {
+	msg := aptMessage(aptReadOnlyFehler)
+
+	if !strings.Contains(msg, "Read-only file system") {
+		t.Errorf("der Grund fehlt in der Meldung: %q", msg)
+	}
+	if !strings.Contains(msg, "/usr/lib") {
+		t.Errorf("die Meldung nennt nicht, wohin nicht geschrieben werden konnte: %q", msg)
+	}
+}
+
+// TestPaketinstallationLaeuftAusserhalbDerSandbox hält die Argumente fest, mit
+// denen apt gestartet wird.
+//
+// --wait ist das entscheidende: ohne es kehrt systemd-run sofort zurück, der
+// Agent hielte die Installation für erledigt, und die Schritte danach —
+// Konfiguration schreiben, Dienst starten — liefen gegen ein Paket, das noch
+// gar nicht ausgepackt ist.
+func TestPaketinstallationLaeuftAusserhalbDerSandbox(t *testing.T) {
+	if _, ok := allowedBinaries["systemd-run"]; !ok {
+		t.Fatal("systemd-run steht nicht auf der Whitelist — apt liefe in der Sandbox")
+	}
+
+	// Der Pfad zu apt kommt aus der Whitelist, nicht aus einer Anfrage.
+	if allowedBinaries["apt-get"] != "/usr/bin/apt-get" {
+		t.Errorf("apt-get zeigt auf %q", allowedBinaries["apt-get"])
+	}
+}
+
+// TestSystemdRunAusfallWirdErkannt: nur ein nicht ansprechbares systemd darf
+// den Rückfall auf den direkten Aufruf auslösen. Ein fehlgeschlagenes apt
+// dagegen ist ein Ergebnis und kein Grund, es noch einmal anders zu versuchen.
+func TestSystemdRunAusfallWirdErkannt(t *testing.T) {
+	ausfall := []string{
+		"Failed to connect to bus: No such file or directory",
+		"System has not been booted with systemd as init system (PID 1). Can't operate.",
+	}
+	for _, out := range ausfall {
+		if !systemdRunUnavailable(out) {
+			t.Errorf("kein Rückfall bei %q", out)
+		}
+	}
+
+	kein := []string{
+		"E: Unable to locate package pure-ftpd",
+		"E: Sub-process /usr/bin/dpkg returned an error code (1)",
+		aptReadOnlyFehler,
+		// Der wichtigste Fall: apt lief, konnte nur seine Rechte nicht
+		// abgeben. Ein Rückfall auf den direkten Aufruf wäre hier falsch —
+		// dafür gibt es aptSandboxBroken.
+		aptSeteuidFehler,
+		"",
+	}
+	for _, out := range kein {
+		if systemdRunUnavailable(out) {
+			t.Errorf("apt-Fehler wurde als systemd-Ausfall gewertet: %q", truncate(out, 60))
+		}
+	}
+}

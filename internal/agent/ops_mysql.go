@@ -468,41 +468,10 @@ func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, e
 // Laufzeitverzeichnis des Agents, das nur root beschreiben kann — dort ist auch
 // kein Symlink-Trick möglich.
 func (s *Server) importAccount(ctx context.Context, db *sql.DB, database string) (string, func(), error) {
-	// Reste eines abgestürzten Laufs zuerst weg. Sonst sammeln sich Konten an,
-	// deren Passwort niemand mehr kennt, die aber weiter Rechte hätten.
-	s.dropStaleImportAccounts(ctx, db)
-
-	suffix, err := randomHex(6)
+	username, password, drop, err := s.throwawayAccount(ctx, db, database, importUserPrefix, OpMySQLImport)
 	if err != nil {
-		return "", nil, opErr(OpMySQLImport, "zufall: %v", err)
+		return "", nil, err
 	}
-	password, err := randomHex(16)
-	if err != nil {
-		return "", nil, opErr(OpMySQLImport, "zufall: %v", err)
-	}
-
-	username := importUserPrefix + suffix
-	account := fmt.Sprintf("'%s'@'localhost'", username)
-	drop := func() {
-		// Eigener Kontext: läuft der Import in einen Timeout, ist der
-		// übergebene Kontext abgelaufen — das Konto muss trotzdem weg.
-		c, cancel := context.WithTimeout(context.Background(), shortTimeout)
-		defer cancel()
-		if _, err := db.ExecContext(c, "DROP USER IF EXISTS "+account); err != nil {
-			s.log.Error("import-konto nicht entfernt", "konto", username, "err", err)
-		}
-	}
-
-	if _, err := db.ExecContext(ctx,
-		fmt.Sprintf("CREATE USER %s IDENTIFIED BY '%s'", account, password)); err != nil {
-		return "", nil, opErr(OpMySQLImport, "import-konto: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", quoteIdent(database), account)); err != nil {
-		drop()
-		return "", nil, opErr(OpMySQLImport, "rechte für das import-konto: %v", err)
-	}
-
 	cnf, err := s.writeClientConfig(username, password)
 	if err != nil {
 		drop()
@@ -511,29 +480,87 @@ func (s *Server) importAccount(ctx context.Context, db *sql.DB, database string)
 	return cnf, drop, nil
 }
 
+// throwawayAccount legt ein Konto an, das ausschliesslich auf eine Datenbank
+// Rechte hat, und gibt die Funktion zurück, die es wieder entfernt.
+//
+// Der Agent selbst spricht als root mit MariaDB. Alles, was Inhalt aus einer
+// Anfrage ausführt — ein Dump, eine Abfrage aus dem Browser — läuft deshalb
+// nicht über diese Verbindung, sondern über ein Konto, das die Datenbank nicht
+// verlassen kann. Ein "USE fremde_db" scheitert damit, statt zu gelingen.
+//
+// Rechte auf eine Datenbank schliessen die globalen aus: FILE, PROCESS und
+// SUPER lassen sich gar nicht auf eine einzelne Datenbank vergeben. Damit sind
+// SELECT … INTO OUTFILE und LOAD_FILE() für dieses Konto keine Option.
+func (s *Server) throwawayAccount(ctx context.Context, db *sql.DB, database, prefix string,
+	op Op) (string, string, func(), error) {
+
+	// Reste eines abgestürzten Laufs zuerst weg. Sonst sammeln sich Konten an,
+	// deren Passwort niemand mehr kennt, die aber weiter Rechte hätten.
+	s.dropStaleAccounts(ctx, db)
+
+	suffix, err := randomHex(6)
+	if err != nil {
+		return "", "", nil, opErr(op, "zufall: %v", err)
+	}
+	password, err := randomHex(16)
+	if err != nil {
+		return "", "", nil, opErr(op, "zufall: %v", err)
+	}
+
+	username := prefix + suffix
+	account := fmt.Sprintf("'%s'@'localhost'", username)
+	drop := func() {
+		// Eigener Kontext: läuft die Operation in einen Timeout, ist der
+		// übergebene Kontext abgelaufen — das Konto muss trotzdem weg.
+		c, cancel := context.WithTimeout(context.Background(), shortTimeout)
+		defer cancel()
+		if _, err := db.ExecContext(c, "DROP USER IF EXISTS "+account); err != nil {
+			s.log.Error("wegwerf-konto nicht entfernt", "konto", username, "err", err)
+		}
+	}
+
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("CREATE USER %s IDENTIFIED BY '%s'", account, password)); err != nil {
+		return "", "", nil, opErr(op, "wegwerf-konto: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", quoteIdent(database), account)); err != nil {
+		drop()
+		return "", "", nil, opErr(op, "rechte für das wegwerf-konto: %v", err)
+	}
+	return username, password, drop, nil
+}
+
 // importUserPrefix kennzeichnet die Wegwerf-Konten, damit sie sich wiederfinden
 // lassen. Er darf sich nicht ändern, sonst bleiben alte Konten liegen.
 const importUserPrefix = "volt_import_"
 
-func (s *Server) dropStaleImportAccounts(ctx context.Context, db *sql.DB) {
-	rows, err := db.QueryContext(ctx,
-		"SELECT user FROM mysql.user WHERE host = 'localhost' AND user LIKE ?", importUserPrefix+"%")
-	if err != nil {
-		return
-	}
+// throwawayPrefixes: jeder Lauf räumt die Reste aller Arten auf, nicht nur die
+// der eigenen. Ein abgebrochener Import würde sonst darauf warten, dass jemand
+// wieder importiert.
+var throwawayPrefixes = []string{importUserPrefix, queryUserPrefix}
+
+func (s *Server) dropStaleAccounts(ctx context.Context, db *sql.DB) {
 	var stale []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err == nil && reMyUser.MatchString(name) {
-			stale = append(stale, name)
+	for _, prefix := range throwawayPrefixes {
+		rows, err := db.QueryContext(ctx,
+			"SELECT user FROM mysql.user WHERE host = 'localhost' AND user LIKE ?", prefix+"%")
+		if err != nil {
+			continue
 		}
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err == nil && reMyUser.MatchString(name) {
+				stale = append(stale, name)
+			}
+		}
+		rows.Close()
 	}
-	rows.Close()
 
 	for _, name := range stale {
 		if _, err := db.ExecContext(ctx,
 			fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", name)); err != nil {
-			s.log.Warn("altes import-konto nicht entfernt", "konto", name, "err", err)
+			s.log.Warn("altes wegwerf-konto nicht entfernt", "konto", name, "err", err)
 		}
 	}
 }
