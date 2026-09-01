@@ -11,7 +11,14 @@ import (
 // notARoot benennt Verzeichnis-Optionen, die bewusst keine Datei-Wurzel sind.
 // Ein Eintrag hier heißt: der Agent soll in diesem Verzeichnis keine Datei
 // anfassen dürfen.
-var notARoot = map[string]bool{}
+var notARoot = map[string]bool{
+	// AppDir hält die Umgebungsdateien der Apps. Dorthin kommt nie ein Pfad
+	// aus einer Anfrage: der Web-Prozess nennt den Namen einer App, den Pfad
+	// bildet der Agent daraus. Stünde das Verzeichnis in roots, wäre es über
+	// jeden datei-basierten Endpunkt erreichbar — und in den Dateien darin
+	// stehen die Passwörter der Apps.
+	"AppDir": true,
+}
 
 // TestJedesVerzeichnisIstEineWurzel hält die Wurzelliste an den Optionen fest.
 //

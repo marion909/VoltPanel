@@ -113,6 +113,11 @@ const (
 	// Traffic aus den Nginx-Access-Logs, ab einem uebergebenen Lesestand.
 	OpNginxTraffic Op = "nginx.traffic"
 
+	// Apps: eine Anwendung als systemd-Unit hinter dem Reverse-Proxy.
+	OpAppWrite  Op = "app.write"
+	OpAppRemove Op = "app.remove"
+	OpAppStatus Op = "app.status"
+
 	// Echte Dateisystem-Quotas ueber Project Quota (ext4/XFS).
 	OpQuotaStatus  Op = "quota.status"
 	OpQuotaProject Op = "quota.project"

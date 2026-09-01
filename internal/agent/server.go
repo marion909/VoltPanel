@@ -38,6 +38,10 @@ type Server struct {
 	phpDir   string
 	certDir  string
 	logDir   string
+	// appDir hält die Umgebungsdateien der Apps. Nicht in den Wurzeln: dort
+	// steht nichts, was der Web-Prozess über einen Pfad ansprechen dürfte —
+	// er nennt den Namen einer App, den Pfad bildet der Agent.
+	appDir string
 	// panelDomain kommt aus der Konfiguration, nicht aus der Anfrage: nur so
 	// kann der Web-Prozess sich nicht selbst zum Eigentümer eines fremden
 	// Schlüssels erklären.
@@ -65,6 +69,7 @@ type ServerOptions struct {
 	SitesDir   string
 	LogDir     string
 	BackupDir  string
+	AppDir     string
 	// PanelDomain ist die Domain des Panels selbst. Ihr Schlüssel bekommt den
 	// Peer als Eigentümer, weil volt-web ihn lesen muss.
 	PanelDomain string
@@ -83,6 +88,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	setDefault(&opts.SitesDir, "/var/www")
 	setDefault(&opts.LogDir, "/var/log")
 	setDefault(&opts.BackupDir, "/var/backups/volt")
+	setDefault(&opts.AppDir, "/etc/volt/apps")
 
 	peerUID, peerGID := -1, -1
 	if opts.PeerUser != "" {
@@ -107,6 +113,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		phpDir:      opts.PHPDir,
 		certDir:     opts.CertDir,
 		logDir:      opts.LogDir,
+		appDir:      opts.AppDir,
 		panelDomain: opts.PanelDomain,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
 		//

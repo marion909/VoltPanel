@@ -68,6 +68,8 @@ var allowedBinaries = map[string]string{
 	// Fuer echte Dateisystem-Quotas: chattr setzt die Projektnummer an einem
 	// ext4-Baum, setquota die Grenze darauf, xfs_quota beides auf XFS. Alle
 	// Argumente sind agentseitig gebildet, die Pfade gehen vorher durch jail().
+	// Fuer Apps: die Unit wird geschrieben, daemon-reload uebernimmt sie.
+	// systemctl steht schon oben; hier nur der Rest.
 	"chattr":    "/usr/bin/chattr",
 	"setquota":  "/usr/sbin/setquota",
 	"xfs_quota": "/usr/sbin/xfs_quota",
@@ -82,12 +84,19 @@ var (
 // in allowedServices pflegen zu müssen.
 var rePHPService = regexp.MustCompile(`^php[578]\.[0-9]-fpm$`)
 
+// reAppService erlaubt die Units, die dieser Agent selbst geschrieben hat.
+//
+// Das Präfix ist die ganze Trennung: ohne es wäre "eine App neu starten" ein
+// Weg an der Whitelist vorbei zu jedem Dienst des Servers. Deshalb steht der
+// Name auch nirgends ohne Präfix in einer Anfrage — der Agent setzt es selbst.
+var reAppService = regexp.MustCompile(`^volt-app-[a-z][a-z0-9-]{1,30}[a-z0-9]$`)
+
 func checkService(name string) error {
 	if !reServiceName.MatchString(name) {
 		return fmt.Errorf("%w: dienstname %q", errBadInput, name)
 	}
 	base := strings.TrimSuffix(name, ".service")
-	if allowedServices[base] || rePHPService.MatchString(base) {
+	if allowedServices[base] || rePHPService.MatchString(base) || reAppService.MatchString(base) {
 		return nil
 	}
 	return fmt.Errorf("%w: dienst %q steht nicht auf der whitelist", errNotAllow, base)

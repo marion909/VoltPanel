@@ -532,6 +532,29 @@ func (c *Client) Traffic(ctx context.Context, cursors []TrafficCursor) (*Traffic
 	return &res, err
 }
 
+// --- Apps -------------------------------------------------------------------
+
+// WriteApp schreibt Unit und Umgebung und startet die App.
+func (c *Client) WriteApp(ctx context.Context, p AppParams) (*AppResult, error) {
+	var res AppResult
+	err := c.Call(ctx, OpAppWrite, p, &res)
+	return &res, err
+}
+
+// RemoveApp hält die App an und räumt ihre Dateien weg. Das Verzeichnis der
+// Site bleibt unangetastet — es gehört der Site, nicht der App.
+func (c *Client) RemoveApp(ctx context.Context, name string) error {
+	var res TextResult
+	return c.Call(ctx, OpAppRemove, AppNameParams{Name: name}, &res)
+}
+
+// AppStatus sagt, was der Dienst wirklich tut — nicht, was das Panel glaubt.
+func (c *Client) AppStatus(ctx context.Context, name string) (*AppResult, error) {
+	var res AppResult
+	err := c.Call(ctx, OpAppStatus, AppNameParams{Name: name}, &res)
+	return &res, err
+}
+
 // --- Echte Dateisystem-Quotas ----------------------------------------------
 
 // QuotaStatus sagt, ob unter einem Pfad Project Quota möglich ist.

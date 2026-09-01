@@ -1,4 +1,5 @@
-# Von VoltPanel generiert für {{ .Name }} — nicht von Hand bearbeiten.
+# Von VoltPanel erzeugt für {{ .Name }} — nicht von Hand bearbeiten.
+# Jede Änderung geht beim nächsten Schreiben verloren.
 # Erzeugt: {{ .GeneratedAt }}
 
 [Unit]
@@ -8,28 +9,51 @@ After=network.target
 [Service]
 Type=simple
 User={{ .User }}
-Group={{ .User }}
+Group={{ .Group }}
 WorkingDirectory={{ .WorkingDir }}
+
+# Die Umgebung steht in einer eigenen Datei mit 0640. Stünde sie hier, könnte
+# jeder Benutzer des Servers sie lesen — Unit-Dateien sind für alle lesbar, und
+# `systemctl show` gibt sie ohnehin heraus. In einer App-Umgebung stehen
+# regelmäßig Datenbankpasswörter.
+EnvironmentFile={{ .EnvPath }}
+
 ExecStart={{ .ExecStart }}
 Restart=always
 RestartSec=5
-StandardOutput=append:{{ .LogPath }}
-StandardError=append:{{ .LogPath }}
-{{- range .Env }}
-Environment={{ . }}
-{{- end }}
 
-# Die App läuft als eigener User und darf ausschließlich in ihr eigenes
+# Ins Journal, nicht in eine Datei: dort ist die Rotation schon geregelt, und
+# der Agent liest es ohnehin über dieselbe Whitelist wie jeden anderen Dienst.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ .Name }}
+
+# Die App läuft als Systembenutzer ihrer Site und darf ausschließlich in deren
 # Verzeichnis schreiben. Ein übernommener Prozess kommt so nicht ans System.
 NoNewPrivileges=yes
 PrivateTmp=yes
+PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
 RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
 ReadWritePaths={{ .WorkingDir }}
+
+# MemoryDenyWriteExecute steht hier bewusst nicht. Die JIT-Übersetzung von V8
+# braucht schreibbaren und ausführbaren Speicher; mit der Sperre startet keine
+# Node-Anwendung. Eine Härtung, die das Ziel nicht laufen lässt, ist keine.
 
 [Install]
 WantedBy=multi-user.target

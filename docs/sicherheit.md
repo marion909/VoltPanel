@@ -531,6 +531,54 @@ Server liegen, ließe sich durch Ausprobieren beantworten.
 bis dahin setzte „sperren" nur ein Feld. Den eigenen Mandanten zu sperren lehnt
 das Panel ab — danach käme niemand mehr herein, der es zurücknimmt.
 
+## 4p. Apps als systemd-Unit
+
+**Risiko:** Eine Unit-Datei ist zeilenweise aufgebaut. Was einen Zeilenumbruch
+in einen Wert bekommt, schreibt die nächste Direktive selbst — und `User=root`
+in einer Zeile, die als Kommandozeile gedacht war, lässt die App als root
+laufen. Das ist dieselbe Klasse wie Config-Injection in einer Nginx-Datei, nur
+mit einer anderen Grammatik und einem schlimmeren Ergebnis.
+
+**Maßnahmen:** Das Startkommando ist eine Liste, keine Zeichenkette. Jedes
+Argument geht einzeln durch ein enges Muster: keine Leerzeichen, keine
+Zeilenumbrüche, kein Prozentzeichen.
+
+Kein Leerzeichen, weil systemd `ExecStart` selbst zerlegt — mit eigenen
+Anführungszeichen und C-Fluchtfolgen. Ein Argument mit Leerzeichen zwänge dazu,
+diese Zerlegung nachzubauen, und eine nachgebaute Zerlegung ist genau die
+Stelle, an der so etwas schiefgeht. Ohne Leerzeichen gibt es nichts nachzubauen.
+
+Kein Prozentzeichen, weil es in einer Unit einen Platzhalter einleitet:
+`%h/bin/node` zeigte auf ein Heimatverzeichnis, nicht auf den gemeinten Pfad.
+
+Das Programm muss ein absoluter Pfad sein. Ein relativer hinge am
+Arbeitsverzeichnis, und das bestimmt jemand anderes.
+
+**Der Unit-Name kommt nie aus der Anfrage.** Er entsteht aus dem App-Namen mit
+festem Präfix `volt-app-`. Ohne das wäre „meine App neu starten" ein Weg an der
+Dienst-Whitelist vorbei zu jedem Dienst des Servers — `systemctl stop ssh` über
+einen Endpunkt, den ein Kunde bedienen darf. Aus demselben Grund entstehen auch
+die Pfade der Unit- und der Umgebungsdatei aus dem Namen: käme der Pfad von
+außen, wäre „eine App schreiben" ein Weg, jede Datei des Servers durch eine
+systemd-Unit zu ersetzen.
+
+**Die Umgebung steht nicht in der Unit.** Unit-Dateien sind für jeden Benutzer
+des Servers lesbar, und `systemctl show` gibt sie ohnehin heraus; in einer
+App-Umgebung stehen regelmäßig Datenbankpasswörter. Sie liegt deshalb in einer
+eigenen Datei mit 0640, `root:<gruppe der site>` — lesen darf sie der Prozess,
+schreiben nur root. Ein Zeilenumbruch in einem Wert wird abgewiesen: er schriebe
+die nächste Zeile selbst und damit eine Variable, die niemand gesetzt hat.
+
+**Die App läuft als Systembenutzer ihrer Site**, nie unter einem Systemkonto —
+derselbe Nachschlag und dieselben drei Schranken wie beim FTP-Zugang. Die Unit
+selbst ist eng gefasst: `ProtectSystem=strict`, `NoNewPrivileges`, leeres
+`CapabilityBoundingSet`, `SystemCallFilter=@system-service`, und als einziger
+schreibbarer Pfad das Verzeichnis der Site.
+
+`MemoryDenyWriteExecute` steht bewusst **nicht** darin: die JIT-Übersetzung von
+V8 braucht schreibbaren und ausführbaren Speicher, und mit der Sperre startet
+keine Node-Anwendung. Eine Härtung, die das Ziel nicht laufen lässt, ist keine.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

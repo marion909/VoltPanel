@@ -149,8 +149,6 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
 ## Offen
 
-**Phase 4 — Multi-Tenant**
-
 **Phase 5 — Docker, Node.js, Git-Deploy**
 
 - Docker: Container, Images, Volumes, Netzwerke, Logs, Stats, Exec
