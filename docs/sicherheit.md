@@ -450,6 +450,46 @@ Weiter:
 - **Kein Proxy aus der Umgebung.** Ein `HTTPS_PROXY` aus einer Variablen wäre
   ein Weg an der Adressprüfung vorbei.
 
+## 4n. Echte Dateisystem-Quotas
+
+**Risiko:** Eine Grenze, die nur auf Anwendungsebene wirkt, ist keine Grenze
+gegen den, der sie reißen will. Sie lehnt eine Aktion über das Panel ab — und
+der PHP-Code der Site schreibt daneben weiter, bis die Platte voll ist. Voll ist
+sie dann für alle Mandanten auf dem Server, nicht nur für den einen.
+
+**Maßnahme:** Project Quota. Die Verzeichnisse eines Mandanten bekommen eine
+Projektnummer, seine Grenze hängt an der Nummer, und der Kernel bucht jeden
+Block darauf — gleichgültig, welcher Prozess ihn schreibt.
+
+Ein Mandant ist ein Projekt, nicht eine Site. Die Quota des Panels gilt je
+Mandant; wer fünf Sites hat, hat eine Grenze über alle fünf. Deshalb geht der
+Agent alle Verzeichnisse eines Mandanten in einem Aufruf durch, und deshalb
+lehnt er ab, wenn sie auf zwei Dateisystemen liegen: der Kernel kennt keine
+Grenze darüber hinweg, und dieselbe Zahl auf beiden zu setzen gäbe dem Mandanten
+das Doppelte — bei einer Anzeige, die etwas anderes behauptet.
+
+Drei Schranken auf dem Weg dorthin:
+
+Jeder Pfad geht durch `jail()`. Ein Pfad außerhalb der Wurzeln bekäme sonst die
+Projektnummer eines fremden Mandanten, und dessen Verbrauch zählte dort mit —
+oder, unangenehmer, stünde unter dessen Grenze.
+
+Die Projektnummer entsteht aus der Mandantennummer mit festem Versatz. Der
+Abstand zu 0 ist kein Schönheitsfehler: 0 trägt jede Datei, die zu keinem
+Projekt gehört, und eine Grenze darauf träfe das halbe Dateisystem.
+
+Pfade, die an `xfs_quota` gehen, dürfen kein Leerzeichen und keinen Umbruch
+enthalten. Das ist keine Shell — aber `xfs_quota` nimmt seine eigenen Befehle
+als eine Zeichenkette hinter `-c` und zerlegt sie selbst. In diese zweite
+Zerlegung darf nichts geraten, was sie verschiebt.
+
+**Was der Agent nicht tut:** an `/etc/fstab` schreiben oder ein Dateisystem neu
+einhängen. Project Quota hängt an einer Mount-Option, und die lässt sich im
+Betrieb nicht setzen. Ein Panel, das das automatisch versucht, riskiert einen
+Server, der nicht mehr hochkommt — für ein Feature, das den Betrieb nicht
+aufhält, wenn es fehlt. Stattdessen steht im Paketebereich, was der Server kann
+und was dafür zu tun wäre.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

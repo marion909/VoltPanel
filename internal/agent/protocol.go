@@ -113,6 +113,10 @@ const (
 	// Traffic aus den Nginx-Access-Logs, ab einem uebergebenen Lesestand.
 	OpNginxTraffic Op = "nginx.traffic"
 
+	// Echte Dateisystem-Quotas ueber Project Quota (ext4/XFS).
+	OpQuotaStatus  Op = "quota.status"
+	OpQuotaProject Op = "quota.project"
+
 	// SQL aus der Oberflaeche, unter einem auf eine Datenbank begrenzten Konto.
 	OpMySQLQuery Op = "mysql.query"
 

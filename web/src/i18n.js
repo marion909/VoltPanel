@@ -97,6 +97,10 @@ const messages = {
     'quota.traffic': 'Traffic',
     'quota.plan': 'Paket',
     'quota.noPlan': 'ohne Paket — keine Grenzen',
+    'plans.fsQuotaOn':
+      'Die Grenzen wirken auch im Dateisystem: der Kernel bremst auch, was am Panel vorbei schreibt.',
+    'plans.fsQuotaOff':
+      'Die Grenzen wirken nur für Aktionen über das Panel. Was der Code einer Site selbst schreibt, bremst niemand.',
 
     'tenants.title': 'Mandanten und Pakete',
     'tenants.tab': 'Mandanten',
@@ -490,6 +494,10 @@ const messages = {
     'quota.traffic': 'Traffic',
     'quota.plan': 'Plan',
     'quota.noPlan': 'no plan — no limits',
+    'plans.fsQuotaOn':
+      'Limits also apply in the filesystem: the kernel stops writes that bypass the panel.',
+    'plans.fsQuotaOff':
+      'Limits only apply to actions taken through the panel. Nothing stops what a site\u2019s own code writes.',
 
     'tenants.title': 'Tenants and plans',
     'tenants.tab': 'Tenants',

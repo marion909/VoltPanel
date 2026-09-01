@@ -15,11 +15,11 @@ import (
 // QuotaService misst den Verbrauch eines Tenants und prüft ihn gegen sein
 // Hosting-Paket.
 //
-// Die Grenzen wirken auf Anwendungsebene: eine Aktion, die eine Grenze reißen
-// würde, wird abgelehnt. Eine echte Dateisystem-Quota (XFS/ext4 Project Quota)
-// wäre stärker — sie würde auch einen Prozess bremsen, der am Panel vorbei
-// schreibt — braucht aber Mount-Optionen und Werkzeuge, die nicht überall da
-// sind. Siehe docs/stand.md.
+// Die Grenzen wirken zunächst auf Anwendungsebene: eine Aktion, die eine Grenze
+// reißen würde, wird abgelehnt. Wo das Dateisystem Project Quota führt, trägt
+// SyncDiskQuotas sie zusätzlich dort ein — dann bremst auch der Kernel, was am
+// Panel vorbei schreibt. Wo nicht, bleibt es bei der Anwendungsebene; die
+// Mount-Option dafür lässt sich nicht im Betrieb setzen.
 type QuotaService struct {
 	store *store.Store
 	agent *agent.Client
@@ -281,7 +281,32 @@ func (s *QuotaService) measureAndLog(ctx context.Context) {
 	if len(terrs) > 0 {
 		s.log.Warn("traffic-zählung teilweise fehlgeschlagen",
 			"gezählt", counted, "fehler", len(terrs), "erster", terrs[0])
+	} else {
+		s.log.Debug("traffic gezählt", "sites", counted)
+	}
+
+	// Und die Grenzen ins Dateisystem nachtragen. Auch das getrennt: ein
+	// Server ohne Project Quota soll die beiden Messungen darüber nicht
+	// verlieren.
+	s.syncQuotasAndLog(ctx)
+}
+
+// syncQuotasAndLog trägt die Grenzen der Hosting-Pakete ins Dateisystem nach.
+//
+// Ein Server, der keine Project Quota führt, ist hier kein Fehler: die Grenzen
+// wirken dann weiter auf Anwendungsebene. Gemeldet wird er trotzdem, aber nur
+// als Hinweis und nur einmal je Durchlauf — sonst stünde derselbe Satz für
+// jeden Mandanten im Log.
+func (s *QuotaService) syncQuotasAndLog(ctx context.Context) {
+	applied, hinweis, errs := s.SyncDiskQuotas(ctx)
+	if len(errs) > 0 {
+		s.log.Warn("dateisystem-quotas teilweise fehlgeschlagen",
+			"gesetzt", applied, "fehler", len(errs), "erster", errs[0])
 		return
 	}
-	s.log.Debug("traffic gezählt", "sites", counted)
+	if hinweis != "" {
+		s.log.Info("keine echten dateisystem-quotas", "gesetzt", applied, "grund", hinweis)
+		return
+	}
+	s.log.Debug("dateisystem-quotas gesetzt", "mandanten", applied)
 }

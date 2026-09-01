@@ -112,6 +112,19 @@ func (s *Server) handleQuota(c echo.Context) error {
 	return c.JSON(http.StatusOK, status)
 }
 
+// handleQuotaFilesystem sagt, ob die Grenzen auch im Dateisystem stehen.
+//
+// Nur für Administratoren: die Antwort nennt Gerätenamen und Einhängepunkte
+// des Servers. Das ist nichts, was ein Kunde über die Maschine erfahren muss,
+// auf der seine Site zufällig liegt.
+func (s *Server) handleQuotaFilesystem(c echo.Context) error {
+	sup, err := s.quota.FilesystemStatus(c.Request().Context())
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, sup)
+}
+
 // handleTenantQuota liefert den Verbrauch eines beliebigen Tenants — der Scope
 // entscheidet, ob das erlaubt ist.
 func (s *Server) handleTenantQuota(c echo.Context) error {

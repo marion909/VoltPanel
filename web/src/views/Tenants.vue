@@ -8,6 +8,9 @@ import QuotaBar from '../components/QuotaBar.vue'
 const tenants = ref([])
 const plans = ref([])
 const quotas = ref({})
+// Ob die Grenzen auch im Dateisystem stehen. Nur für Administratoren zu holen —
+// die Antwort nennt Gerät und Einhängepunkt des Servers.
+const fsQuota = ref(null)
 const loading = ref(true)
 const error = ref('')
 const busy = ref(false)
@@ -38,10 +41,15 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [tenantList, planList] = await Promise.all([
+    const [tenantList, planList, fs] = await Promise.all([
       api.get('/tenants?all=true'),
       api.get('/plans'),
+      // Scheitert bei Resellern an der Rolle, und das ist in Ordnung: dann
+      // steht der Hinweis eben nicht da. Die Liste soll deswegen nicht leer
+      // bleiben.
+      api.get('/quota/filesystem').catch(() => null),
     ])
+    fsQuota.value = fs
     tenants.value = tenantList
     plans.value = planList
 
@@ -299,6 +307,38 @@ onMounted(load)
 
     <!-- Pakete -->
     <template v-else>
+      <!--
+        Wo die Grenzen wirken. Ohne Project Quota im Dateisystem gelten sie nur
+        für Aktionen über das Panel — was der PHP-Code einer Site selbst
+        schreibt, bremst dann niemand. Das gehört hierher, wo die Grenzen
+        eingetragen werden, nicht in eine Fußnote der Dokumentation.
+      -->
+      <div
+        v-if="fsQuota"
+        class="mb-5 flex items-start gap-2.5 rounded-lg border px-4 py-3 text-[12px]"
+        :style="{
+          borderColor: fsQuota.ready
+            ? 'var(--border-ring)'
+            : 'color-mix(in srgb, var(--status-warning) 40%, var(--border-ring))',
+          background: fsQuota.ready
+            ? 'var(--surface-card)'
+            : 'color-mix(in srgb, var(--status-warning) 14%, var(--surface-card))',
+        }"
+      >
+        <span aria-hidden="true">{{ fsQuota.ready ? '\u2713' : '\u26A0' }}</span>
+        <div class="space-y-1">
+          <p :style="{ color: 'var(--ink-primary)' }">
+            {{ fsQuota.ready ? t('plans.fsQuotaOn') : t('plans.fsQuotaOff') }}
+          </p>
+          <p v-if="fsQuota.hinweis" :style="{ color: 'var(--ink-secondary)' }">
+            {{ fsQuota.hinweis }}
+          </p>
+          <p v-if="fsQuota.mount_point" :style="{ color: 'var(--ink-muted)' }">
+            {{ fsQuota.mount_point }} &middot; {{ fsQuota.fstype }}
+          </p>
+        </div>
+      </div>
+
       <form
         v-if="showPlanForm"
         class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-4"

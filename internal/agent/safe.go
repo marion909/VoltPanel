@@ -65,6 +65,12 @@ var allowedBinaries = map[string]string{
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",
 	"ufw":     "/usr/sbin/ufw",
+	// Fuer echte Dateisystem-Quotas: chattr setzt die Projektnummer an einem
+	// ext4-Baum, setquota die Grenze darauf, xfs_quota beides auf XFS. Alle
+	// Argumente sind agentseitig gebildet, die Pfade gehen vorher durch jail().
+	"chattr":    "/usr/bin/chattr",
+	"setquota":  "/usr/sbin/setquota",
+	"xfs_quota": "/usr/sbin/xfs_quota",
 }
 
 var (

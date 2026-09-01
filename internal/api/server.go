@@ -269,6 +269,7 @@ func (s *Server) setupRoutes() {
 	auth.PUT("/tenants/:id/cloudflare", s.handleSetCloudflareToken, s.requireRole(store.RoleReseller))
 
 	auth.GET("/quota", s.handleQuota)
+	auth.GET("/quota/filesystem", s.handleQuotaFilesystem, s.requireRole(store.RoleAdmin))
 	auth.GET("/plans", s.handleListPlans)
 	auth.POST("/plans", s.handleCreatePlan, s.requireRole(store.RoleAdmin))
 	auth.PATCH("/plans/:id", s.handleUpdatePlan, s.requireRole(store.RoleAdmin))

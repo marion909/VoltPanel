@@ -124,21 +124,25 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   die eben rotierte Datei nachgelesen. Gezählt werden nur vollständige Zeilen —
   eine halbe, die nginx gerade schreibt, käme sonst beim nächsten Lauf ein
   zweites Mal.
+- Echte Dateisystem-Quotas über Project Quota, wo das Dateisystem sie führt:
+  die Verzeichnisse eines Mandanten bekommen eine Projektnummer, die Grenze
+  seines Pakets hängt daran, und der Kernel bremst damit auch, was am Panel
+  vorbei schreibt — PHP-Code der Site, ein Upload über FTP, ein entpacktes
+  Archiv. Ein Mandant ist ein Projekt, nicht eine Site: wer fünf Sites hat, hat
+  eine Grenze über alle fünf. ext4 und XFS; wo die Mount-Option fehlt, bleibt es
+  bei der Anwendungsebene, und das Panel sagt im Paketebereich, was dafür zu tun
+  wäre. Automatisch geändert wird an /etc/fstab nichts.
 - Mandanten sperren und entsperren; Löschen nur, wenn nichts mehr daran hängt
 - Reduzierte Oberfläche für Kunden: keine Server-Dienste, keine
   Mandantenverwaltung
 
-Phase 0 bis 2 sind damit abgeschlossen, Phase 4 bis auf die drei unten
-genannten Punkte.
+Phase 0 bis 2 sind damit abgeschlossen, Phase 4 bis auf den unten genannten
+Punkt.
 
 ## Offen
 
 **Phase 4 — Multi-Tenant**
 
-- Echte Dateisystem-Quotas (XFS/ext4 Project Quota). Die Grenzen wirken derzeit
-  auf Anwendungsebene: eine Aktion über der Quota wird abgelehnt. Ein Prozess,
-  der am Panel vorbei schreibt — etwa PHP-Code der Site selbst —, wird davon
-  nicht gebremst. Dafür bräuchte es Mount-Optionen und Quota-Werkzeuge.
 - Eigene Anmeldeseite und Domain für den Kundenbereich (die reduzierte
   Navigation steht bereits)
 

@@ -532,6 +532,27 @@ func (c *Client) Traffic(ctx context.Context, cursors []TrafficCursor) (*Traffic
 	return &res, err
 }
 
+// --- Echte Dateisystem-Quotas ----------------------------------------------
+
+// QuotaStatus sagt, ob unter einem Pfad Project Quota möglich ist.
+func (c *Client) QuotaStatus(ctx context.Context, path string) (*QuotaSupport, error) {
+	var res QuotaSupport
+	err := c.Call(ctx, OpQuotaStatus, QuotaStatusParams{Path: path}, &res)
+	return &res, err
+}
+
+// SetQuotaProject hängt die Verzeichnisse eines Mandanten an seine
+// Projektnummer und setzt darauf die Grenze.
+func (c *Client) SetQuotaProject(ctx context.Context, tenant int64, dirs []string,
+	limitMB int64) (*QuotaProjectResult, error) {
+
+	var res QuotaProjectResult
+	err := c.Call(ctx, OpQuotaProject, QuotaProjectParams{
+		Tenant: tenant, Dirs: dirs, LimitMB: limitMB,
+	}, &res)
+	return &res, err
+}
+
 // --- Datenbankzugriff von außen --------------------------------------------
 
 func (c *Client) MySQLRemoteStatus(ctx context.Context) (*MySQLRemoteResult, error) {

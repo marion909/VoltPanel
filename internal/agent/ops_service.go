@@ -54,6 +54,8 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFTPUserList:   s.opFTPUserList,
 
 		OpNginxTraffic:      s.opNginxTraffic,
+		OpQuotaStatus:       s.opQuotaStatus,
+		OpQuotaProject:      s.opQuotaProject,
 		OpMySQLQuery:        s.opMySQLQuery,
 		OpMySQLRemoteStatus: s.opMySQLRemoteStatus,
 		OpMySQLRemoteSet:    s.opMySQLRemoteSet,
