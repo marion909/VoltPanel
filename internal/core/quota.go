@@ -271,7 +271,17 @@ func (s *QuotaService) measureAndLog(ctx context.Context) {
 	if len(errs) > 0 {
 		s.log.Warn("verbrauchsmessung teilweise fehlgeschlagen",
 			"gemessen", measured, "fehler", len(errs), "erster", errs[0])
+	} else {
+		s.log.Debug("verbrauch gemessen", "sites", measured)
+	}
+
+	// Der Traffic im selben Takt. Getrennt vom Plattenverbrauch, damit ein
+	// Fehlschlag dort nicht auch die Zahlen hier verhindert — und umgekehrt.
+	counted, terrs := s.CollectTraffic(ctx)
+	if len(terrs) > 0 {
+		s.log.Warn("traffic-zählung teilweise fehlgeschlagen",
+			"gezählt", counted, "fehler", len(terrs), "erster", terrs[0])
 		return
 	}
-	s.log.Debug("verbrauch gemessen", "sites", measured)
+	s.log.Debug("traffic gezählt", "sites", counted)
 }

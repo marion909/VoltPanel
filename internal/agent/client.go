@@ -525,6 +525,13 @@ func (c *Client) RunQuery(ctx context.Context, database, statement string,
 	return &res, err
 }
 
+// Traffic liest die Access-Logs ab dem übergebenen Lesestand.
+func (c *Client) Traffic(ctx context.Context, cursors []TrafficCursor) (*TrafficResult, error) {
+	var res TrafficResult
+	err := c.Call(ctx, OpNginxTraffic, TrafficParams{Files: cursors}, &res)
+	return &res, err
+}
+
 // --- Datenbankzugriff von außen --------------------------------------------
 
 func (c *Client) MySQLRemoteStatus(ctx context.Context) (*MySQLRemoteResult, error) {

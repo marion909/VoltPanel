@@ -119,6 +119,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   stille Sperre ist
 - Verbrauchsmessung stündlich im Hintergrund: belegte Blöcke statt nomineller
   Größe, Hardlinks nur einmal gezählt, Symlinks nicht verfolgt
+- Traffic aus den Nginx-Access-Logs, im selben Takt. Gelesen wird ab einem
+  Lesestand je Site, nicht von vorn; Logrotation wird an der Inode erkannt und
+  die eben rotierte Datei nachgelesen. Gezählt werden nur vollständige Zeilen —
+  eine halbe, die nginx gerade schreibt, käme sonst beim nächsten Lauf ein
+  zweites Mal.
 - Mandanten sperren und entsperren; Löschen nur, wenn nichts mehr daran hängt
 - Reduzierte Oberfläche für Kunden: keine Server-Dienste, keine
   Mandantenverwaltung
@@ -138,8 +143,6 @@ Damit ist Phase 3 abgeschlossen.
   auf Anwendungsebene: eine Aktion über der Quota wird abgelehnt. Ein Prozess,
   der am Panel vorbei schreibt — etwa PHP-Code der Site selbst —, wird davon
   nicht gebremst. Dafür bräuchte es Mount-Optionen und Quota-Werkzeuge.
-- Traffic-Zähler aus den Nginx-Access-Logs. Die Spalten und die Fortschreibung
-  je Abrechnungszeitraum stehen, das Einlesen der Logs fehlt.
 - Eigene Anmeldeseite und Domain für den Kundenbereich (die reduzierte
   Navigation steht bereits)
 

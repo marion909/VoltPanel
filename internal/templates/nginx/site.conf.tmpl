@@ -56,7 +56,7 @@ server {
     root {{ .WebRoot }};
     index index.html index.htm{{ if eq .Site.Type "php" }} index.php{{ end }};
 
-    access_log {{ .LogDir }}/{{ .Site.Domain }}.access.log;
+    access_log {{ .LogDir }}/{{ .Site.Domain }}.access.log volt;
     error_log  {{ .LogDir }}/{{ .Site.Domain }}.error.log warn;
 
     add_header X-Content-Type-Options "nosniff" always;

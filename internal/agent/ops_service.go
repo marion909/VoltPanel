@@ -53,6 +53,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFTPUserDelete: s.opFTPUserDelete,
 		OpFTPUserList:   s.opFTPUserList,
 
+		OpNginxTraffic:      s.opNginxTraffic,
 		OpMySQLQuery:        s.opMySQLQuery,
 		OpMySQLRemoteStatus: s.opMySQLRemoteStatus,
 		OpMySQLRemoteSet:    s.opMySQLRemoteSet,
@@ -168,8 +169,18 @@ func (s *Server) serviceAction(action string) Handler {
 		if err := checkService(p.Name); err != nil {
 			return nil, err
 		}
-		if _, err := run(ctx, longTimeout, "systemctl", action, p.Name); err != nil {
-			return nil, err
+		// Bei start, restart und reload wird der Grund mitgeliefert. Bei stop
+		// und disable gibt es keinen Dienst mehr, dessen Journal etwas sagen
+		// könnte.
+		switch action {
+		case "start", "restart", "reload":
+			if err := s.startService(ctx, Op("service."+action), p.Name, action); err != nil {
+				return nil, err
+			}
+		default:
+			if _, err := run(ctx, longTimeout, "systemctl", action, p.Name); err != nil {
+				return nil, err
+			}
 		}
 		return s.serviceStatus(ctx, p.Name), nil
 	}

@@ -1,6 +1,16 @@
 # Von VoltPanel generiert. Wird nach /etc/nginx/conf.d/volt-shared.conf gelegt
 # und gilt für alle Vhosts.
 
+# Das Format, aus dem der Traffic-Zähler liest. Es ist "combined" plus zwei
+# Zahlen am Ende, damit vorhandene Log-Auswerter die Zeilen weiter verstehen.
+#
+# $body_bytes_sent allein wäre zu wenig: es zählt nur den Rumpf der Antwort,
+# nicht die Kopfzeilen und nichts von dem, was hereinkam. Bei vielen kleinen
+# Anfragen ist das der grössere Teil.
+log_format volt '$remote_addr - $remote_user [$time_local] "$request" '
+                '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                '$request_length $bytes_sent';
+
 # Wird von jedem Reverse-Proxy-Vhost gebraucht: ohne diese Map schlägt ein
 # WebSocket-Upgrade fehl, weil $connection_upgrade undefiniert wäre.
 map $http_upgrade $connection_upgrade {

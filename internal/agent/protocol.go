@@ -110,6 +110,9 @@ const (
 	OpFTPUserDelete Op = "ftp.user_delete"
 	OpFTPUserList   Op = "ftp.user_list"
 
+	// Traffic aus den Nginx-Access-Logs, ab einem uebergebenen Lesestand.
+	OpNginxTraffic Op = "nginx.traffic"
+
 	// SQL aus der Oberflaeche, unter einem auf eine Datenbank begrenzten Konto.
 	OpMySQLQuery Op = "mysql.query"
 

@@ -81,7 +81,11 @@ func ftpSettings() map[string]string {
 
 		"MaxClientsNumber": "50",
 		"MaxClientsPerIP":  "8",
-		"PassivePortRange": fmt.Sprintf("%d %d", ftpPassiveFrom, ftpPassiveTo),
+		// Doppelpunkt, kein Leerzeichen: der Debian-Wrapper reicht den Inhalt
+		// dieser Datei als ein einziges Argument an -p weiter, und pure-ftpd
+		// liest dort "erster:letzter". Mit einem Leerzeichen startet der
+		// Dienst nicht.
+		"PassivePortRange": fmt.Sprintf("%d:%d", ftpPassiveFrom, ftpPassiveTo),
 
 		// Kein Rückwärts-Auflösen der Adresse je Verbindung: das kostet bei
 		// einem trägen Resolver Sekunden und steht in keinem Log, das jemand
@@ -151,11 +155,13 @@ func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error)
 		return nil, opErr(OpFTPSetup, "puredb übersetzen: %s", truncate(out, 300))
 	}
 
-	if out, err := run(ctx, longTimeout, "systemctl", "enable", "--now", "pure-ftpd"); err != nil {
-		return nil, opErr(OpFTPSetup, "dienst starten: %s", truncate(out, 300))
+	// enable ohne --now: der Start kommt gleich darunter, und ein Fehlschlag
+	// soll die Meldung des Starts tragen, nicht die des Einrichtens.
+	if out, err := run(ctx, longTimeout, "systemctl", "enable", "pure-ftpd"); err != nil {
+		return nil, opErr(OpFTPSetup, "dienst eintragen: %s", truncate(out, 300))
 	}
-	if out, err := run(ctx, longTimeout, "systemctl", "restart", "pure-ftpd"); err != nil {
-		return nil, opErr(OpFTPSetup, "dienst neu starten: %s", truncate(out, 300))
+	if err := s.startService(ctx, OpFTPSetup, "pure-ftpd", "restart"); err != nil {
+		return nil, err
 	}
 
 	res := FTPSetupResult{

@@ -36,14 +36,17 @@ var allowedServices = map[string]bool{
 // allowedBinaries: absolute Pfade, damit kein manipulierter PATH greift.
 var allowedBinaries = map[string]string{
 	"systemctl": "/usr/bin/systemctl",
-	"nginx":     "/usr/sbin/nginx",
-	"useradd":   "/usr/sbin/useradd",
-	"userdel":   "/usr/sbin/userdel",
-	"id":        "/usr/bin/id",
-	"chown":     "/usr/bin/chown",
-	"mysql":     "/usr/bin/mysql",
-	"mysqldump": "/usr/bin/mysqldump",
-	"crontab":   "/usr/bin/crontab",
+	// Nur lesend: holt den Grund, aus dem ein Dienst nicht startet. systemctl
+	// selbst sagt darüber nur "see journalctl".
+	"journalctl": "/usr/bin/journalctl",
+	"nginx":      "/usr/sbin/nginx",
+	"useradd":    "/usr/sbin/useradd",
+	"userdel":    "/usr/sbin/userdel",
+	"id":         "/usr/bin/id",
+	"chown":      "/usr/bin/chown",
+	"mysql":      "/usr/bin/mysql",
+	"mysqldump":  "/usr/bin/mysqldump",
+	"crontab":    "/usr/bin/crontab",
 	// Für das Update: der Agent ruft `volt update` auf, statt den Tausch
 	// selbst nachzubauen. Snapshot, Prüfsumme und automatischer Rollback
 	// stecken dort und sind getestet.

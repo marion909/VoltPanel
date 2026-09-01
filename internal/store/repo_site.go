@@ -140,6 +140,49 @@ func (s *Store) RecordSiteUsage(ctx context.Context, siteID, bytes, files int64)
 	return err
 }
 
+// TrafficCursor ist der Lesestand einer Access-Log-Datei.
+type TrafficCursor struct {
+	SiteID int64
+	Domain string
+	Offset int64
+	Inode  uint64
+}
+
+// TrafficCursors liefert für jede aktive Site, wo zuletzt aufgehört wurde.
+func (s *Store) TrafficCursors(ctx context.Context) ([]TrafficCursor, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain, traffic_offset, traffic_inode FROM sites
+		 WHERE status != 'deleted' ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []TrafficCursor{}
+	for rows.Next() {
+		var c TrafficCursor
+		var inode int64
+		if err := rows.Scan(&c.SiteID, &c.Domain, &c.Offset, &inode); err != nil {
+			return nil, err
+		}
+		c.Inode = uint64(inode)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// SetTrafficCursor schreibt den Lesestand fort.
+//
+// Getrennt von AddSiteTraffic, weil beides auch getrennt vorkommt: eine Datei
+// ohne neue Zeilen bewegt keinen Zähler, aber ihr Lesestand kann sich nach
+// einer Rotation trotzdem ändern.
+func (s *Store) SetTrafficCursor(ctx context.Context, siteID, offset int64, inode uint64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE sites SET traffic_offset = ?, traffic_inode = ? WHERE id = ?`,
+		offset, int64(inode), siteID)
+	return err
+}
+
 // AddSiteTraffic zählt Traffic auf. period ist der Abrechnungszeitraum als
 // "2026-08"; wechselt er, beginnt der Zähler wieder bei null.
 func (s *Store) AddSiteTraffic(ctx context.Context, siteID int64, bytes int64, period string) error {
