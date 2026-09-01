@@ -36,6 +36,7 @@ type Server struct {
 	cron      *core.CronService
 	quota     *core.QuotaService
 	certs     *core.CertService
+	backups   *core.BackupService
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
@@ -77,6 +78,7 @@ func New(opts Options) (*Server, error) {
 		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
 		quota:     core.NewQuotaService(opts.Store, opts.Agent, opts.Config, opts.Logger),
 		certs:     core.NewCertService(opts.Config, opts.Store, opts.Agent, opts.Secrets, opts.Logger),
+		backups:   core.NewBackupService(opts.Config, opts.Store, opts.Logger, opts.Secrets),
 		log:       opts.Logger,
 		devOrigin: opts.DevOrigin,
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
@@ -243,6 +245,15 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/db-hosts/:id", s.handleRemoveRemoteHost)
 	auth.GET("/databases-remote", s.handleRemoteStatus)
 	auth.POST("/databases-remote", s.handleSetRemoteAccess, s.requireRole(store.RoleAdmin))
+
+	auth.GET("/backups", s.handleListBackups)
+	auth.POST("/backups", s.handleCreateBackup, s.requireRole(store.RoleAdmin))
+	auth.GET("/backup-targets", s.handleListTargets)
+	auth.POST("/backup-targets", s.handleCreateTarget)
+	auth.PATCH("/backup-targets/:id", s.handleUpdateTarget)
+	auth.DELETE("/backup-targets/:id", s.handleDeleteTarget)
+	auth.POST("/backup-targets/:id/test", s.handleTestTarget)
+	auth.POST("/backup-targets/:id/upload", s.handleUploadBackup, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/cronjobs", s.handleListCronjobs)
 	auth.POST("/cronjobs", s.handleCreateCronjob)

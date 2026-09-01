@@ -290,6 +290,47 @@ type Backup struct {
 	StartedAt   *int64 `json:"started_at"`
 	FinishedAt  *int64 `json:"finished_at"`
 	CreatedAt   int64  `json:"created_at"`
+
+	// Wohin es ging, wenn es nicht auf dieser Maschine blieb.
+	TargetID   *int64 `json:"target_id"`
+	RemotePath string `json:"remote_path"`
+}
+
+// BackupTarget ist ein Ablageort ausserhalb dieses Servers.
+//
+// Ein Backup, das neben dem Original liegt, ist kein Backup — es überlebt genau
+// die Fehler, die ohnehin niemandem weh tun.
+type BackupTarget struct {
+	ID       int64  `json:"id"`
+	TenantID int64  `json:"tenant_id"`
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+
+	Endpoint  string `json:"endpoint"`
+	Region    string `json:"region"`
+	Bucket    string `json:"bucket"`
+	PathStyle bool   `json:"path_style"`
+
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	UseTLS     bool   `json:"use_tls"`
+	SkipVerify bool   `json:"skip_verify"`
+
+	Username string `json:"username"`
+	// Nie in JSON: das Geheimnis verlässt den Server nicht. Angezeigt wird nur,
+	// ob eines hinterlegt ist.
+	SecretEnc string `json:"-"`
+	HasSecret bool   `json:"has_secret"`
+
+	BasePath string `json:"base_path"`
+	Enabled  bool   `json:"enabled"`
+
+	LastError  string `json:"last_error"`
+	LastUsedAt *int64 `json:"last_used_at"`
+	LastOKAt   *int64 `json:"last_ok_at"`
+
+	CreatedAt int64 `json:"created_at"`
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 type AuditEntry struct {

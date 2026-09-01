@@ -389,6 +389,47 @@ Preis klein — die Signaturprüfung der Pakete ändert sich dadurch nicht, und 
 zweite Versuch läuft nur nach genau diesem einen Abbruch. Wo der Wechsel
 funktioniert, bleibt er unangetastet.
 
+## 4m. Ausgehende Verbindungen zu Backup-Zielen
+
+**Risiko:** Ein Backup-Ziel ist eine Adresse, die der Kunde eingibt, und der
+Panel-Server baut die Verbindung auf. Er steht in einem Netz, in dem der Kunde
+nichts zu suchen hat. `169.254.169.254` ist bei praktisch jedem Cloud-Anbieter
+der Metadaten-Dienst; eine Anfrage dorthin liefert die Zugangsschlüssel der
+Maschine. Ein „Backup-Ziel" mit dieser Adresse wäre kein Backup-Ziel, sondern
+ein Ausleseversuch — und ohne Prüfung würde er beantwortet.
+
+**Maßnahmen:** Die Prüfung sitzt im `Control`-Hook des Wählers, also *nach* der
+Namensauflösung und *vor* `connect()`. Das ist der Unterschied zwischen „der
+Name zeigte auf etwas Erlaubtes" und „die Verbindung ging dorthin": wer den
+DNS-Eintrag stellt, kann zwischen zwei Auflösungen die Antwort wechseln. Ein
+Test prüft das an einem echten Lauscher — käme die Verbindung durch, würde er
+sie annehmen.
+
+Abgewiesen werden Loopback, link-local, Multicast und die unspezifische
+Adresse. Private Netze bleiben erlaubt: ein MinIO im selben Rechenzentrumsnetz
+ist ein üblicher Aufbewahrungsort für Sicherungen, und ihn zu verbieten hiesse,
+das Feature für die abzuschalten, die es am ehesten richtig benutzen.
+
+Weiter:
+
+- **Der lokale Pfad kommt nicht aus der Anfrage.** Der Aufrufer nennt einen
+  Dateinamen; der Verzeichnisanteil wird abgeworfen und das Ergebnis gegen das
+  Backup-Verzeichnis gehalten. Sonst wäre „lade dieses Backup hoch" der Weg,
+  jede Datei des Servers in einen fremden Bucket zu schieben.
+- **Nur Administratoren dürfen hochladen.** Das Archiv enthält die
+  Panel-Datenbank, also die Daten aller Mandanten. Sie an einen Speicher zu
+  schicken, den ein Kunde eingerichtet hat, wäre die vollständige Weitergabe
+  des Servers an ihn.
+- **Das Geheimnis wird nie ausgeliefert.** Es liegt entschlüsselbar in der
+  Datenbank, weil eine Signatur es im Klartext braucht; in der API-Antwort
+  steht nur, *ob* eines hinterlegt ist. Ein leeres Feld beim Speichern heisst
+  „unverändert", nicht „löschen" — sonst verlöre jedes Speichern des Formulars
+  die Zugangsdaten, und das Ziel scheiterte ab dann still.
+- **Zeilenumbrüche sind überall ausgeschlossen.** In S3 wäre einer eine zweite
+  HTTP-Kopfzeile, in FTP ein zweites Kommando auf derselben Verbindung.
+- **Kein Proxy aus der Umgebung.** Ein `HTTPS_PROXY` aus einer Variablen wäre
+  ein Weg an der Adressprüfung vorbei.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

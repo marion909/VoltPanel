@@ -39,7 +39,7 @@ func (a *app) backupCreateCmd() *cobra.Command {
 				}
 			}
 
-			svc := core.NewBackupService(a.cfg, a.store, a.log)
+			svc := core.NewBackupService(a.cfg, a.store, a.log, a.secrets)
 			res, err := svc.Create(ctx, core.CreateOptions{
 				IncludeConfig: !noConfigs, SiteDomains: sites, TenantID: 1,
 			})
@@ -66,7 +66,7 @@ func (a *app) backupListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "Listet die lokal vorhandenen Backups",
 		RunE: a.withApp(false, func(cmd *cobra.Command, _ []string) error {
-			archives, err := core.NewBackupService(a.cfg, a.store, a.log).ListArchives()
+			archives, err := core.NewBackupService(a.cfg, a.store, a.log, a.secrets).ListArchives()
 			if err != nil {
 				return err
 			}
@@ -103,7 +103,7 @@ func (a *app) backupRestoreCmd() *cobra.Command {
 				return nil
 			}
 
-			svc := core.NewBackupService(a.cfg, a.store, a.log)
+			svc := core.NewBackupService(a.cfg, a.store, a.log, a.secrets)
 			if err := svc.Restore(cmd.Context(), args[0]); err != nil {
 				return err
 			}

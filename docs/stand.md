@@ -100,6 +100,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
 - Backups: Datenbank plus Konfiguration plus Site-Dateien als tar.gz, mit
   Prüfsumme, Eintrag in der Datenbank, nächtlichem Timer und Restore mit
   automatischer Sicherheitskopie davor
+- Backup-Ziele S3, B2 und FTP: eigener SigV4-Signierer und eigener
+  FTPS-Client, beide ohne zusätzliche Abhängigkeit. Jeder ausgehende
+  Verbindungsaufbau prüft die Adresse, mit der wirklich gesprochen wird —
+  Loopback und link-local sind ausgeschlossen, damit ein Backup-Ziel nicht der
+  Weg zum Metadaten-Dienst des Anbieters wird.
 
 **Phase 4 — Multi-Tenant**
 
@@ -125,7 +130,7 @@ genannten Punkte.
 
 **Phase 3 — Daten, Dateien, Cronjobs**
 
-- Backup-Ziele S3, B2, FTP
+Damit ist Phase 3 abgeschlossen.
 
 **Phase 4 — Multi-Tenant**
 

@@ -151,10 +151,12 @@ func (s *Store) CreateBackup(ctx context.Context, sc Scope, b *Backup) error {
 
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO backups (tenant_id, site_id, database_id, kind, destination, path,
-			size_bytes, checksum, status, error, started_at, finished_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			size_bytes, checksum, status, error, started_at, finished_at, created_at,
+			target_id, remote_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.TenantID, nilIfEmpty(b.SiteID), nilIfEmpty(b.DatabaseID), b.Kind, b.Destination,
-		b.Path, b.SizeBytes, b.Checksum, b.Status, b.Error, b.StartedAt, b.FinishedAt, b.CreatedAt)
+		b.Path, b.SizeBytes, b.Checksum, b.Status, b.Error, b.StartedAt, b.FinishedAt, b.CreatedAt,
+		nilIfEmpty(b.TargetID), b.RemotePath)
 	if err != nil {
 		return err
 	}
@@ -174,7 +176,8 @@ func (s *Store) ListBackups(ctx context.Context, sc Scope, limit int) ([]*Backup
 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, tenant_id, site_id, database_id, kind, destination, path, size_bytes,
-		       checksum, status, error, started_at, finished_at, created_at
+		       checksum, status, error, started_at, finished_at, created_at,
+		       target_id, remote_path
 		FROM backups`+where+` ORDER BY id DESC LIMIT ?`, append(args, limit)...)
 	if err != nil {
 		return nil, err
@@ -186,7 +189,7 @@ func (s *Store) ListBackups(ctx context.Context, sc Scope, limit int) ([]*Backup
 		var b Backup
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.SiteID, &b.DatabaseID, &b.Kind,
 			&b.Destination, &b.Path, &b.SizeBytes, &b.Checksum, &b.Status, &b.Error,
-			&b.StartedAt, &b.FinishedAt, &b.CreatedAt); err != nil {
+			&b.StartedAt, &b.FinishedAt, &b.CreatedAt, &b.TargetID, &b.RemotePath); err != nil {
 			return nil, err
 		}
 		out = append(out, &b)

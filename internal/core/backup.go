@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/config"
 	"github.com/marion909/voltpanel/internal/store"
 )
@@ -26,13 +27,19 @@ type BackupService struct {
 	cfg   *config.Config
 	store *store.Store
 	log   *slog.Logger
+	// secrets entschlüsselt die Zugangsdaten der Backup-Ziele. Ohne sie
+	// funktioniert alles ausser dem Hochladen — die CLI-Befehle, die nur
+	// lokal arbeiten, kommen deshalb auch mit nil durch.
+	secrets *authn.SecretBox
 }
 
-func NewBackupService(cfg *config.Config, st *store.Store, log *slog.Logger) *BackupService {
+func NewBackupService(cfg *config.Config, st *store.Store, log *slog.Logger,
+	secrets *authn.SecretBox) *BackupService {
+
 	if log == nil {
 		log = slog.Default()
 	}
-	return &BackupService{cfg: cfg, store: st, log: log}
+	return &BackupService{cfg: cfg, store: st, log: log, secrets: secrets}
 }
 
 // CreateOptions steuert, was in ein Backup wandert.
