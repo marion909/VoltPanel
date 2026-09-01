@@ -133,10 +133,6 @@ genannten Punkte.
 
 ## Offen
 
-**Phase 3 — Daten, Dateien, Cronjobs**
-
-Damit ist Phase 3 abgeschlossen.
-
 **Phase 4 — Multi-Tenant**
 
 - Echte Dateisystem-Quotas (XFS/ext4 Project Quota). Die Grenzen wirken derzeit

@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -54,48 +56,131 @@ var reFTPName = regexp.MustCompile(`^[a-z][a-z0-9_]{2,31}$`)
 // beendet die Eingabe.
 var reFTPPassword = regexp.MustCompile(`^[A-Za-z0-9!#%()*+,\-./;<=>?@^_{|}~]{12,128}$`)
 
-func ftpSettings() map[string]string {
-	return map[string]string{
+// ftpValueKind ist die Regel, nach der der Debian-Wrapper den Inhalt einer
+// dieser Dateien liest — dieselbe Einteilung, die er in seiner eigenen Tabelle
+// trifft (debian/pure-ftpd-wrapper, %conf).
+//
+// Sie steht hier, weil der Wrapper einen Wert, den er nicht versteht, nicht
+// etwa überspringt, sondern daran stirbt:
+//
+//	die "Invalid configuration file /etc/pure-ftpd/conf/Umask: \"137:027\" not two octal numbers"
+//
+// Ein Tippfehler in der Tabelle unten ist damit kein schiefer Wert, sondern ein
+// Dienst, der nicht mehr startet. Genau das ist hier zweimal passiert: Umask
+// und PassivePortRange standen mit Doppelpunkt statt mit Leerzeichen.
+type ftpValueKind int
+
+const (
+	ftpYesNo      ftpValueKind = iota // parse_yesno:     yes/no/on/off/0/1
+	ftpNumber                         // parse_number_1:  eine Zahl
+	ftpTwoNumbers                     // parse_number_2:  zwei Zahlen, Leerzeichen dazwischen
+	ftpUmask                          // parse_umask:     zwei dreistellige Oktalzahlen, Leerzeichen dazwischen
+	ftpFilename                       // parse_filename:  die Datei muss existieren
+)
+
+// ftpValueRules bildet die Prüfungen des Wrappers nach. Die Ausdrücke sind
+// seine, nur in Go-Schreibweise.
+var ftpValueRules = map[ftpValueKind]*regexp.Regexp{
+	ftpYesNo:      regexp.MustCompile(`^(?i:yes|no|on|off|0|1)$`),
+	ftpNumber:     regexp.MustCompile(`^\d+$`),
+	ftpTwoNumbers: regexp.MustCompile(`^\d+\s+\d+$`),
+	ftpUmask:      regexp.MustCompile(`^[0-7]{3}\s+[0-7]{3}$`),
+}
+
+// reFTPOptionName ist die Bedingung, unter der der Wrapper eine Datei
+// überhaupt ansieht: `next unless /^[A-Za-z][A-Za-z0-9]+$/`.
+//
+// Was hier nicht passt, wird stillschweigend übergangen — und das ist die
+// unangenehmere Hälfte: ein Dienst, der nicht startet, fällt auf. Ein
+// verschluckter Dateiname namens "Chroot-Everyone" fiele niemandem auf, und
+// jeder FTP-Zugang stünde ohne Sperre im Dateisystem aller anderen.
+var reFTPOptionName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]+$`)
+
+type ftpSetting struct {
+	Value string
+	Kind  ftpValueKind
+}
+
+func ftpSettings() map[string]ftpSetting {
+	return map[string]ftpSetting{
 		// Die virtuellen Zugänge liegen in der PureDB, nicht in /etc/passwd.
-		"PureDB": ftpDBPath + ".pdb",
+		// parse_filename heißt: die übersetzte Datenbank muss dastehen, bevor
+		// der Dienst startet — sonst stirbt der Wrapper an dieser Zeile.
+		"PureDB": {ftpDBPath + ".pdb", ftpFilename},
 
 		// Jeder Zugang sitzt in seinem Heimatverzeichnis fest. Ohne das käme
 		// ein Kunde über .. in die Verzeichnisse aller anderen.
-		"ChrootEveryone": "yes",
-		"NoAnonymous":    "yes",
+		"ChrootEveryone": {"yes", ftpYesNo},
+		"NoAnonymous":    {"yes", ftpYesNo},
 
 		// Unter 1000 liegen die Systemkonten. Selbst wenn ein Eintrag mit
 		// falscher UID in die PureDB geriete, würde er hier abgewiesen.
-		"MinUID": "1000",
+		"MinUID": {"1000", ftpNumber},
 
 		// Verschlüsselung ist Pflicht, nicht Angebot. FTP ohne TLS schickt das
 		// Passwort im Klartext über die Leitung — bei einem Panel, das sonst
 		// jede Kleinigkeit absichert, wäre das ein Widerspruch.
-		"TLS": "2",
+		"TLS": {"2", ftpNumber},
 
 		// Dieselben Rechte, die auch das Panel auf den Site-Verzeichnissen
 		// setzt: Dateien 640, Verzeichnisse 750. Die Gruppe ist über das
 		// setgid-Bit die des Webservers, der die Dateien lesen können muss;
 		// alle anderen sehen nichts.
-		"Umask": "137:027",
+		//
+		// Leerzeichen, kein Doppelpunkt: der Wrapper liest hier zwei Zahlen
+		// und setzt selbst `-U %s:%s` daraus zusammen.
+		"Umask": {"137 027", ftpUmask},
 
-		"MaxClientsNumber": "50",
-		"MaxClientsPerIP":  "8",
-		// Doppelpunkt, kein Leerzeichen: der Debian-Wrapper reicht den Inhalt
-		// dieser Datei als ein einziges Argument an -p weiter, und pure-ftpd
-		// liest dort "erster:letzter". Mit einem Leerzeichen startet der
-		// Dienst nicht.
-		"PassivePortRange": fmt.Sprintf("%d:%d", ftpPassiveFrom, ftpPassiveTo),
+		"MaxClientsNumber": {"50", ftpNumber},
+		"MaxClientsPerIP":  {"8", ftpNumber},
+
+		// Ebenfalls zwei Zahlen mit Leerzeichen — `-p %d:%d` baut der Wrapper.
+		"PassivePortRange": {fmt.Sprintf("%d %d", ftpPassiveFrom, ftpPassiveTo), ftpTwoNumbers},
 
 		// Kein Rückwärts-Auflösen der Adresse je Verbindung: das kostet bei
 		// einem trägen Resolver Sekunden und steht in keinem Log, das jemand
 		// liest.
-		"DontResolve": "yes",
+		"DontResolve": {"yes", ftpYesNo},
 
 		// Ein FTP-Client, der nichts mehr tut, belegt sonst dauerhaft einen
 		// der Plätze oben.
-		"MaxIdleTime": "15",
+		"MaxIdleTime": {"15", ftpNumber},
 	}
+}
+
+// checkFTPSettings prüft die Tabelle gegen die Regeln des Wrappers, bevor
+// irgendetwas geschrieben wird.
+//
+// Ein halb geschriebenes Konfigurationsverzeichnis wäre der schlechtere
+// Zustand: die alten Dateien wären schon ersetzt, die neuen unvollständig.
+//
+// Die Existenz der PureDB wird hier nicht geprüft — die entsteht erst weiter
+// unten. Dafür ist checkFTPFiles da.
+func checkFTPSettings() error {
+	for name, set := range ftpSettings() {
+		if !reFTPOptionName.MatchString(name) {
+			return fmt.Errorf("%q ist kein name, den der wrapper ansieht", name)
+		}
+		re, ok := ftpValueRules[set.Kind]
+		if !ok {
+			continue // ftpFilename, siehe checkFTPFiles
+		}
+		if !re.MatchString(set.Value) {
+			return fmt.Errorf("%s=%q passt nicht zu dem, was pure-ftpd dort liest", name, set.Value)
+		}
+	}
+	return nil
+}
+
+// checkFTPFiles prüft, was der Wrapper als Datei erwartet. Fehlt sie, stirbt er
+// mit "No such file" — und der Dienst startet nie.
+func checkFTPFiles() error {
+	for name, set := range ftpSettings() {
+		if set.Kind == ftpFilename && !fileExists(set.Value) {
+			return fmt.Errorf("%s: %s fehlt", name, set.Value)
+		}
+	}
+	return nil
 }
 
 // opFTPSetup richtet Pure-FTPd ein: Paket, Einstellungen, Zertifikat, Dienst.
@@ -129,12 +214,17 @@ func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error)
 		return nil, opErr(OpFTPSetup, "betriebsart setzen: %v", err)
 	}
 
+	// Erst prüfen, dann schreiben: ein halb ersetztes
+	// Konfigurationsverzeichnis wäre der schlechtere Zustand.
+	if err := checkFTPSettings(); err != nil {
+		return nil, opErr(OpFTPSetup, "eigene einstellungen sind fehlerhaft: %v", err)
+	}
 	if err := os.MkdirAll(ftpConfDir, 0o755); err != nil {
 		return nil, opErr(OpFTPSetup, "konfigurationsverzeichnis: %v", err)
 	}
-	for name, value := range ftpSettings() {
+	for name, set := range ftpSettings() {
 		path := filepath.Join(ftpConfDir, name)
-		if err := os.WriteFile(path, []byte(value+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(set.Value+"\n"), 0o644); err != nil {
 			return nil, opErr(OpFTPSetup, "%s schreiben: %v", name, err)
 		}
 	}
@@ -153,6 +243,13 @@ func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error)
 	if out, err := run(ctx, shortTimeout, "pure-pw", "mkdb", ftpDBPath+".pdb",
 		"-f", ftpDBPath); err != nil {
 		return nil, opErr(OpFTPSetup, "puredb übersetzen: %s", truncate(out, 300))
+	}
+
+	// Was der Wrapper als Datei erwartet, muss jetzt dastehen. Fehlt sie,
+	// stirbt er beim Lesen der Konfiguration, und die Meldung des Dienstes
+	// wäre "No such file" ohne Hinweis darauf, wer die Datei anlegt.
+	if err := checkFTPFiles(); err != nil {
+		return nil, opErr(OpFTPSetup, "%v", err)
 	}
 
 	// enable ohne --now: der Start kommt gleich darunter, und ein Fehlschlag
@@ -184,6 +281,7 @@ func (s *Server) opFTPSetup(ctx context.Context, _ json.RawMessage) (any, error)
 // mindestens ein selbstsigniertes —, und wer später ein echtes für die
 // Panel-Domain holt, bekommt es hier mit dem nächsten Einrichten ebenfalls.
 func (s *Server) writeFTPCert() error {
+	var letzter error
 	for _, pair := range s.panelCertChain() {
 		key, err := os.ReadFile(pair.Key)
 		if err != nil {
@@ -193,18 +291,50 @@ func (s *Server) writeFTPCert() error {
 		if err != nil {
 			continue
 		}
+		// Prüfen, bevor pure-ftpd es tut. Mit TLS=2 ist Verschlüsselung
+		// Pflicht: ein Zertifikat, das nicht aufgeht, ist kein
+		// Schönheitsfehler, sondern ein Dienst, der nicht startet — und die
+		// Meldung dazu käme aus pure-ftpd, nicht von hier.
+		if _, err := tls.X509KeyPair(cert, key); err != nil {
+			letzter = fmt.Errorf("%s und %s passen nicht zusammen: %w", pair.Cert, pair.Key, err)
+			s.log.Warn("zertifikat für ftp unbrauchbar", "cert", pair.Cert, "err", err)
+			continue
+		}
 		if err := os.MkdirAll(filepath.Dir(ftpTLSPath), 0o710); err != nil {
 			return fmt.Errorf("verzeichnis für das ftp-zertifikat: %w", err)
 		}
 		// 0600: die Datei enthält den privaten Schlüssel. Pure-FTPd liest sie
-		// als root, bevor es die Rechte fallen lässt.
-		if err := os.WriteFile(ftpTLSPath, append(key, cert...), 0o600); err != nil {
+		// als root, bevor es die Rechte fallen lässt, und weigert sich, wenn
+		// Gruppe oder Andere sie lesen dürfen.
+		if err := os.WriteFile(ftpTLSPath, joinPEM(key, cert), 0o600); err != nil {
 			return fmt.Errorf("ftp-zertifikat schreiben: %w", err)
 		}
 		return nil
 	}
+	if letzter != nil {
+		return letzter
+	}
 	return fmt.Errorf("kein lesbares zertifikat gefunden — ohne eines startet pure-ftpd nicht, " +
 		"weil verschlüsselung pflicht ist")
+}
+
+// joinPEM setzt PEM-Blöcke zu einer Datei zusammen.
+//
+// Der Zeilenumbruch dazwischen ist der ganze Zweck. Endet der Schlüssel ohne
+// einen — jedes von Hand abgelegte Zertifikat kann das —, stünde
+// "-----END PRIVATE KEY----------BEGIN CERTIFICATE-----" in einer Zeile, und
+// die Datei wäre unlesbar.
+func joinPEM(parts ...[]byte) []byte {
+	var b bytes.Buffer
+	for _, p := range parts {
+		p = bytes.TrimRight(p, "\r\n")
+		if len(p) == 0 {
+			continue
+		}
+		b.Write(p)
+		b.WriteByte('\n')
+	}
+	return b.Bytes()
 }
 
 // openFTPPorts gibt die Ports in ufw frei, sofern ufw überhaupt läuft.

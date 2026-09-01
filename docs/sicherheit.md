@@ -226,6 +226,26 @@ Der Dienst wird nicht mitinstalliert, sondern auf Wunsch eingerichtet. Ein
 Dienst, der nur läuft, weil er beim Installieren dabei war, ist Angriffsfläche
 ohne Nutzen.
 
+**Eine stille Falle in der Konfiguration.** Pure-FTPd wird auf Debian nicht
+direkt gestartet, sondern über `pure-ftpd-wrapper`. Der liest
+`/etc/pure-ftpd/conf`, wo der Dateiname die Option ist und der Inhalt der Wert,
+und baut daraus die Kommandozeile. Dabei tut er zweierlei, und nur eines davon
+fällt auf:
+
+Einen **Wert**, den er nicht versteht, quittiert er mit `die` — der Dienst
+startet nicht. Unangenehm, aber sichtbar.
+
+Einen **Dateinamen**, der nicht auf `^[A-Za-z][A-Za-z0-9]+$` passt, überspringt
+er wortlos. Das ist die gefährlichere Hälfte: aus `ChrootEveryone` müsste nur
+`Chroot-Everyone` werden, und jeder FTP-Zugang stünde ohne Sperre im
+Dateisystem aller anderen — ohne Fehler, ohne Warnung, ohne Eintrag im Log.
+
+Deshalb steht die Tabelle im Agent nicht als `map[string]string` da, sondern
+trägt zu jedem Wert die Regel, nach der der Wrapper ihn liest. Vor dem
+Schreiben wird beides geprüft, Name und Wert, und ein Test hält jeden Eintrag
+gegen die Ausdrücke aus `debian/pure-ftpd-wrapper` — unabhängig abgeschrieben,
+sonst prüfte er die Tabelle gegen sich selbst.
+
 ## 4h. Shell im Browser
 
 **Risiko:** Ein Terminal im Panel ist die naheliegendste Art, die Trennung
