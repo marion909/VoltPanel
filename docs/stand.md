@@ -277,6 +277,14 @@ Steht bereits:
   Quelladresse oder eine Kette. nftables wird nur gelesen: in ein gewachsenes
   Regelwerk lässt sich keine Zeile gefahrlos einfügen, ohne zu wissen, wie es
   aufgebaut ist.
+- Port-Scan-Erkennung: fail2ban zählt die von ufw abgewiesenen Pakete je
+  Adresse und sperrt für alle Ports — wer der Reihe nach anklopft, sucht nicht
+  einen bestimmten Dienst. Drei Stufen statt dreier Zahlenfelder, Filter und
+  Jail aus Vorlagen; es gibt kein Feld für einen regulären Ausdruck und keines
+  für eine Aktion, denn ein fail2ban-Filter ist ausführbare Konfiguration. Die
+  Adressen aus `ip_whitelist` sind ausgenommen. Nimmt fail2ban die Regel nicht
+  an, wird sie zurückgenommen — eine Datei, die es nicht versteht, nähme sonst
+  den ganzen Dienst mit, auch die Jails, die vorher liefen.
 - `volt doctor` mit Prüfungen zu Schema, Pfaden, Agent, Diensten, Port,
   gemeinsamer Config, Benutzersperren und Zertifikaten; strukturierte Logs
 - Update-Kanäle stable und beta sind in der Konfiguration angelegt und werden
@@ -292,8 +300,6 @@ Offen:
   für die Cloudflare-API ist der Host fest. Was fehlt, ist die Auflösung von
   Namen: ein Hostname, der auf 169.254.169.254 zeigt, geht durch. Dagegen hilft
   nur ein Proxy, der die aufgelöste Adresse prüft.
-- Port-Scan-Schutz. Die Firewall-Oberfläche steht (siehe oben), aber ein
-  Scan von außen fällt nirgends auf.
 - Doku-Site und Changelog
 - Closed Beta mit zwei bis drei fremden Nutzern, erst danach öffentlich
 

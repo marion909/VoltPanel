@@ -8,6 +8,7 @@ import { t } from '../i18n'
 // wird auch nur dort eingebunden.
 const fw = ref(null)
 const f2b = ref(null)
+const scan = ref(null)
 const error = ref('')
 const busy = ref(false)
 const form = ref({ action: 'allow', port: null, port_to: null, proto: 'tcp' })
@@ -20,12 +21,33 @@ const inputStyle = {
 
 async function load() {
   error.value = ''
-  const [a, b] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     api.get('/system/firewall').catch((e) => ({ hinweis: e.message })),
     api.get('/system/fail2ban').catch((e) => ({ hinweis: e.message })),
+    api.get('/system/portscan').catch((e) => ({ hinweis: e.message })),
   ])
   fw.value = a
   f2b.value = b
+  scan.value = c
+}
+
+// Die Empfindlichkeit ist eine von drei Stufen, kein Zahlenfeld. Die Frage,
+// die ein Betreiber beantworten kann, ist "wie schnell soll gesperrt werden" —
+// nicht "wie viele Treffer in wie vielen Sekunden".
+const stufen = ['vorsichtig', 'normal', 'streng']
+const stufe = ref('normal')
+
+async function scanSetzen(enabled) {
+  busy.value = true
+  error.value = ''
+  try {
+    await api.post('/system/portscan', { enabled, level: stufe.value })
+    await load()
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    busy.value = false
+  }
 }
 
 async function regelSetzen(remove) {
@@ -167,6 +189,70 @@ onMounted(load)
           </button>
         </div>
       </div>
+    </div>
+
+    <h2 class="mb-3 mt-6 text-[14px] font-medium">{{ t('fw.scanTitle') }}</h2>
+
+    <!--
+      Ein Scan von außen fiel bisher nirgends auf: ufw wies die Pakete ab und
+      schrieb eine Zeile ins Protokoll, und dort blieb sie liegen.
+    -->
+    <div
+      class="rounded-lg border p-4 text-[12px]"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <p v-if="scan && scan.hinweis" :style="{ color: 'var(--ink-secondary)' }">
+        {{ scan.hinweis }}
+      </p>
+
+      <template v-else-if="scan && scan.available">
+        <div class="flex flex-wrap items-center gap-3">
+          <span
+            class="h-1.5 w-1.5 shrink-0 rounded-full"
+            :style="{ background: scan.enabled ? 'var(--status-good)' : 'var(--ink-muted)' }"
+          ></span>
+          <span>
+            {{ scan.enabled ? t('fw.scanOn', { level: scan.level }) : t('fw.scanOff') }}
+          </span>
+          <code v-if="scan.log_path" class="font-mono" :style="{ color: 'var(--ink-muted)' }">
+            {{ scan.log_path }}
+          </code>
+          <span v-if="scan.enabled" :style="{ color: 'var(--ink-muted)' }">
+            {{ t('fw.banned', { n: scan.currently, total: scan.total }) }}
+          </span>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            v-model="stufe"
+            class="rounded-md border px-2 py-1 text-[12px]"
+            :style="inputStyle"
+          >
+            <option v-for="s in stufen" :key="s" :value="s">{{ t('fw.level.' + s) }}</option>
+          </select>
+          <button
+            class="rounded-md border px-2 py-1 text-[12px]"
+            :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+            :disabled="busy"
+            @click="scanSetzen(true)"
+          >
+            {{ scan.enabled ? t('fw.scanApply') : t('fw.scanEnable') }}
+          </button>
+          <button
+            v-if="scan.enabled"
+            class="rounded-md border px-2 py-1 text-[12px]"
+            :style="{ borderColor: 'var(--border-ring)', color: 'var(--status-critical)' }"
+            :disabled="busy"
+            @click="scanSetzen(false)"
+          >
+            {{ t('fw.scanDisable') }}
+          </button>
+        </div>
+
+        <p class="mt-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          {{ t('fw.scanHint') }}
+        </p>
+      </template>
     </div>
 
     <h2 class="mb-3 mt-6 text-[14px] font-medium">{{ t('fw.f2bTitle') }}</h2>

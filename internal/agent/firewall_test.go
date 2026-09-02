@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/templates"
 )
 
 // TestFirewallRegelWirdGebautNichtDurchgereicht ist der Kern.
@@ -166,5 +168,36 @@ func TestJailListeWirdGefiltert(t *testing.T) {
 	kaputt := parseJailList("`- Jail list:\tsshd, --help, mit leerzeichen, ../etc")
 	if len(kaputt) != 1 || kaputt[0] != "sshd" {
 		t.Errorf("aus einer kaputten Liste kamen %v", kaputt)
+	}
+}
+
+// Was in der geschriebenen Jail-Datei steht, ist der Zustand — nicht eine
+// zweite Ablage im Panel. Also muss es sich zurücklesen lassen.
+func TestReadPortScanConf(t *testing.T) {
+	filter, jail, err := templates.RenderPortScan(templates.PortScanStreng,
+		"/var/log/kern.log", []string{"203.0.113.7"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(filter, "UFW BLOCK") {
+		t.Error("der filter sucht nicht nach abgewiesenen paketen")
+	}
+
+	level, logPath := readPortScanConf(jail)
+	if level != "streng" {
+		t.Errorf("stufe = %q", level)
+	}
+	if logPath != "/var/log/kern.log" {
+		t.Errorf("logpath = %q", logPath)
+	}
+
+	// Eine Datei, die jemand von Hand geschrieben hat, hat den Kommentar
+	// nicht. Dann bleibt die Stufe eben leer — geraten wird nichts.
+	level, logPath = readPortScanConf("[volt-portscan]\nlogpath = /var/log/ufw.log\n")
+	if level != "" {
+		t.Errorf("aus einer datei ohne kommentar wurde die stufe %q geraten", level)
+	}
+	if logPath != "/var/log/ufw.log" {
+		t.Errorf("logpath = %q", logPath)
 	}
 }
