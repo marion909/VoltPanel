@@ -564,6 +564,36 @@ func (c *Client) AppRuntimes(ctx context.Context) ([]RuntimeInfo, error) {
 	return res, err
 }
 
+// --- Firewall und Fail2ban --------------------------------------------------
+
+// FirewallStatusOf sagt, welche Firewall läuft und was offen ist.
+func (c *Client) FirewallStatusOf(ctx context.Context) (*FirewallStatus, error) {
+	var res FirewallStatus
+	err := c.Call(ctx, OpFirewallStatus, nil, &res)
+	return &res, err
+}
+
+// SetFirewallRule setzt oder entfernt eine ufw-Regel.
+func (c *Client) SetFirewallRule(ctx context.Context, p FirewallRuleParams) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpFirewallRule, p, &res)
+	return res.Text, err
+}
+
+// Fail2banStatusOf liest die Jails und die gesperrten Adressen.
+func (c *Client) Fail2banStatusOf(ctx context.Context) (*Fail2banStatus, error) {
+	var res Fail2banStatus
+	err := c.Call(ctx, OpFail2banStatus, nil, &res)
+	return &res, err
+}
+
+// Unban hebt eine Sperre auf.
+func (c *Client) Unban(ctx context.Context, jail, ip string) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpFail2banUnban, Fail2banUnbanParams{Jail: jail, IP: ip}, &res)
+	return res.Text, err
+}
+
 // --- Node-Fassungen ---------------------------------------------------------
 
 // NodeVersions sagt, welche Fassungen installiert sind.

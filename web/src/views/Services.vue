@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import { isAdmin } from "../stores/session";
 import PHPExtensions from "../components/PHPExtensions.vue";
 import ProcessList from "../components/ProcessList.vue";
+import FirewallPanel from "../components/FirewallPanel.vue";
 
 const services = ref([]);
 const loading = ref(true);
@@ -130,6 +131,10 @@ onMounted(load);
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="isAdmin()" class="mt-8">
+      <FirewallPanel />
     </div>
 
     <div v-if="isAdmin()" class="mt-6">

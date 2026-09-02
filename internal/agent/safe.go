@@ -66,6 +66,9 @@ var allowedBinaries = map[string]string{
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",
 	"ufw":     "/usr/sbin/ufw",
+	// Firewall und Fail2ban. nft nur lesend — siehe ops_firewall.go.
+	"nft":             "/usr/sbin/nft",
+	"fail2ban-client": "/usr/bin/fail2ban-client",
 	// Fuer Git-Deploy. git holt den Stand, ssh-keygen erzeugt den Deploy-Key,
 	// composer und npm bauen. Alle Argumente kommen aus festen Listen oder
 	// gehen vorher durch NormalizeGitURL bzw. ValidGitRef.

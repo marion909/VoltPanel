@@ -246,6 +246,12 @@ Steht bereits:
 
 - Panel-Absicherung: eigener Port, nicht erratbarer Zugriffspfad,
   IP-Whitelist
+- Firewall und Fail2ban in der Oberfläche: ufw-Regeln setzen und entfernen,
+  Jails und gesperrte Adressen ansehen, eine Sperre aufheben. Die Regel kommt
+  in Teilen über die Leitung, nicht als Text — es gibt kein Feld für eine
+  Quelladresse oder eine Kette. nftables wird nur gelesen: in ein gewachsenes
+  Regelwerk lässt sich keine Zeile gefahrlos einfügen, ohne zu wissen, wie es
+  aufgebaut ist.
 - `volt doctor` mit Prüfungen zu Schema, Pfaden, Agent, Diensten, Port,
   gemeinsamer Config, Benutzersperren und Zertifikaten; strukturierte Logs
 - Update-Kanäle stable und beta sind in der Konfiguration angelegt und werden
@@ -261,9 +267,8 @@ Offen:
   für die Cloudflare-API ist der Host fest. Was fehlt, ist die Auflösung von
   Namen: ein Hostname, der auf 169.254.169.254 zeigt, geht durch. Dagegen hilft
   nur ein Proxy, der die aufgelöste Adresse prüft.
-- Fail2ban-Anbindung und eine Oberfläche für die Firewall. Derzeit öffnet
-  `install.sh` Ports in ufw, sofern ufw überhaupt läuft; bei nftables gibt es
-  eine Warnung und sonst nichts. Port-Scan-Schutz fehlt ganz.
+- Port-Scan-Schutz. Die Firewall-Oberfläche steht (siehe oben), aber ein
+  Scan von außen fällt nirgends auf.
 - Voll-Backup und Restore eines einzelnen Mandanten, dazu Migration von Server
   zu Server. Das Backup ist heute serverweit — für einen Umzug ist das zu
   grob.

@@ -119,6 +119,12 @@ const (
 	OpAppStatus   Op = "app.status"
 	OpAppRuntimes Op = "app.runtimes"
 
+	// Firewall und Fail2ban. ufw schreibend, nftables nur lesend.
+	OpFirewallStatus Op = "firewall.status"
+	OpFirewallRule   Op = "firewall.rule"
+	OpFail2banStatus Op = "fail2ban.status"
+	OpFail2banUnban  Op = "fail2ban.unban"
+
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"
 	OpNodeInstall Op = "node.install"

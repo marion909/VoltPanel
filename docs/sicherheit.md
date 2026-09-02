@@ -743,6 +743,36 @@ nodejs.org. Node signiert die Liste zusätzlich mit GPG; das hier zu prüfen hie
 die Release-Schlüssel im Binary zu führen und mitzupflegen — was in dem Moment
 unbemerkt bricht, in dem Node einen Schlüssel wechselt.
 
+## 4t. Firewall und Fail2ban
+
+**Risiko:** Eine Firewallregel ist eine Zeile, die den Zugang zum ganzen Server
+regelt. Sie als Text entgegenzunehmen hieße, ufws eigene Sprache
+durchzureichen — `allow from 1.2.3.4 to any port 22 proto tcp` ist gültig, und
+allerlei anderes auch.
+
+**Maßnahme:** Die Regel kommt in Teilen: Aktion (`allow`/`deny`), Port,
+optionaler Endport, Protokoll (`tcp`/`udp`). Die Kommandozeile baut der Agent.
+Es gibt kein Feld für eine Quelladresse, keines für ein Interface und keines für
+eine Kette — was nicht vorgesehen ist, lässt sich nicht anfordern.
+
+**ufw schreibend, nftables nur lesend.** Das ist keine Bequemlichkeit: in ein
+gewachsenes nftables-Regelwerk lässt sich keine Zeile gefahrlos einfügen, ohne
+zu wissen, wie der Betreiber es aufgebaut hat — und eine halb verstandene Regel
+in einer fremden Kette ist der Weg, sich vom eigenen Server auszusperren. Das
+Panel zeigt das Regelwerk und sagt, warum es nichts daran ändert.
+
+**Fail2ban:** Der Jail-Name geht als Argument an `fail2ban-client`; ein
+führender Bindestrich wäre dort ein Schalter. Er wird deshalb gegen ein Muster
+geprüft — auch schon beim *Lesen* der Jail-Liste, denn was dort steht, geht
+gleich als Argument weiter. Die zu entsperrende Adresse geht durch
+`netip.ParseAddr`, nicht durch ein Muster: eine Adresse ist entweder eine oder
+nicht.
+
+Alles davon ist Administratoren vorbehalten. Eine Regel betrifft den ganzen
+Server, und die Liste der gesperrten Adressen sagt einem Kunden nichts über
+seinen Mandanten, aber allerlei über die anderen — wer gerade ausgesperrt ist,
+aus welchem Netz Anmeldeversuche kommen, wie viele.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

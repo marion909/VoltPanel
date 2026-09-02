@@ -168,6 +168,12 @@ func (s *Server) setupRoutes() {
 	auth.GET("/system/metrics", s.handleMetricsSnapshot)
 	auth.GET("/system/metrics/stream", s.handleMetricsStream)
 	auth.GET("/system/services", s.handleServices)
+
+	// Firewall und Fail2ban betreffen den ganzen Server, nicht eine Site.
+	auth.GET("/system/firewall", s.handleFirewallStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/firewall", s.handleFirewallRule, s.requireRole(store.RoleAdmin))
+	auth.GET("/system/fail2ban", s.handleFail2banStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/fail2ban/unban", s.handleUnban, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/services/:name/:action", s.handleServiceAction, s.requireRole(store.RoleAdmin))
 
 	// Den Stand darf jeder Angemeldete sehen — er steht als Hinweis in der
