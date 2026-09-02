@@ -263,6 +263,19 @@ func (s *SiteService) Rebuild(ctx context.Context, sc store.Scope, siteID int64)
 		return err
 	}
 
+	// Der Systembenutzer zuerst. Er gehört zum Zustand, den `rebuild`
+	// herstellt, und ohne ihn scheitert schon der nächste Schritt: die Rechte
+	// lassen sich auf niemanden setzen, den es nicht gibt.
+	//
+	// Das ist nicht nur Vorsicht. Nach `volt tenant import` steht die Site in
+	// der Datenbank, aber auf diesem Server hat sie noch keinen Benutzer —
+	// ohne diese Zeile wäre `rebuild` genau dort nutzlos, wo man es am
+	// nötigsten braucht. Der Aufruf ist idempotent: einen vorhandenen
+	// Benutzer meldet der Agent als vorhanden und tut sonst nichts.
+	if err := s.agent.CreateSystemUser(ctx, site.SystemUser, site.RootPath); err != nil {
+		return fmt.Errorf("systembenutzer %s: %w", site.SystemUser, err)
+	}
+
 	// Rechte gehören zum Zustand, den `rebuild` herstellt: eine Site, deren
 	// Verzeichnis der Webserver nicht betreten darf, ist genauso kaputt wie
 	// eine mit fehlendem Vhost — nur sieht man es erst beim ersten Aufruf.

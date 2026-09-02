@@ -81,7 +81,7 @@ func (a *app) tenantImportCmd() *cobra.Command {
 			"Datenbanken.\n\nEin vorhandener Mandant mit demselben Slug wird nicht " +
 			"überschrieben — ein halb überschriebener wäre schlimmer als gar keiner.\n\n" +
 			"Danach fehlen noch die Systemressourcen: Linux-Benutzer, Vhosts und " +
-			"FPM-Pools entstehen erst mit `volt site rebuild`.",
+			"FPM-Pools entstehen erst mit `volt site rebuild --all`.",
 		Args: cobra.ExactArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			pass, err := readPassphrase(passphrase, false)
@@ -116,9 +116,9 @@ func (a *app) tenantImportCmd() *cobra.Command {
 				fmt.Fprintf(os.Stderr, "Hinweis: %s\n", w)
 			}
 			fmt.Println()
-			fmt.Println("Noch zu tun: `volt site rebuild <id>` je Site — Linux-Benutzer,")
-			fmt.Println("Vhost und FPM-Pool entstehen erst dort. Zertifikate holt")
-			fmt.Println("`volt cert issue <domain>`, sobald der DNS-Eintrag zeigt.")
+			fmt.Println("Noch zu tun: `volt site rebuild --all` — Linux-Benutzer, Vhost")
+			fmt.Println("und FPM-Pool entstehen erst dort. Zertifikate holt")
+			fmt.Println("`volt cert issue <domain>`, sobald der DNS-Eintrag hierher zeigt.")
 			return nil
 		}),
 	}
