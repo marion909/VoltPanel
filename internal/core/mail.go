@@ -2,6 +2,11 @@ package core
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -343,6 +348,23 @@ func (s *MailService) collect(ctx context.Context) (agent.MailApplyParams, error
 		})
 	}
 
+	// Die DKIM-Schlüssel zuletzt. Der private Teil geht im Klartext an den
+	// Agent — wie ein Mailpasswort, und aus demselben Grund: er muss in eine
+	// Datei, die OpenDKIM lesen kann, und der Agent ist der einzige, der dort
+	// schreiben darf.
+	for _, d := range domains {
+		if aktiveDomain[d.ID] == "" || d.DKIMPrivate == "" {
+			continue
+		}
+		schluessel, err := s.secrets.Decrypt(d.DKIMPrivate)
+		if err != nil {
+			return p, fmt.Errorf("der dkim-schlüssel von %s ist nicht lesbar: %w", d.Domain, err)
+		}
+		p.DKIM = append(p.DKIM, agent.DKIMParams{
+			Domain: d.Domain, Selector: d.DKIMSelector, PrivateKey: schluessel,
+		})
+	}
+
 	return p, nil
 }
 
@@ -394,4 +416,95 @@ func pruefePasswort(p string) error {
 		return errors.New("ein passwort enthält keine zeilenumbrüche")
 	}
 	return nil
+}
+
+// --- DKIM -------------------------------------------------------------------
+
+// DKIMInfo ist der DNS-Eintrag, den eine Domäne braucht.
+type DKIMInfo struct {
+	Domain   string `json:"domain"`
+	Selector string `json:"selector"`
+	// Name ist der Name des TXT-Eintrags, Value sein Inhalt. Beides so, wie es
+	// bei einem DNS-Anbieter eingetragen wird.
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// dkimSelector ist der Name, unter dem der Schlüssel im DNS steht.
+//
+// Fest und nicht einstellbar: er landet in einem DNS-Namen, in der KeyTable
+// und im Dateipfad des Schlüssels. Ein Eingabefeld dafür wäre drei Wege, an
+// denen etwas schiefgehen kann, für einen Namen, den niemand je liest.
+const dkimSelector = "volt"
+
+// EnableDKIM erzeugt einen Schlüssel für eine Domäne.
+//
+// Der private Teil bleibt in der Panel-Datenbank, verschlüsselt, und geht von
+// dort an den Agent — wie ein Mailpasswort. Wer ihn hat, unterschreibt Mail im
+// Namen dieser Domäne; er soll deshalb nicht daneben im Klartext liegen.
+//
+// 2048 Bit RSA. Nicht ed25519: das kann kaum ein empfangender Server prüfen,
+// und ein DKIM, das niemand prüft, ist keines. Nicht 4096: der öffentliche
+// Teil passt dann nicht mehr in einen TXT-Eintrag, ohne ihn zu teilen, und
+// mancher DNS-Anbieter macht das falsch.
+func (s *MailService) EnableDKIM(ctx context.Context, sc store.Scope, domainID int64) (
+	*DKIMInfo, error) {
+
+	d, err := s.store.GetMailDomain(ctx, sc, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("schlüssel erzeugen: %w", err)
+	}
+	privPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+	pubDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	enc, err := s.secrets.Encrypt(string(privPEM))
+	if err != nil {
+		return nil, err
+	}
+	d.DKIMSelector = dkimSelector
+	d.DKIMPrivate = enc
+	d.DKIMPublic = base64.StdEncoding.EncodeToString(pubDER)
+	if err := s.store.UpdateMailDomain(ctx, sc, d); err != nil {
+		return nil, err
+	}
+	if _, err := s.Apply(ctx); err != nil {
+		return s.dkimInfo(d), err
+	}
+	return s.dkimInfo(d), nil
+}
+
+// DKIMOf liefert den DNS-Eintrag einer Domäne, falls sie einen Schlüssel hat.
+func (s *MailService) DKIMOf(ctx context.Context, sc store.Scope, domainID int64) (
+	*DKIMInfo, error) {
+
+	d, err := s.store.GetMailDomain(ctx, sc, domainID)
+	if err != nil {
+		return nil, err
+	}
+	if d.DKIMPublic == "" {
+		return nil, errors.New("für diese domäne gibt es noch keinen dkim-schlüssel")
+	}
+	return s.dkimInfo(d), nil
+}
+
+func (s *MailService) dkimInfo(d *store.MailDomain) *DKIMInfo {
+	return &DKIMInfo{
+		Domain:   d.Domain,
+		Selector: d.DKIMSelector,
+		Name:     d.DKIMSelector + "._domainkey." + d.Domain,
+		// h=sha256 ausgeschrieben: manche Prüfer nehmen sonst an, jeder
+		// Algorithmus sei erlaubt, und das ist schwächer als gemeint.
+		Value: "v=DKIM1; h=sha256; k=rsa; p=" + d.DKIMPublic,
+	}
 }

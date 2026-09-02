@@ -34,6 +34,7 @@ import (
 // abhängen, dass jemand dort später etwas lockert.
 var (
 	reMailLocal      = regexp.MustCompile(`^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$`)
+	reDKIMSelector   = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
 	reMailDomainTeil = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
 )
 
@@ -49,6 +50,8 @@ const (
 	// eigene Kennung.
 	vmailUser = "vmail"
 	vmailHome = "/var/vmail"
+	// opendkimDir ist das Verzeichnis, in dem OpenDKIM seine Tabellen sucht.
+	opendkimDir = "/etc/opendkim"
 )
 
 // MailboxParams ist ein Postfach, wie das Panel es beschreibt.
@@ -77,6 +80,19 @@ type MailApplyParams struct {
 	Domains   []string          `json:"domains"`
 	Mailboxes []MailboxParams   `json:"mailboxes"`
 	Aliases   []MailAliasParams `json:"aliases"`
+	DKIM      []DKIMParams      `json:"dkim"`
+}
+
+// DKIMParams ist ein Schlüssel, mit dem für eine Domäne unterschrieben wird.
+//
+// Der private Teil kommt im Klartext über den Socket und wird hier in eine
+// Datei geschrieben, die nur OpenDKIM lesen darf. Der Pfad entsteht aus
+// Domäne und Selector — nicht aus der Anfrage: was OpenDKIM aus der KeyTable
+// liest, unterschreibt im Namen einer Domäne.
+type DKIMParams struct {
+	Domain     string `json:"domain"`
+	Selector   string `json:"selector"`
+	PrivateKey string `json:"private_key"`
 }
 
 // MailStatus sagt, was auf diesem Server steht.
@@ -223,6 +239,10 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, opErr(OpMailApply, "%s schreiben: %v", pfad, err)
 	}
 
+	if err := s.schreibeDKIM(ctx, p.DKIM); err != nil {
+		return nil, err
+	}
+
 	var meldungen []string
 	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "postfix"); err != nil {
 		meldungen = append(meldungen, "postfix nicht neu geladen: "+truncate(out, 200))
@@ -239,6 +259,87 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 		text += " — " + strings.Join(meldungen, "; ")
 	}
 	return TextResult{Text: text}, nil
+}
+
+// schreibeDKIM legt die Schlüsseldateien und die Tabellen von OpenDKIM an.
+//
+// Ist OpenDKIM nicht installiert, passiert nichts — und das ist kein Fehler:
+// eine Domäne kann einen Schlüssel haben, bevor der Dienst dasteht. Der
+// DNS-Eintrag ist ohnehin der langsamere Teil.
+func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
+	if !fileExists(allowedBinaries["opendkim-testkey"]) && !dirExists(opendkimDir) {
+		return nil
+	}
+
+	uid, gid := opendkimIDs()
+	var eintraege []templates.DKIMEntry
+
+	for _, k := range keys {
+		if !reMailDomainTeil.MatchString(k.Domain) || !reDKIMSelector.MatchString(k.Selector) {
+			return opInputErr(OpMailApply, "%q/%q ist kein zulässiges dkim-paar",
+				k.Domain, k.Selector)
+		}
+		if !strings.Contains(k.PrivateKey, "PRIVATE KEY") {
+			return opInputErr(OpMailApply, "der dkim-schlüssel von %s ist kein pem", k.Domain)
+		}
+
+		dir := filepath.Join(opendkimDir, "keys", k.Domain)
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return opErr(OpMailApply, "%s anlegen: %v", dir, err)
+		}
+		pfad := filepath.Join(dir, k.Selector+".private")
+		// 0600: den Schlüssel liest OpenDKIM und sonst niemand. Wer ihn hat,
+		// unterschreibt Mail im Namen dieser Domäne.
+		if err := writeFileAtomic(pfad, []byte(k.PrivateKey), 0o600); err != nil {
+			return opErr(OpMailApply, "dkim-schlüssel schreiben: %v", err)
+		}
+		if uid > 0 {
+			_ = os.Chown(pfad, uid, gid)
+			_ = os.Chown(dir, uid, gid)
+		}
+		eintraege = append(eintraege, templates.DKIMEntry{
+			Domain: k.Domain, Selector: k.Selector, KeyPath: pfad,
+		})
+	}
+
+	stamp := templates.NowStamp()
+	keyTable, err := templates.RenderDKIMKeyTable(eintraege, stamp)
+	if err != nil {
+		return opInputErr(OpMailApply, "%v", err)
+	}
+	signing, err := templates.RenderDKIMSigningTable(eintraege, stamp)
+	if err != nil {
+		return opInputErr(OpMailApply, "%v", err)
+	}
+
+	for name, inhalt := range map[string]string{
+		"KeyTable":     keyTable,
+		"SigningTable": signing,
+		"TrustedHosts": templates.RenderDKIMTrustedHosts(stamp),
+	} {
+		if err := writeFileAtomic(filepath.Join(opendkimDir, name), []byte(inhalt), 0o644); err != nil {
+			return opErr(OpMailApply, "%s schreiben: %v", name, err)
+		}
+	}
+
+	// Neu laden, nicht neu starten: ein Neustart hielte die Zustellung an,
+	// und Postfix wartet dann auf einen Milter, den es gerade nicht gibt.
+	_, _ = run(ctx, shortTimeout, "systemctl", "reload", "opendkim")
+	return nil
+}
+
+// opendkimIDs sucht die Kennung, unter der OpenDKIM läuft.
+func opendkimIDs() (int, int) {
+	uid, gid, err := siteUserIDs(OpMailApply, "opendkim")
+	if err != nil {
+		return -1, -1
+	}
+	return uid, gid
+}
+
+func dirExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
 }
 
 // maildirFuer bildet den Pfad eines Postfachs aus seiner Adresse.
@@ -339,6 +440,29 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		}
 	}
 	schritte = append(schritte, "postfix zeigt auf "+postfixMailDir)
+
+	// Der Milter nur, wenn OpenDKIM wirklich da ist. Sonst spräche Postfix mit
+	// einem Dienst, den es nicht gibt — milter_default_action=accept fängt das
+	// zwar ab, aber jede Mail liefe erst in einen Zeitfehler.
+	if dirExists(opendkimDir) {
+		milter := [][2]string{
+			{"smtpd_milters", "inet:localhost:8891"},
+			{"non_smtpd_milters", "inet:localhost:8891"},
+			// Fällt der Milter aus, geht die Mail unsigniert raus statt gar
+			// nicht. Unsigniert ist ein Nachteil bei der Zustellung; nicht
+			// zugestellt ist ein Ausfall.
+			{"milter_default_action", "accept"},
+			{"milter_protocol", "6"},
+		}
+		for _, e := range milter {
+			if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
+				return nil, opErr(OpMailSetup, "postconf %s: %s", e[0], truncate(out, 200))
+			}
+		}
+		schritte = append(schritte, "opendkim als milter eingetragen")
+	} else {
+		schritte = append(schritte, "opendkim fehlt — ohne dkim landet post häufiger im spam")
+	}
 
 	// Leere Maps anlegen, damit Postfix beim Neuladen nicht über eine fehlende
 	// Datei stolpert. Der erste echte Stand kommt mit mail.apply.

@@ -212,19 +212,19 @@ Mailcow als Alternative offen; die Entscheidung ist gegen sie gefallen: ein
 Docker-Stack, den das Panel nur verwaltet, wäre ein zweites Panel mit eigener
 Datenhaltung und eigener Vorstellung davon, wem was gehört.
 
-Es steht: Domänen, Postfächer, Weiterleitungen und Catch-All in Datenbank,
-Dienst, API und Oberfläche. Der Agent schreibt daraus die Map-Dateien für
+Es steht: Domänen, Postfächer, Weiterleitungen, Catch-All und DKIM in
+Datenbank, Dienst, API und Oberfläche. Der Agent schreibt daraus die Map-Dateien für
 Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
 nie. Ein gesperrter Mandant nimmt keine Post mehr an, ein Catch-All zeigt nur
 auf ein eigenes Postfach, und Postfächer zählen zum Paket.
 
 Offen ist der Rest:
 
-- DKIM-Schlüssel erzeugen, SPF-, DKIM- und DMARC-Einträge automatisch über die
-  Cloudflare-Anbindung aus Phase 2 setzen. Die Spalten dafür stehen im Schema,
-  gefüllt werden sie noch nicht.
-- Rspamd und OpenDKIM einrichten — bisher richtet `mail.setup` nur Postfix und
-  den Mailspeicher ein.
+- SPF-, DKIM- und DMARC-Einträge automatisch über die Cloudflare-Anbindung aus
+  Phase 2 setzen. Den DKIM-Eintrag zeigt das Panel; ins DNS trägt ihn noch von
+  Hand, wer die Domäne verwaltet.
+- Rspamd einrichten — bisher richtet `mail.setup` Postfix, den Mailspeicher und
+  den OpenDKIM-Milter ein, aber keine Spamprüfung.
 - TLS für SMTP und IMAP aus den vorhandenen Zertifikaten.
 - Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
   sie noch nicht auf einem laufenden Server.

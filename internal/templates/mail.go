@@ -235,3 +235,79 @@ func mapKopf(b *strings.Builder, erzeugt, was string) {
 
 // NowStamp ist der Zeitstempel im Kopf jeder erzeugten Datei.
 func NowStamp() string { return time.Now().Format(time.RFC3339) }
+
+// DKIMEntry ist ein Schlüssel, mit dem für eine Domäne unterschrieben wird.
+type DKIMEntry struct {
+	Domain   string
+	Selector string
+	// KeyPath ist die Datei, in der der private Schlüssel liegt. Sie entsteht
+	// im Agent aus Domäne und Selector, nicht aus einer Anfrage.
+	KeyPath string
+}
+
+// checkDKIM prüft, was in die OpenDKIM-Tabellen geht.
+//
+// Dieselbe Gefahr wie bei den Postfix-Maps, mit einem Zusatz: in der KeyTable
+// steht ein Dateipfad. Was dort hineingerät, liest OpenDKIM als Schlüssel —
+// und unterschreibt damit im Namen einer Domäne.
+func checkDKIM(e DKIMEntry) error {
+	switch {
+	case !reMailDomainEntry.MatchString(e.Domain):
+		return fmt.Errorf("%q ist keine domäne für dkim", e.Domain)
+	case !reDKIMSel.MatchString(e.Selector):
+		return fmt.Errorf("%q ist kein dkim-selector", e.Selector)
+	case !strings.HasPrefix(e.KeyPath, "/") || strings.ContainsAny(e.KeyPath, " \n\t\r:"):
+		return fmt.Errorf("%q ist kein zulässiger pfad für einen schlüssel", e.KeyPath)
+	}
+	return nil
+}
+
+var reDKIMSel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
+
+// RenderDKIMKeyTable ordnet jedem Selector seine Schlüsseldatei zu.
+func RenderDKIMKeyTable(entries []DKIMEntry, erzeugt string) (string, error) {
+	var b strings.Builder
+	mapKopf(&b, erzeugt, "Selector -> Domäne:Selector:Schlüsseldatei.")
+	sortiert := sortiereDKIM(entries)
+	for _, e := range sortiert {
+		if err := checkDKIM(e); err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&b, "%s._domainkey.%s %s:%s:%s\n",
+			e.Selector, e.Domain, e.Domain, e.Selector, e.KeyPath)
+	}
+	return b.String(), nil
+}
+
+// RenderDKIMSigningTable sagt, welche Absender mit welchem Schlüssel
+// unterschreiben.
+func RenderDKIMSigningTable(entries []DKIMEntry, erzeugt string) (string, error) {
+	var b strings.Builder
+	mapKopf(&b, erzeugt, "Absender -> Selector. \"*@domain\" gilt für alle Postfächer.")
+	for _, e := range sortiereDKIM(entries) {
+		if err := checkDKIM(e); err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&b, "*@%s %s._domainkey.%s\n", e.Domain, e.Selector, e.Domain)
+	}
+	return b.String(), nil
+}
+
+// RenderDKIMTrustedHosts sind die Absender, für die überhaupt unterschrieben
+// wird.
+//
+// Nur der Server selbst. Eine Liste, die weiter reicht, macht aus dem
+// Mailserver ein offenes Relay mit gültiger Unterschrift — und die Domäne
+// bekommt den Ruf dafür.
+func RenderDKIMTrustedHosts(erzeugt string) string {
+	var b strings.Builder
+	mapKopf(&b, erzeugt, "Absender, für die unterschrieben wird — nur dieser Server.")
+	b.WriteString("127.0.0.1\n::1\nlocalhost\n")
+	return b.String()
+}
+
+func sortiereDKIM(entries []DKIMEntry) []DKIMEntry {
+	out := append([]DKIMEntry(nil), entries...)
+	sort.Slice(out, func(i, j int) bool { return out[i].Domain < out[j].Domain })
+	return out
+}

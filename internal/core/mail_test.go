@@ -2,6 +2,11 @@ package core
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"strings"
 	"testing"
 
 	"github.com/marion909/voltpanel/internal/store"
@@ -218,4 +223,119 @@ func ersteDomain(t *testing.T, env *testEnv, tenantID int64) int64 {
 		t.Fatalf("keine domäne für %d: %v", tenantID, err)
 	}
 	return liste[0].ID
+}
+
+// Der DKIM-Eintrag, den ein DNS-Anbieter bekommt.
+//
+// Geprüft wird, dass der öffentliche Teil wirklich zum privaten gehört — sonst
+// unterschreibt der Server mit einem Schlüssel, den niemand prüfen kann, und
+// das ist schlechter als gar keine Signatur: eine kaputte Unterschrift wertet
+// eine Mail ab, eine fehlende nur nicht auf.
+func TestDKIMSchluesselPaarPasstZusammen(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	svc := mailService(env)
+
+	alice := seedMailTenant(t, env, "alice")
+	scA := store.Scope{TenantID: alice, Role: store.RoleOwner}
+	domA := ersteDomain(t, env, alice)
+
+	info, err := svc.EnableDKIM(ctx, scA, domA)
+	if err != nil {
+		t.Logf("schreiben scheiterte (erwartbar ohne mail.setup): %v", err)
+	}
+	if info == nil {
+		t.Fatal("kein dkim-eintrag zurückgegeben")
+	}
+
+	if info.Name != "volt._domainkey.alice.example.at" {
+		t.Errorf("name = %q", info.Name)
+	}
+	if !strings.HasPrefix(info.Value, "v=DKIM1; h=sha256; k=rsa; p=") {
+		t.Errorf("wert = %q", info.Value)
+	}
+
+	// Den privaten Teil aus der Datenbank holen und beide vergleichen.
+	d, err := env.store.GetMailDomain(ctx, scA, domA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privPEM, err := env.secrets.Decrypt(d.DKIMPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(d.DKIMPrivate, "PRIVATE KEY") {
+		t.Error("der private schlüssel liegt unverschlüsselt in der datenbank")
+	}
+
+	block, _ := pem.Decode([]byte(privPEM))
+	if block == nil {
+		t.Fatal("der private schlüssel ist kein pem")
+	}
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if priv.N.BitLen() != 2048 {
+		t.Errorf("schlüssellänge %d, erwartet 2048", priv.N.BitLen())
+	}
+
+	roh, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(info.Value,
+		"v=DKIM1; h=sha256; k=rsa; p="))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := x509.ParsePKIXPublicKey(roh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsaPub, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		t.Fatalf("der öffentliche teil ist kein rsa-schlüssel (%T)", pub)
+	}
+	if !rsaPub.Equal(&priv.PublicKey) {
+		t.Error("öffentlicher und privater teil gehören nicht zusammen")
+	}
+}
+
+// Der private Schlüssel geht an den Agent — aber nur der einer aktiven Domäne,
+// und nur entschlüsselt.
+func TestDKIMKommtInDenSollzustand(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	svc := mailService(env)
+
+	alice := seedMailTenant(t, env, "alice")
+	scA := store.Scope{TenantID: alice, Role: store.RoleOwner}
+	domA := ersteDomain(t, env, alice)
+	if _, err := svc.EnableDKIM(ctx, scA, domA); err != nil {
+		t.Logf("schreiben scheiterte (erwartbar): %v", err)
+	}
+
+	p, err := svc.collect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.DKIM) != 1 {
+		t.Fatalf("%d dkim-einträge, erwartet 1", len(p.DKIM))
+	}
+	if p.DKIM[0].Domain != "alice.example.at" || p.DKIM[0].Selector != "volt" {
+		t.Errorf("falscher eintrag: %+v", p.DKIM[0])
+	}
+	if !strings.Contains(p.DKIM[0].PrivateKey, "PRIVATE KEY") {
+		t.Error("der schlüssel kommt nicht entschlüsselt beim agent an")
+	}
+
+	// Eine abgeschaltete Domäne unterschreibt nicht mehr.
+	aus := false
+	if _, err := svc.SetDomain(ctx, scA, domA, &aus, nil); err != nil {
+		t.Logf("schreiben scheiterte (erwartbar): %v", err)
+	}
+	p, err = svc.collect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.DKIM) != 0 {
+		t.Errorf("eine abgeschaltete domäne unterschreibt weiter: %+v", p.DKIM)
+	}
 }

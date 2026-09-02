@@ -104,6 +104,38 @@ func (s *Server) handleDeleteMailDomain(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"hinweis": hinweis})
 }
 
+// handleEnableDKIM erzeugt einen Signaturschlüssel für eine Domäne.
+//
+// Die Antwort ist der DNS-Eintrag, nicht der Schlüssel. Der private Teil
+// verlässt das Panel nie über HTTP — nur über den Socket zum Agent, der ihn in
+// eine Datei schreibt, die OpenDKIM lesen darf.
+func (s *Server) handleEnableDKIM(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	info, err := s.mail.EnableDKIM(ctx, s.scopeFor(c), id)
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "mail.dkim.enable", "domain", info.Domain, "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, info)
+}
+
+// handleDKIM liefert den DNS-Eintrag noch einmal.
+func (s *Server) handleDKIM(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	info, err := s.mail.DKIMOf(c.Request().Context(), s.scopeFor(c), id)
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, info)
+}
+
 func (s *Server) handleListMailboxes(c echo.Context) error {
 	domainID, _ := queryID(c, "domain_id")
 	list, err := s.store.ListMailboxes(c.Request().Context(), s.scopeFor(c), domainID)

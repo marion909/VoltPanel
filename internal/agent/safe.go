@@ -77,6 +77,9 @@ var allowedBinaries = map[string]string{
 	"postconf": "/usr/sbin/postconf",
 	"postmap":  "/usr/sbin/postmap",
 	"doveadm":  "/usr/bin/doveadm",
+	// Nur zum Erkennen, ob OpenDKIM ueberhaupt da ist — aufgerufen wird es
+	// nicht. Der Schluessel entsteht im Panel, nicht ueber opendkim-genkey.
+	"opendkim-testkey": "/usr/sbin/opendkim-testkey",
 	// Fuer Git-Deploy. git holt den Stand, ssh-keygen erzeugt den Deploy-Key,
 	// composer und npm bauen. Alle Argumente kommen aus festen Listen oder
 	// gehen vorher durch NormalizeGitURL bzw. ValidGitRef.

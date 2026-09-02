@@ -24,6 +24,7 @@ const offen = ref({})
 const domainForm = ref('')
 const boxForm = ref({ domain_id: null, local_part: '', password: '', quota_mb: 0 })
 const aliasForm = ref({ domain_id: null, source: '', destination: '' })
+const dkim = ref({})
 
 const inputStyle = {
   borderColor: 'var(--line-axis)',
@@ -136,6 +137,29 @@ const aliasAnlegen = (d) =>
   })
 
 const aliasEntfernen = (a) => fuehreAus(() => api.del(`/mail/aliases/${a.id}`))
+
+// DKIM. Der Schlüssel entsteht im Panel; hier kommt nur der DNS-Eintrag an —
+// der private Teil verlässt den Server nie über HTTP.
+async function dkimZeigen(d) {
+  try {
+    dkim.value = { ...dkim.value, [d.id]: await api.get(`/mail/domains/${d.id}/dkim`) }
+  } catch {
+    dkim.value = { ...dkim.value, [d.id]: null }
+  }
+}
+
+// Beim Aufklappen den vorhandenen DKIM-Eintrag nachladen. Er steht nicht in
+// der Domänenliste: dort wäre er Ballast in jeder Zeile, und gebraucht wird er
+// genau einmal — beim Eintragen im DNS.
+function umschalten(d) {
+  offen.value = { ...offen.value, [d.id]: !offen.value[d.id] }
+  if (offen.value[d.id] && dkim.value[d.id] === undefined) dkimZeigen(d)
+}
+
+const dkimAnlegen = (d) =>
+  fuehreAus(async () => {
+    dkim.value = { ...dkim.value, [d.id]: await api.post(`/mail/domains/${d.id}/dkim`) }
+  })
 
 onMounted(load)
 </script>
@@ -276,7 +300,7 @@ onMounted(load)
               <button
                 class="underline"
                 :style="{ color: 'var(--ink-secondary)' }"
-                @click="offen[d.id] = !offen[d.id]"
+                @click="umschalten(d)"
               >
                 {{ offen[d.id] ? t('common.close') : t('mail.manage') }}
               </button>
@@ -391,6 +415,39 @@ onMounted(load)
                   {{ t('mail.catchAllHint') }}
                 </span>
               </div>
+            </section>
+
+            <!-- DKIM -->
+            <section>
+              <h3 class="mb-2 text-[12px] font-medium">{{ t('mail.dkim') }}</h3>
+              <template v-if="dkim[d.id]">
+                <p class="mb-1 text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+                  {{ t('mail.dkimRecord') }}
+                </p>
+                <div
+                  class="rounded-md p-2 font-mono text-[11px]"
+                  :style="{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }"
+                >
+                  <div>TXT &nbsp;{{ dkim[d.id].name }}</div>
+                  <div class="mt-1 break-all">{{ dkim[d.id].value }}</div>
+                </div>
+                <p class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                  {{ t('mail.dkimHint') }}
+                </p>
+              </template>
+              <template v-else>
+                <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                  {{ t('mail.dkimNone') }}
+                </p>
+                <button
+                  class="rounded-md border px-2 py-1 text-[12px]"
+                  :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+                  :disabled="busy"
+                  @click="dkimAnlegen(d)"
+                >
+                  {{ t('mail.dkimCreate') }}
+                </button>
+              </template>
             </section>
 
             <!-- Weiterleitungen -->

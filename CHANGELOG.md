@@ -13,13 +13,40 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.5 — 2026-09-02
+
+- DKIM: Schlüssel je Domäne, OpenDKIM-Tabellen und der DNS-Eintrag im Panel
+
+## v0.4.4 — 2026-09-02
+
+- Mail: Dienst, Maps und API
+- Die Seite nahm die Signatur nie mit
+- Mail in der Oberfläche
+
+## v0.4.3 — 2026-09-02
+
+- install.sh: VOLT_ALLOW_UNSIGNED wirkte nur im halben Fall
+
+## v0.4.2 — 2026-09-02
+
+- Phase 6: die Datenhaltung für Mail
+- Der Release-Schlüssel steht
+
+> **Achtung:** Ab hier trägt der Quelltext einen Release-Schlüssel. Ein Panel,
+> das noch ohne gebaut wurde, lehnt jeden Kanal ab; einmal
+> `update_allow_unsigned: true` in der config.yaml, aktualisieren, Flag wieder
+> heraus.
+
+## v0.4.1 — 2026-09-02
+
+- Signieren ohne cosign — zwei openssl-Zeilen genügen
+
+## v0.4.0 — 2026-09-02
+
 - Port-Scan-Erkennung: die abgewiesenen Pakete zählen
 - Changelog — und er wird zu dem, was vor dem Update dasteht
-- Signieren ohne cosign: `RELEASE_SIGNING_KEY` und zwei openssl-Zeilen
-- Der Release-Schlüssel steht
-- install.sh: VOLT_ALLOW_UNSIGNED wirkte nur im halben Fall
-- Die Seite nahm die Signatur nie mit
-- Phase 6: Datenhaltung, Dienst, Maps und Oberfläche für Mail
 
 ## v0.3.9 — 2026-09-02
 
