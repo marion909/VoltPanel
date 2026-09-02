@@ -119,6 +119,16 @@ type UpdateStatus struct {
 	// Fehler der Anfrage: das Panel läuft weiter, es weiß nur gerade nicht,
 	// ob es etwas Neues gibt — und das soll man sehen.
 	Error string `json:"error,omitempty"`
+	// NoKey heißt: dieses Programm wurde ohne Release-Schlüssel gebaut.
+	//
+	// Ein eigenes Feld, weil es etwas anderes ist als ein Fehler des Kanals.
+	// Der Kanal mag tadellos antworten; geprüft werden kann die Antwort
+	// trotzdem nicht, und dann steht die Auskunft "es gibt Version x" auf
+	// nichts. Die Oberfläche schrieb darüber bisher "Der Update-Kanal ist
+	// nicht erreichbar" — eine Überschrift, die von der Leitung sprach,
+	// während es um das Binary ging, und die den Betreiber an der falschen
+	// Stelle suchen lässt.
+	NoKey bool `json:"no_key,omitempty"`
 }
 
 const updateCacheTTL = time.Hour
@@ -139,6 +149,15 @@ func (u *Updater) UpdateStatus(ctx context.Context, force bool) UpdateStatus {
 		Current:   version.Version,
 		Channel:   u.cfg.UpdateChannel,
 		CheckedAt: time.Now(),
+	}
+
+	// Ohne Schlüssel gar nicht erst fragen. Die Antwort ließe sich nicht
+	// prüfen, und eine ungeprüfte Versionsangabe im Panel wäre genau die Art
+	// Auskunft, auf die sich jemand verlässt.
+	if !u.cfg.UpdateAllowUnsigned && !u.verifier.HasKey() {
+		status.NoKey = true
+		u.cached, u.fetched = &status, time.Now()
+		return status
 	}
 
 	rel, err := u.LatestRelease(ctx)

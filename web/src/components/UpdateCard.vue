@@ -139,6 +139,19 @@ function reload() {
     >
       {{ error }}
     </p>
+    <!--
+      Kein Schlüssel im Binary ist kein Fehler der Leitung. Die eigene Meldung
+      steht hier, weil die Überschrift "Kanal nicht erreichbar" den Betreiber
+      an der falschen Stelle suchen ließ.
+    -->
+    <p
+      v-else-if="update.no_key"
+      class="text-[13px]"
+      :style="{ color: 'var(--status-warning)' }"
+    >
+      {{ t("update.nokey") }}
+      <span :style="{ color: 'var(--ink-muted)' }">{{ t("update.nokeyHint") }}</span>
+    </p>
     <p
       v-else-if="update.error"
       class="text-[13px]"

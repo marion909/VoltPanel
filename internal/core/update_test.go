@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -356,5 +357,39 @@ func TestUnsigniertNurAufAnsage(t *testing.T) {
 	env.updater.cfg.UpdateAllowUnsigned = true
 	if _, err := env.updater.LatestRelease(context.Background()); err != nil {
 		t.Errorf("mit update_allow_unsigned schlug es fehl: %v", err)
+	}
+}
+
+// Ohne Schlüssel ist der Kanal nicht "nicht erreichbar" — er wird gar nicht
+// erst gefragt.
+//
+// Die Unterscheidung ist keine Wortklauberei. Die Oberfläche schrieb über jede
+// Störung "Der Update-Kanal ist nicht erreichbar" und darunter den wahren
+// Grund; wer nur die Überschrift las, suchte an der Leitung, während das
+// Binary das Problem war.
+func TestUpdateStatusOhneSchluesselFragtGarNicht(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	env.updater.verifier = release.NewVerifier(nil)
+
+	var gefragt int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gefragt++
+		fmt.Fprint(w, `{"version":"9.9.9","assets":{}}`)
+	}))
+	defer srv.Close()
+	env.updater.cfg.UpdateBaseURL = srv.URL
+
+	st := env.updater.UpdateStatus(context.Background(), true)
+	if !st.NoKey {
+		t.Error("no_key steht nicht in der antwort")
+	}
+	if st.Error != "" {
+		t.Errorf("es steht ein kanalfehler daneben: %q", st.Error)
+	}
+	if st.Available {
+		t.Error("ein ungeprüftes update wurde angeboten")
+	}
+	if gefragt != 0 {
+		t.Errorf("der kanal wurde %dx gefragt, obwohl die antwort nicht prüfbar wäre", gefragt)
 	}
 }
