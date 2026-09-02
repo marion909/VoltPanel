@@ -773,6 +773,51 @@ Server, und die Liste der gesperrten Adressen sagt einem Kunden nichts über
 seinen Mandanten, aber allerlei über die anderen — wer gerade ausgesperrt ist,
 aus welchem Netz Anmeldeversuche kommen, wie viele.
 
+## 4u. Einen Mandanten umziehen
+
+**Risiko:** Ein Bündel, das einen Mandanten vollständig enthält, enthält auch
+alle seine Zugangsdaten — FTP- und Datenbankpasswörter, TOTP-Secrets, den
+Cloudflare-Token. In der Datenbank stehen sie verschlüsselt, aber mit dem
+Schlüssel *dieses* Servers; auf einem anderen wären sie unlesbar. Sie im
+Klartext mitzugeben hieße, eine Datei zu erzeugen, in der alles davon steht.
+
+**Maßnahme:** Sie werden umgeschlüsselt — auf einen Schlüssel, der aus einer
+Passphrase des Betreibers stammt (argon2id) und den der Server nirgends
+aufbewahrt. Ohne die Passphrase lässt sich das Bündel zwar auspacken, aber kein
+Zugang daraus wiederherstellen.
+
+Zwei Schichten halten die alten Geheimtexte aus der Datei: alle
+Geheimnisfelder tragen `json:"-"`, kommen also gar nicht erst hinein, und beim
+Umschlüsseln werden sie zusätzlich geleert. Nachgemessen: nimmt man einer der
+beiden Schichten weg, hält die andere.
+
+**Was die Passphrase nicht schützt:** die Dateien der Sites und die
+Datenbankauszüge. Die liegen im Bündel wie in jedem Backup. Das Archiv gehört
+so behandelt wie ein Backup, und `volt tenant export` schreibt genau das auch
+hin — damit niemand die Passphrase für mehr hält, als sie ist.
+
+**Das Bündel ist Eingabe.** Es stammt vom eigenen Server, aber wer es in die
+Hand bekommt, kann darin stehen lassen, was er will. Beim Auspacken wird jeder
+Eintrag geprüft: Pfade mit `..` oder führendem `/` fliegen raus, Symlinks dürfen
+nur innerhalb des Site-Verzeichnisses zeigen, die Rechte kommen nicht aus dem
+Archiv, und alles außer Datei, Verzeichnis und Symlink wird übergangen.
+Datenbankauszüge werden nur für Datenbanken eingespielt, die im Bündel stehen —
+ein Dateiname im Archiv bestimmt nicht, welche Datenbank auf diesem Server
+überschrieben wird.
+
+**Beim Einspielen entsteht alles neu.** Die Nummern aus dem Bündel gelten auf
+dem Zielserver nicht; was aufeinander zeigt, wird über eine Zuordnung umgehängt.
+Ein vorhandener Mandant wird nicht überschrieben und nicht ergänzt: ein halb
+überschriebener wäre schlimmer als gar keiner, und welche Hälfte gälte, wüsste
+danach niemand.
+
+Drei Dinge kommen bewusst *nicht* mit. Die Anmeldedomain zeigt auf den alten
+Server. Der Port einer App wird neu vergeben — der alte ist hier vielleicht
+belegt. Und Webhook-Adresse und -Geheimnis eines Deploys sind neu: die alten
+stehen in den Einstellungen eines fremden Dienstes und zeigen auf den alten
+Server; sie mitzunehmen hieße, zwei Server auf denselben Webhook hören zu
+lassen.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

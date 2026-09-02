@@ -13,7 +13,8 @@ import (
 func (a *app) tenantCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "tenant", Short: "Mandanten verwalten"}
 	cmd.AddCommand(a.tenantListCmd(), a.tenantAddCmd(), a.tenantSetPlanCmd(),
-		a.tenantSuspendCmd(), a.tenantUsageCmd())
+		a.tenantSuspendCmd(), a.tenantUsageCmd(),
+		a.tenantExportCmd(), a.tenantImportCmd())
 	return cmd
 }
 
