@@ -333,13 +333,13 @@ onMounted(load)
     <!-- Fehlt Docker ganz, gehört der Knopf daneben; die übrigen Hinweise
          sind Einstellungen des Daemons und lassen sich nicht nachinstallieren. -->
     <InstallHint
-      v-if="docker && !docker.available"
+      v-if="docker && !docker.installed"
       feature="docker"
       :text="t('apps.needDocker')"
       @installed="load"
     />
     <p
-      v-for="w in (docker && docker.available && docker.warnings) || []"
+      v-for="w in (docker && docker.installed && docker.warnings) || []"
       :key="w"
       class="mb-4 rounded-md px-3 py-2 text-[12px]"
       :style="{

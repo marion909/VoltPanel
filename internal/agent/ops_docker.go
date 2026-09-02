@@ -69,6 +69,7 @@ type ContainerResult struct {
 
 // dockerStatus sagt, ob Docker überhaupt läuft und wie sicher es steht.
 type DockerStatus struct {
+	Installed bool   `json:"installed"`
 	Available bool   `json:"available"`
 	Version   string `json:"version,omitempty"`
 	// UserNSRemap ist die eigentliche Trennung zwischen Container und Wirt.
@@ -91,6 +92,7 @@ func (s *Server) opDockerStatus(ctx context.Context, _ json.RawMessage) (any, er
 		res.Warnings = append(res.Warnings, "Docker ist auf diesem Server nicht installiert.")
 		return res, nil
 	}
+	res.Installed = true
 
 	out, err := run(ctx, shortTimeout, "docker", "version", "--format", "{{.Server.Version}}")
 	if err != nil {

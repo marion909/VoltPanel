@@ -15,6 +15,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.14 — 2026-09-02
+
+- Docker-Warnung unterscheidet Installation und laufenden Daemon
+
 ## v0.4.13 — 2026-09-02
 
 - Docker-Installation startet den Dienst

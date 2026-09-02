@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -150,5 +152,33 @@ func TestVeroeffentlichtNurAufLocalhost(t *testing.T) {
 		if !strings.HasPrefix(args[i+1], "127.0.0.1:") {
 			t.Errorf("veröffentlicht auf %q", args[i+1])
 		}
+	}
+}
+
+func TestDockerStatusUnterscheidetInstalliertVonVerfuegbar(t *testing.T) {
+	srv, _ := testServer(t)
+	dir := t.TempDir()
+	docker := filepath.Join(dir, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\necho daemon fehlt\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	alt := allowedBinaries["docker"]
+	allowedBinaries["docker"] = docker
+	t.Cleanup(func() { allowedBinaries["docker"] = alt })
+
+	out, err := srv.opDockerStatus(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := out.(DockerStatus)
+	if !st.Installed {
+		t.Fatal("Docker-CLI ist da, Status meldet aber nicht installiert")
+	}
+	if st.Available {
+		t.Fatal("ein nicht antwortender Daemon darf nicht als verfuegbar gelten")
+	}
+	if len(st.Warnings) == 0 || !strings.Contains(st.Warnings[0], "Daemon antwortet aber nicht") {
+		t.Fatalf("Daemon-Warnung fehlt: %+v", st)
 	}
 }
