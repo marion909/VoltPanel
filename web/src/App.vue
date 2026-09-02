@@ -13,9 +13,7 @@ const router = useRouter();
 const nav = computed(() =>
   [
     { to: "/", key: "nav.dashboard", icon: "grid" },
-    { to: "/sites", key: "nav.sites", icon: "globe" },
-    { to: "/apps", key: "nav.apps", icon: "box" },
-    { to: "/deploys", key: "nav.deploys", icon: "branch" },
+    { to: "/frontend", key: "nav.frontend", icon: "globe", active: "/frontend" },
     { to: "/files", key: "nav.files", icon: "folder" },
     { to: "/databases", key: "nav.databases", icon: "database" },
     { to: "/sql", key: "nav.sql", icon: "database" },
@@ -36,6 +34,9 @@ const labels = computed(() => {
   void i18n.locale;
   return Object.fromEntries(nav.value.map((n) => [n.key, t(n.key)]));
 });
+
+const isActiveNav = (item) =>
+  item.active ? route.path.startsWith(item.active) : route.path === item.to;
 
 // Einmal beim Laden fragen. Der Server hält die Antwort eine Stunde vor, ein
 // zweites Fenster kostet also keinen weiteren Aufruf nach außen.
@@ -103,7 +104,7 @@ const paths = {
           :to="item.to"
           class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors"
           :style="
-            route.path === item.to
+            isActiveNav(item)
               ? {
                   background: 'var(--surface-sunken)',
                   color: 'var(--ink-primary)',

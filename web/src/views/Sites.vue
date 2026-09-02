@@ -254,7 +254,7 @@ const inputStyle = {
           >
             <td class="px-4 py-2.5">
               <RouterLink
-                :to="`/sites/${site.id}`"
+                :to="`/frontend/sites/${site.id}`"
                 class="font-medium hover:underline"
               >
                 {{ site.domain }}
@@ -308,7 +308,7 @@ const inputStyle = {
             </td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
               <RouterLink
-                :to="`/sites/${site.id}`"
+                :to="`/frontend/sites/${site.id}`"
                 class="text-[12px] underline"
                 :style="{ color: 'var(--ink-secondary)' }"
               >

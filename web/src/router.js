@@ -3,6 +3,7 @@ import { session, hasRole } from './stores/session'
 
 import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
+import Frontend from './views/Frontend.vue'
 import Sites from './views/Sites.vue'
 import Apps from './views/Apps.vue'
 import Mail from './views/Mail.vue'
@@ -22,10 +23,24 @@ import Settings from './views/Settings.vue'
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
   { path: '/', name: 'dashboard', component: Dashboard },
-  { path: '/sites', name: 'sites', component: Sites },
-  { path: '/sites/:id', name: 'site-detail', component: SiteDetail },
-  { path: '/apps', name: 'apps', component: Apps },
-  { path: '/deploys', name: 'deploys', component: Deploys },
+  {
+    path: '/frontend',
+    component: Frontend,
+    children: [
+      { path: '', redirect: { name: 'sites' } },
+      { path: 'sites', name: 'sites', component: Sites },
+      { path: 'sites/:id', name: 'site-detail', component: SiteDetail },
+      { path: 'apps', name: 'apps', component: Apps },
+      { path: 'deploys', name: 'deploys', component: Deploys },
+    ],
+  },
+  { path: '/sites', redirect: { name: 'sites' } },
+  {
+    path: '/sites/:id',
+    redirect: (to) => ({ name: 'site-detail', params: { id: to.params.id } }),
+  },
+  { path: '/apps', redirect: { name: 'apps' } },
+  { path: '/deploys', redirect: { name: 'deploys' } },
   { path: '/databases', name: 'databases', component: Databases },
   { path: '/sql', name: 'sql', component: SQL },
   { path: '/files', name: 'files', component: Files },

@@ -237,7 +237,7 @@ watch(logType, loadLog)
   <div class="fade-in px-8 py-6">
     <header class="mb-5">
       <button class="mb-2 text-[12px] underline" :style="{ color: 'var(--ink-muted)' }"
-              @click="router.push('/sites')">
+              @click="router.push('/frontend/sites')">
         ← {{ t('sites.title') }}
       </button>
 
