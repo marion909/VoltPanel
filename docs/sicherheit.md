@@ -706,6 +706,43 @@ Terminal der Site, das unter derselben Kennung läuft und über dieselbe
 Whitelist. Compose nähme eine Datei aus dem Repository des Kunden entgegen, und
 in ihr stünden genau die Schalter wieder, die hier nicht vorgesehen sind.
 
+## 4s. Node-Fassungen aus dem Netz
+
+**Risiko:** Der Agent lädt ein Archiv von einem fremden Server herunter, packt
+es als root aus und legt Programme ab, die anschließend unter den Kennungen der
+Sites laufen. Zwei Dinge können dabei schiefgehen, und beide sind bekannt: das
+Archiv enthält Pfade, die aus dem Zielverzeichnis führen (Zip-Slip), oder es
+enthält Symlinks, die woanders hinzeigen.
+
+**Maßnahmen:** Ausgepackt wird mit `archive/tar`, nicht mit dem Programm `tar` —
+derselbe Grund wie überall hier: ein Archiv ist Eingabe, und wer sie an ein
+Werkzeug weitergibt, das sie anders auslegt, hat die Prüfung verschenkt. Jeder
+Eintrag wird selbst angesehen:
+
+- Pfade mit `..` oder führendem `/` werden abgelehnt.
+- Symlinks dürfen nur innerhalb des ausgepackten Verzeichnisses zeigen. Geprüft
+  wird, *wohin* der Link zeigt, nicht ob `..` darin vorkommt — Node verlinkt
+  sein eigenes `npm` als `../lib/node_modules/npm/bin/npm-cli.js`, und eine
+  Prüfung auf `..` lehnte genau das ab.
+- Die Rechte kommen nicht aus dem Archiv, sondern sind fest: 0644, mit 0755 für
+  alles, was im Archiv ausführbar war. `0666` im Archiv hieße sonst, dass jeder
+  Benutzer des Servers die Datei überschreiben kann.
+- Alles außer Datei, Verzeichnis und Symlink — Geräte, Sockets, Hardlinks — wird
+  übergangen.
+
+Die Version geht in eine URL *und* in einen Pfad; ein `..` darin wäre beides
+zugleich. Sie muss deshalb genau `<zahl>.<zahl>.<zahl>` sein. Der Host der URL
+ist fest, es gibt also keine Adresse, die von außen bestimmt wird.
+
+**Was die Prüfsumme leistet — und was nicht.** Sie fängt einen abgebrochenen
+oder verstümmelten Download und den Fall, dass zwischen Prüfsummenliste und
+Archiv etwas anderes ausgeliefert wird. Sie schützt *nicht* vor einem
+übernommenen nodejs.org: beide Dateien kommen von dort, und wer die eine
+austauschen kann, kann auch die andere. Der Anker ist das TLS-Zertifikat von
+nodejs.org. Node signiert die Liste zusätzlich mit GPG; das hier zu prüfen hieße,
+die Release-Schlüssel im Binary zu führen und mitzupflegen — was in dem Moment
+unbemerkt bricht, in dem Node einen Schlüssel wechselt.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/marion909/voltpanel/internal/store"
 	"github.com/marion909/voltpanel/internal/templates"
 )
 
@@ -69,16 +72,47 @@ type RuntimeInfo struct {
 	Version   string `json:"version,omitempty"`
 }
 
-// runtimeBinary sucht den Interpreter zu einem Namen und liefert seinen
-// Whitelist-Schlüssel.
-func runtimeBinary(name string) (string, error) {
+// reNodeRuntime ist eine Laufzeitumgebung wie "node22": eine der Fassungen,
+// die der Agent selbst unter /opt/volt/node installiert hat.
+var reNodeRuntime = regexp.MustCompile(`^node([0-9]{1,3})$`)
+
+// runtimePath liefert den Pfad des Interpreters zu einem Namen.
+//
+// Zwei Quellen, und beide sind Listen — keine Pfade aus der Anfrage:
+//
+// Die festen Programme stehen in allowedBinaries, wie alles andere auch.
+//
+// Die selbst installierten Node-Fassungen stehen nicht darin, weil sie erst zur
+// Laufzeit entstehen. Ihr Pfad wird aus einer Zahl gebildet, die aus dem Namen
+// kommt und durch ein Muster geht — er wird also erzeugt, nicht angenommen. Die
+// Zusage der Whitelist bleibt damit dieselbe: keine Anfrage kann ein beliebiges
+// Programm benennen.
+func (s *Server) runtimePath(name string) (string, error) {
+	// Dieselbe Prüfung, die auch der Store beim Speichern anwendet. Ohne sie
+	// ließe sich hier eine Fassung anfordern, die dort gar nicht gespeichert
+	// werden könnte — oder umgekehrt.
+	if !store.ValidAppRuntime(name) {
+		return "", fmt.Errorf("%w: %q ist keine bekannte laufzeitumgebung", errNotAllow, name)
+	}
+	if m := reNodeRuntime.FindStringSubmatch(name); m != nil {
+		major, err := strconv.Atoi(m[1])
+		if err != nil || major < 1 {
+			return "", fmt.Errorf("%w: %q ist keine node-fassung", errBadInput, name)
+		}
+		bin := filepath.Join(s.nodeDir(major), "bin", "node")
+		if !fileExists(bin) {
+			return "", fmt.Errorf("%w: node %d ist nicht installiert", errBadInput, major)
+		}
+		return bin, nil
+	}
+
 	keys, ok := appRuntimes[name]
 	if !ok {
 		return "", fmt.Errorf("%w: %q ist keine bekannte laufzeitumgebung", errNotAllow, name)
 	}
 	for _, key := range keys {
 		if fileExists(allowedBinaries[key]) {
-			return key, nil
+			return allowedBinaries[key], nil
 		}
 	}
 	return "", fmt.Errorf("%w: %s ist auf diesem server nicht installiert", errBadInput, name)
@@ -87,18 +121,36 @@ func runtimeBinary(name string) (string, error) {
 // opAppRuntimes sagt, was installiert ist. Damit kann die Oberfläche "Node ist
 // nicht installiert" schreiben, statt eine App anzulegen, die nicht startet.
 func (s *Server) opAppRuntimes(ctx context.Context, _ json.RawMessage) (any, error) {
-	out := make([]RuntimeInfo, 0, len(appRuntimes))
+	out := make([]RuntimeInfo, 0, len(appRuntimes)+4)
 	for name := range appRuntimes {
 		info := RuntimeInfo{Name: name}
-		if key, err := runtimeBinary(name); err == nil {
-			info.Path, info.Available = allowedBinaries[key], true
+		if path, err := s.runtimePath(name); err == nil {
+			info.Path, info.Available = path, true
 			// --version ist ein festes Argument an ein Programm der Whitelist;
 			// nichts daran kommt aus einer Anfrage.
-			if v, err := run(ctx, shortTimeout, key, "--version"); err == nil {
-				info.Version = strings.TrimSpace(truncate(v, 40))
+			for key, p := range allowedBinaries {
+				if p == path {
+					if v, err := run(ctx, shortTimeout, key, "--version"); err == nil {
+						info.Version = strings.TrimSpace(truncate(v, 40))
+					}
+					break
+				}
 			}
 		}
 		out = append(out, info)
+	}
+
+	// Und die Fassungen, die der Agent selbst installiert hat. Ihre Nummer
+	// steht in einer Datei daneben; ein Aufruf des Programms wäre dafür der
+	// umständlichere Weg.
+	if liste, err := s.opNodeList(ctx, nil); err == nil {
+		versionen, _ := liste.([]NodeVersion)
+		for _, v := range versionen {
+			out = append(out, RuntimeInfo{
+				Name: "node" + strconv.Itoa(v.Major), Path: v.Binary,
+				Available: true, Version: v.Version,
+			})
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -154,7 +206,7 @@ func (s *Server) opAppWrite(ctx context.Context, raw json.RawMessage) (any, erro
 	// die Anfrage beurteilt, sondern den Server. Erst wenn alles an der Anfrage
 	// stimmt, ist "node ist nicht installiert" die richtige Auskunft — sonst
 	// verdeckt sie den eigentlichen Fehler.
-	key, err := runtimeBinary(p.Runtime)
+	bin, err := s.runtimePath(p.Runtime)
 	if err != nil {
 		return nil, opInputErr(OpAppWrite, "%v", err)
 	}
@@ -166,7 +218,7 @@ func (s *Server) opAppWrite(ctx context.Context, raw json.RawMessage) (any, erro
 		Group:       p.SystemUser,
 		WorkingDir:  workdir,
 		EnvPath:     s.appEnvPath(p.Name),
-		Command:     append([]string{allowedBinaries[key]}, p.Args...),
+		Command:     append([]string{bin}, p.Args...),
 		Env:         envList(p.Env),
 	}
 

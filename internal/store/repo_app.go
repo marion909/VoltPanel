@@ -370,7 +370,7 @@ func validateApp(a *App) error {
 }
 
 func validateNativeApp(a *App) error {
-	if !validAppRuntime(a.Runtime) {
+	if !ValidAppRuntime(a.Runtime) {
 		return fmt.Errorf("laufzeitumgebung %q ist unbekannt", a.Runtime)
 	}
 	if len(a.Args) > 32 {
@@ -413,10 +413,20 @@ func validateDockerApp(a *App) error {
 	return nil
 }
 
-func validAppRuntime(r string) bool {
+// reNodeVersionRuntime ist eine der Fassungen, die der Agent selbst installiert:
+// "node22", "node20". "node" ohne Zahl ist die des Systems.
+var reNodeVersionRuntime = regexp.MustCompile(`^node[1-9][0-9]{0,2}$`)
+
+// ValidAppRuntime sagt, ob ein Name eine Laufzeitumgebung bezeichnet.
+//
+// Hier und nicht im Agent, obwohl der Agent den Pfad auflöst: der Store muss
+// beim Speichern dasselbe zulassen, sonst ließe sich eine Fassung eintragen,
+// die der Agent kennt — oder umgekehrt eine speichern, die er ablehnt. Eine
+// Definition, zwei Aufrufer.
+func ValidAppRuntime(r string) bool {
 	switch r {
 	case "node", "npm":
 		return true
 	}
-	return false
+	return reNodeVersionRuntime.MatchString(r)
 }

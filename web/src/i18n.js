@@ -5,6 +5,12 @@ import { reactive, computed } from 'vue'
 const messages = {
   de: {
     'nav.apps': 'Apps',
+    'apps.nodeVersions': 'Node-Fassungen',
+    'apps.nodeNone': 'keine eigene installiert',
+    'apps.nodeInstall': 'Installieren',
+    'apps.nodeInstalling': 'wird geholt …',
+    'apps.nodeHint': 'Vollständige Version, z. B. 22.12.0. Wird von nodejs.org geholt, gegen die dortige Prüfsumme geprüft und nach /opt/volt/node entpackt. Eine App wählt sie dann als „node22“.',
+    'apps.nodeConfirmDelete': 'Node {v} entfernen?',
     'apps.kind': 'Art',
     'apps.kindNative': 'Dienst auf dem Server',
     'apps.kindDocker': 'Container',
@@ -458,6 +464,12 @@ const messages = {
 
   en: {
     'nav.apps': 'Apps',
+    'apps.nodeVersions': 'Node versions',
+    'apps.nodeNone': 'none installed',
+    'apps.nodeInstall': 'Install',
+    'apps.nodeInstalling': 'fetching \u2026',
+    'apps.nodeHint': 'Full version, e.g. 22.12.0. Fetched from nodejs.org, checked against the checksum published there and unpacked to /opt/volt/node. An app then selects it as \u201cnode22\u201d.',
+    'apps.nodeConfirmDelete': 'Remove Node {v}?',
     'apps.kind': 'Kind',
     'apps.kindNative': 'Service on the server',
     'apps.kindDocker': 'Container',

@@ -45,6 +45,9 @@ type Server struct {
 	// deployDir hält die Deploy-Keys. Ebenfalls keine Wurzel: der Pfad
 	// entsteht aus dem geprüften Namen der Site, nie aus einer Anfrage.
 	deployDir string
+	// nodeRoot hält die installierten Node-Fassungen. Keine Wurzel: der Pfad
+	// darin entsteht aus einer Hauptversionsnummer, nie aus einer Anfrage.
+	nodeRoot string
 	// panelDomain kommt aus der Konfiguration, nicht aus der Anfrage: nur so
 	// kann der Web-Prozess sich nicht selbst zum Eigentümer eines fremden
 	// Schlüssels erklären.
@@ -74,6 +77,7 @@ type ServerOptions struct {
 	BackupDir  string
 	AppDir     string
 	DeployDir  string
+	NodeRoot   string
 	// PanelDomain ist die Domain des Panels selbst. Ihr Schlüssel bekommt den
 	// Peer als Eigentümer, weil volt-web ihn lesen muss.
 	PanelDomain string
@@ -94,6 +98,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	setDefault(&opts.BackupDir, "/var/backups/volt")
 	setDefault(&opts.AppDir, "/etc/volt/apps")
 	setDefault(&opts.DeployDir, "/etc/volt/deploy")
+	setDefault(&opts.NodeRoot, "/opt/volt/node")
 
 	peerUID, peerGID := -1, -1
 	if opts.PeerUser != "" {
@@ -120,6 +125,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		logDir:      opts.LogDir,
 		appDir:      opts.AppDir,
 		deployDir:   opts.DeployDir,
+		nodeRoot:    opts.NodeRoot,
 		panelDomain: opts.PanelDomain,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
 		//

@@ -564,6 +564,28 @@ func (c *Client) AppRuntimes(ctx context.Context) ([]RuntimeInfo, error) {
 	return res, err
 }
 
+// --- Node-Fassungen ---------------------------------------------------------
+
+// NodeVersions sagt, welche Fassungen installiert sind.
+func (c *Client) NodeVersions(ctx context.Context) ([]NodeVersion, error) {
+	var res []NodeVersion
+	err := c.Call(ctx, OpNodeList, nil, &res)
+	return res, err
+}
+
+// InstallNode holt eine Fassung und packt sie aus.
+func (c *Client) InstallNode(ctx context.Context, version string) (*NodeVersion, error) {
+	var res NodeVersion
+	err := c.Call(ctx, OpNodeInstall, NodeInstallParams{Version: version}, &res)
+	return &res, err
+}
+
+// RemoveNode entfernt eine Fassung.
+func (c *Client) RemoveNode(ctx context.Context, major int) error {
+	var res TextResult
+	return c.Call(ctx, OpNodeRemove, map[string]int{"major": major}, &res)
+}
+
 // --- Docker -----------------------------------------------------------------
 
 // DockerStatusOf sagt, ob Docker läuft und wie sicher es steht.

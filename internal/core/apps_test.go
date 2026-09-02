@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/store"
 )
 
 // TestUmgebungLiegtVerschluesselt: in einer App-Umgebung stehen regelmäßig
@@ -75,5 +77,44 @@ func TestNamenOhneWerte(t *testing.T) {
 	raw, _ := json.Marshal(kaputt)
 	if string(raw) != "[]" {
 		t.Errorf("die leere Liste wird als %s serialisiert — null bricht die Oberfläche", raw)
+	}
+}
+
+// TestNodeFassungWirdNichtUnterAppsWeggezogen: eine Fassung stillschweigend zu
+// entfernen, während drei Sites darauf laufen, wäre die unangenehmere Art, es
+// zu erfahren — die Apps starten nach dem nächsten Neustart nicht mehr, und im
+// Panel steht nur "läuft nicht".
+func TestNodeFassungWirdNichtUnterAppsWeggezogen(t *testing.T) {
+	env := newTestEnv(t)
+	ctx, sys := t.Context(), store.SystemScope()
+	svc := NewAppService(env.store, env.agent, env.cfg, env.secrets)
+
+	_, _, site := env.seedSite(t, "shop")
+	site.Type = store.SiteProxy
+	site.ProxyTarget = "http://127.0.0.1:1"
+	if err := env.store.UpdateSite(ctx, sys, site); err != nil {
+		t.Fatal(err)
+	}
+	app := &store.App{
+		TenantID: site.TenantID, SiteID: site.ID, Name: "shop",
+		Kind: store.AppNative, Runtime: "node22", Args: []string{"server.js"},
+	}
+	if err := env.store.CreateApp(ctx, sys, app); err != nil {
+		t.Fatal(err)
+	}
+
+	err := svc.RemoveNode(ctx, sys, 22)
+	if err == nil {
+		t.Fatal("node22 wurde entfernt, obwohl eine App darauf läuft")
+	}
+	if !strings.Contains(err.Error(), "shop") {
+		t.Errorf("die Meldung nennt die App nicht: %v", err)
+	}
+
+	// Eine Fassung, die niemand benutzt, darf weg. Ohne laufenden Agent
+	// scheitert der Aufruf danach — aber nicht mehr an dieser Prüfung.
+	if err := svc.RemoveNode(ctx, sys, 20); err != nil &&
+		strings.Contains(err.Error(), "wird von") {
+		t.Errorf("node20 galt als benutzt: %v", err)
 	}
 }

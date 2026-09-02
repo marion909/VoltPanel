@@ -80,6 +80,48 @@ func (s *Server) handleAppLogs(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"log": out})
 }
 
+// handleNodeVersions sagt, welche Node-Fassungen installiert sind.
+func (s *Server) handleNodeVersions(c echo.Context) error {
+	list, err := s.apps.NodeVersions(c.Request().Context())
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, list)
+}
+
+// handleInstallNode holt eine Fassung.
+//
+// Nur für Administratoren: eine Node-Fassung liegt systemweit und gilt für
+// alle Mandanten. Wer sie installiert, belegt Platte für den ganzen Server.
+func (s *Server) handleInstallNode(c echo.Context) error {
+	var req struct {
+		Version string `json:"version"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+	ctx := c.Request().Context()
+	v, err := s.apps.InstallNode(ctx, req.Version)
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "node.install", "node", req.Version, "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusCreated, v)
+}
+
+func (s *Server) handleRemoveNode(c echo.Context) error {
+	major, err := strconv.Atoi(c.Param("major"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "keine hauptversion")
+	}
+	ctx := c.Request().Context()
+	if err := s.apps.RemoveNode(ctx, s.scopeFor(c), major); err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "node.remove", "node", c.Param("major"), "ok", c.RealIP(), nil)
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (s *Server) handleCreateApp(c echo.Context) error {
 	var in core.AppInput
 	if err := c.Bind(&in); err != nil {

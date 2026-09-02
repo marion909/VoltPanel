@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/authn"
@@ -371,6 +372,41 @@ func (s *AppService) ContainerLogs(ctx context.Context, sc store.Scope, id int64
 		return "", fmt.Errorf("%s läuft nicht als container", app.Name)
 	}
 	return s.agent.ContainerLogs(ctx, app.Name, lines)
+}
+
+// NodeVersions sagt, welche Node-Fassungen installiert sind.
+func (s *AppService) NodeVersions(ctx context.Context) ([]agent.NodeVersion, error) {
+	return s.agent.NodeVersions(ctx)
+}
+
+// InstallNode holt eine Fassung. Dauert Minuten — der Aufrufer entscheidet, ob
+// er wartet.
+func (s *AppService) InstallNode(ctx context.Context, version string) (*agent.NodeVersion, error) {
+	return s.agent.InstallNode(ctx, version)
+}
+
+// RemoveNode entfernt eine Fassung.
+//
+// Apps, die darauf laufen, starten danach nicht mehr — deshalb wird vorher
+// nachgesehen. Eine Fassung stillschweigend wegzunehmen, während drei Sites
+// darauf laufen, wäre die unangenehmere Art, es zu erfahren.
+func (s *AppService) RemoveNode(ctx context.Context, sc store.Scope, major int) error {
+	apps, err := s.store.ListApps(ctx, store.SystemScope())
+	if err != nil {
+		return err
+	}
+	name := "node" + strconv.Itoa(major)
+	var betroffen []string
+	for _, a := range apps {
+		if a.Kind == store.AppNative && a.Runtime == name {
+			betroffen = append(betroffen, a.Name)
+		}
+	}
+	if len(betroffen) > 0 {
+		return fmt.Errorf("%s wird von %d app(s) benutzt: %s",
+			name, len(betroffen), strings.Join(betroffen, ", "))
+	}
+	return s.agent.RemoveNode(ctx, major)
 }
 
 // Runtimes sagt, welche Laufzeitumgebungen der Server hat.

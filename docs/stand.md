@@ -152,6 +152,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Unit-Name vom Panel vergeben. Die App läuft als Systembenutzer ihrer Site in
   einer eng gefassten Unit; die Umgebung liegt verschlüsselt in der Datenbank
   und auf dem Server in einer Datei mit 0640, nicht in der Unit.
+- Node-Fassungen nebeneinander, systemweit unter `/opt/volt/node`. Geholt vom
+  offiziellen Archiv, gegen die dortige Prüfsumme geprüft und mit eigenem Code
+  ausgepackt statt mit `tar` — Pfade und Symlinks, die aus dem Verzeichnis
+  führen, kommen nicht durch. Eine App wählt eine Fassung als „node22". Eine
+  Fassung, auf der noch eine App läuft, lässt sich nicht entfernen.
 - Eine App läuft wahlweise als systemd-Unit oder als Container. Beide belegen
   denselben Port, beide bekommen den Vhost auf sich gerichtet; der Unterschied
   ist eine Spalte, nicht eine zweite Hälfte des Panels. Der Container läuft
@@ -178,15 +183,14 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 - Eigene Netzwerke und benannte Volumes. Bisher nur Bind-Mounts aus dem
   Verzeichnis der Site — mehr braucht keine der Anwendungen, um die es hier
   geht.
-- Node.js: Versionen über fnm. Die App selbst steht (oben unter „Fertig"), die
-  Versionsverwaltung nicht — genommen wird, was auf dem Server liegt.
 
 App, Container und Git-Deploy stehen (oben unter „Fertig"). Offen bleibt, was
 aus gutem Grund offen bleibt — siehe die Begründungen oben.
 
-Die Versionsverwaltung für Node über fnm fehlt ebenfalls. Genommen wird, was
-unter `/usr/bin` oder `/usr/local/bin` liegt; das Panel sagt, welche Fassung
-das ist, und weist darauf hin, wenn gar keine da ist.
+Statt fnm liegen die Node-Fassungen systemweit unter `/opt/volt/node`. fnm
+installiert je Benutzer, und in diesem Panel hat jede Site einen eigenen —
+dieselbe Fassung läge dann zwanzigmal auf der Platte. Das System-Node bleibt
+als „node" wählbar.
 
 **Phase 6 — Mailserver**
 

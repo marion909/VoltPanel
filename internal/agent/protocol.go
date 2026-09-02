@@ -119,6 +119,11 @@ const (
 	OpAppStatus   Op = "app.status"
 	OpAppRuntimes Op = "app.runtimes"
 
+	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
+	OpNodeList    Op = "node.list"
+	OpNodeInstall Op = "node.install"
+	OpNodeRemove  Op = "node.remove"
+
 	// Docker. Der Aufrufer beschreibt, was er will; die Kommandozeile baut
 	// der Agent. Es gibt kein Feld fuer einen Schalter.
 	OpDockerStatus Op = "docker.status"

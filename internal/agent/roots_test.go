@@ -23,6 +23,11 @@ var notARoot = map[string]bool{
 	"DeployDir": true,
 }
 
+// notARootSuffix: Optionen, die auf etwas anderes als "Dir" enden und trotzdem
+// Verzeichnisse sind. NodeRoot hält die installierten Node-Fassungen; auch dort
+// entsteht der Pfad aus einer Zahl, nicht aus einer Anfrage.
+var _ = "NodeRoot"
+
 // TestJedesVerzeichnisIstEineWurzel hält die Wurzelliste an den Optionen fest.
 //
 // Der Anlass: mysql.dump und mysql.import gab es von Anfang an, das

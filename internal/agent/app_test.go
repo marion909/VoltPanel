@@ -144,9 +144,15 @@ func TestAppVerzeichnisBleibtInDenWurzeln(t *testing.T) {
 // aber "nie sh -c" ist eine Regel dieses Projekts, und eine Regel, die für
 // jeden Aufruf gilt außer diesem einen, gilt nicht.
 func TestNurBekannteLaufzeitumgebungen(t *testing.T) {
-	for _, name := range []string{"", "sh", "bash", "/bin/sh", "python3", "NODE", "node "} {
-		if key, err := runtimeBinary(name); err == nil {
-			t.Errorf("die Laufzeitumgebung %q wurde angenommen: %s", name, key)
+	srv, _ := testServer(t)
+	for _, name := range []string{
+		"", "sh", "bash", "/bin/sh", "python3", "NODE", "node ",
+		// Auch die Node-Fassungen sind Namen, keine Pfade.
+		"node22/../../../bin/sh", "node-22", "nodeXX", "node0",
+		"/opt/volt/node/node22/bin/node",
+	} {
+		if path, err := srv.runtimePath(name); err == nil {
+			t.Errorf("die Laufzeitumgebung %q wurde angenommen: %s", name, path)
 		}
 	}
 

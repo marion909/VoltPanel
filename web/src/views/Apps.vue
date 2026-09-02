@@ -25,6 +25,12 @@ const form = ref({
 // bleibt er null, und die Warnung darüber steht dann eben nicht da.
 const docker = ref(null)
 const logs = ref({})
+// Die installierten Node-Fassungen. Sie liegen systemweit; installieren und
+// entfernen darf sie nur ein Administrator, ansehen jeder.
+const nodes = ref([])
+const nodeWunsch = ref('')
+const nodeBusy = ref(false)
+const showNodes = ref(false)
 
 // Die Umgebung wird je App bearbeitet. Die Werte kommen nie zurück — das Panel
 // gibt sie nach dem Speichern nicht mehr heraus —, deshalb ist das Feld immer
@@ -55,7 +61,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [appList, siteList, runtimeList, dockerState] = await Promise.all([
+    const [appList, siteList, runtimeList, dockerState, nodeList] = await Promise.all([
       api.get('/apps'),
       api.get('/sites'),
       // Ohne laufenden Agent gibt es keine Auskunft über Laufzeitumgebungen.
@@ -64,11 +70,13 @@ async function load() {
       // Scheitert für alle außer Administratoren an der Rolle, und das ist in
       // Ordnung.
       api.get('/apps/docker').catch(() => null),
+      api.get('/apps/node').catch(() => []),
     ])
     apps.value = appList
     sites.value = siteList
     runtimes.value = runtimeList
     docker.value = dockerState
+    nodes.value = nodeList
   } catch (err) {
     error.value = err.message
   } finally {
@@ -174,6 +182,34 @@ async function removeApp(app) {
   }
 }
 
+async function nodeInstallieren() {
+  nodeBusy.value = true
+  error.value = ''
+  try {
+    await api.post('/apps/node', { version: nodeWunsch.value.trim() })
+    nodeWunsch.value = ''
+    await load()
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    nodeBusy.value = false
+  }
+}
+
+async function nodeEntfernen(v) {
+  if (!confirm(t('apps.nodeConfirmDelete', { v: v.version || v.major }))) return
+  nodeBusy.value = true
+  error.value = ''
+  try {
+    await api.del(`/apps/node/${v.major}`)
+    await load()
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    nodeBusy.value = false
+  }
+}
+
 async function logsLaden(app) {
   if (logs.value[app.id] !== undefined) {
     logs.value = { ...logs.value, [app.id]: undefined }
@@ -249,6 +285,70 @@ onMounted(load)
     >
       {{ w }}
     </p>
+
+    <!--
+      Node-Fassungen liegen systemweit unter /opt/volt/node. Mehrere
+      nebeneinander, damit eine alte Anwendung weiterläuft, während eine neue
+      schon auf der nächsten baut.
+    -->
+    <div
+      class="mb-5 rounded-lg border p-4"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <button
+        class="flex w-full items-center justify-between text-[12px]"
+        :style="{ color: 'var(--ink-secondary)' }"
+        @click="showNodes = !showNodes"
+      >
+        <span>
+          {{ t('apps.nodeVersions') }}
+          <template v-if="nodes.length">
+            — {{ nodes.map((n) => 'node' + n.major).join(', ') }}
+          </template>
+          <template v-else>— {{ t('apps.nodeNone') }}</template>
+        </span>
+        <span aria-hidden="true">{{ showNodes ? '\u2212' : '+' }}</span>
+      </button>
+
+      <div v-if="showNodes" class="mt-3 space-y-2">
+        <div
+          v-for="n in nodes"
+          :key="n.major"
+          class="flex items-center gap-3 text-[12px]"
+        >
+          <code class="font-mono">node{{ n.major }}</code>
+          <span :style="{ color: 'var(--ink-muted)' }">{{ n.version }}</span>
+          <button
+            class="underline"
+            :style="{ color: 'var(--status-critical)' }"
+            :disabled="nodeBusy"
+            @click="nodeEntfernen(n)"
+          >
+            {{ t('common.delete') }}
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <input
+            v-model="nodeWunsch"
+            placeholder="22.12.0"
+            class="w-40 rounded-md border px-2 py-1 font-mono text-[12px]"
+            :style="inputStyle"
+          />
+          <button
+            class="rounded-md border px-2 py-1 text-[12px]"
+            :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+            :disabled="nodeBusy || !nodeWunsch.trim()"
+            @click="nodeInstallieren"
+          >
+            {{ nodeBusy ? t('apps.nodeInstalling') : t('apps.nodeInstall') }}
+          </button>
+        </div>
+        <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          {{ t('apps.nodeHint') }}
+        </p>
+      </div>
+    </div>
 
     <form
       v-if="showForm"
