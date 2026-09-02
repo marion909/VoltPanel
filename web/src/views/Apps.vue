@@ -59,7 +59,10 @@ const freieSites = computed(() => {
 
 const nodeFehlt = computed(() => {
   const node = runtimes.value.find((r) => r.name === 'node')
-  return node && !node.available
+  const eigeneNode =
+    nodes.value.length > 0 ||
+    runtimes.value.some((r) => /^node[0-9]+$/.test(r.name) && r.available)
+  return node && !node.available && !eigeneNode
 })
 
 async function load() {

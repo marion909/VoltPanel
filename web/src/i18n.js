@@ -121,7 +121,7 @@ const messages = {
     'apps.running': 'läuft',
     'apps.stopped': 'läuft nicht',
     'apps.empty': 'Noch keine App. Eine App braucht eine Site vom Typ „proxy" — der Vhost dafür steht dann schon.',
-    'apps.noRuntime': 'Node.js is not installed on this server. An app can be created but will not start \u2014 the \u201cNode versions\u201d panel below fetches one. Deliberately not from apt: the panel keeps its own under /opt/volt/node.',
+    'apps.noRuntime': 'Auf diesem Server ist keine Node-Laufzeitumgebung installiert. Eine App lässt sich anlegen, startet aber nicht. Das Panel darunter holt eine Node-Fassung nach /opt/volt/node.',
     'apps.confirmDelete': 'Die App von {name} anhalten und entfernen? Die Dateien der Site bleiben.',
     'nav.deploys': 'Deploys',
     'deploy.title': 'Git-Deploy',

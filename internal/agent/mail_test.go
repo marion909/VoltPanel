@@ -2,6 +2,8 @@ package agent
 
 import (
 	"encoding/hex"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -90,6 +92,35 @@ func TestFeatureNimmtKeinenPaketnamen(t *testing.T) {
 	} {
 		if ValidFeature(name) {
 			t.Errorf("%q wurde als fähigkeit angenommen", name)
+		}
+	}
+}
+
+func TestDockerFeatureStartetDenDienst(t *testing.T) {
+	srv, _ := testServer(t)
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "systemctl.log")
+	systemctl := filepath.Join(dir, "systemctl")
+	skript := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + logPath + "\n"
+	if err := os.WriteFile(systemctl, []byte(skript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	alt := allowedBinaries["systemctl"]
+	allowedBinaries["systemctl"] = systemctl
+	t.Cleanup(func() { allowedBinaries["systemctl"] = alt })
+
+	if err := srv.featureDiensteStarten(t.Context(), "docker"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aufrufe := string(got)
+	for _, will := range []string{"enable docker\n", "start docker\n"} {
+		if !strings.Contains(aufrufe, will) {
+			t.Errorf("%q fehlt in den systemctl-Aufrufen:\n%s", will, aufrufe)
 		}
 	}
 }

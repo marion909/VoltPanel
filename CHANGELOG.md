@@ -15,6 +15,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.13 — 2026-09-02
+
+- Docker-Installation startet den Dienst
+- Node-Warnung zählt eigene Node-Fassungen mit
+
 ## v0.4.12 — 2026-09-02
 
 - OpenDKIM-Installation wartet lang genug

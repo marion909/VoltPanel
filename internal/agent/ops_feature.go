@@ -35,6 +35,14 @@ var featurePakete = map[string][]string{
 	// /opt/volt/node. Ein Paket daneben wäre eine zweite Wahrheit.
 }
 
+// featureDienste sind Dienste, die nach der Paketinstallation sofort laufen
+// müssen, damit die Oberfläche nicht weiter "installiert, aber unbenutzbar"
+// meldet. apt darf Dienste während der Installation nicht selbst starten; das
+// macht der Agent danach gezielt.
+var featureDienste = map[string][]string{
+	"docker": {"docker"},
+}
+
 // FeatureNames sind die Fähigkeiten, die sich nachinstallieren lassen.
 func FeatureNames() []string {
 	out := make([]string, 0, len(featurePakete))
@@ -71,5 +79,23 @@ func (s *Server) opFeatureInstall(ctx context.Context, raw json.RawMessage) (any
 		return nil, opErr(OpFeatureInstall, "%s installieren: %s",
 			strings.Join(pakete, ", "), truncate(out, 500))
 	}
+	if err := s.featureDiensteStarten(ctx, p.Feature); err != nil {
+		return nil, err
+	}
 	return TextResult{Text: strings.Join(pakete, ", ") + " installiert"}, nil
+}
+
+func (s *Server) featureDiensteStarten(ctx context.Context, feature string) error {
+	for _, dienst := range featureDienste[feature] {
+		if err := checkService(dienst); err != nil {
+			return err
+		}
+		if out, err := run(ctx, longTimeout, "systemctl", "enable", dienst); err != nil {
+			return opErr(OpFeatureInstall, "%s aktivieren: %s", dienst, truncate(out, 300))
+		}
+		if err := s.startService(ctx, OpFeatureInstall, dienst, "start"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
