@@ -546,3 +546,110 @@ func (s *MailService) dkimInfo(d *store.MailDomain) *DKIMInfo {
 		Value: "v=DKIM1; h=sha256; k=rsa; p=" + d.DKIMPublic,
 	}
 }
+
+// --- DNS über Cloudflare ----------------------------------------------------
+
+// DNSErgebnis sagt je Eintrag, was geschehen ist.
+type DNSErgebnis struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Text   string `json:"text"`
+}
+
+// PublishDNS setzt die Einträge, die zu einer Maildomäne gehören.
+//
+// Drei Einträge, drei verschiedene Regeln:
+//
+//   - DKIM gehört dem Panel. Es hat den Schlüssel erzeugt, es kennt den
+//     richtigen Wert, und ein alter Eintrag daneben wäre schädlich — also
+//     überschreiben.
+//   - SPF gehört dem Kunden. Steht schon einer da, bleibt er: er zählt
+//     womöglich einen Newsletter-Versand auf, und ihn zu ersetzen sperrte den
+//     aus. Nur wenn keiner da ist, wird einer angelegt.
+//   - DMARC ebenso, und mit p=none: das sammelt Berichte, ohne etwas
+//     abzuweisen. Eine schärfere Regel gehört dem, der die Berichte gelesen
+//     hat.
+func (s *MailService) PublishDNS(ctx context.Context, sc store.Scope, domainID int64) (
+	[]DNSErgebnis, error) {
+
+	d, err := s.store.GetMailDomain(ctx, sc, domainID)
+	if err != nil {
+		return nil, err
+	}
+	tenant, err := s.store.GetTenant(ctx, sc, d.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	if tenant.CloudflareToken == "" {
+		return nil, errors.New("für diesen mandanten ist kein cloudflare-token hinterlegt — " +
+			"die einträge stehen im panel und lassen sich von hand eintragen")
+	}
+	token, err := s.secrets.Decrypt(tenant.CloudflareToken)
+	if err != nil {
+		return nil, fmt.Errorf("cloudflare-token: %w", err)
+	}
+
+	cf := newCloudflareClient(token)
+	zone, err := cf.zoneID(ctx, d.Domain)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []DNSErgebnis
+	melde := func(name, status, text string) {
+		out = append(out, DNSErgebnis{Name: name, Status: status, Text: text})
+	}
+
+	// DKIM
+	if d.DKIMPublic == "" {
+		melde("DKIM", BefundWarnung, "Für diese Domäne gibt es noch keinen Schlüssel.")
+	} else {
+		info := s.dkimInfo(d)
+		if err := cf.setzeTXT(ctx, zone, info.Name, info.Value); err != nil {
+			melde("DKIM", BefundKritisch, err.Error())
+		} else {
+			melde("DKIM", BefundGut, info.Name+" gesetzt.")
+		}
+	}
+
+	// SPF — nur, wenn keiner dasteht.
+	spf, err := cf.txtRecords(ctx, zone, d.Domain)
+	if err != nil {
+		melde("SPF", BefundKritisch, err.Error())
+	} else if vorhandenesSPF(spf) != "" {
+		melde("SPF", BefundGut, "Es steht schon einer da: "+vorhandenesSPF(spf)+
+			" — unverändert gelassen.")
+	} else if err := cf.setzeTXT(ctx, zone, d.Domain, "v=spf1 mx -all"); err != nil {
+		melde("SPF", BefundKritisch, err.Error())
+	} else {
+		melde("SPF", BefundGut, "v=spf1 mx -all gesetzt — der MX darf senden, sonst niemand.")
+	}
+
+	// DMARC — ebenso.
+	dmarcName := "_dmarc." + d.Domain
+	dmarc, err := cf.txtRecords(ctx, zone, dmarcName)
+	if err != nil {
+		melde("DMARC", BefundKritisch, err.Error())
+	} else if len(dmarc) > 0 {
+		melde("DMARC", BefundGut, "Es steht schon einer da — unverändert gelassen.")
+	} else {
+		wert := "v=DMARC1; p=none; rua=mailto:postmaster@" + d.Domain
+		if err := cf.setzeTXT(ctx, zone, dmarcName, wert); err != nil {
+			melde("DMARC", BefundKritisch, err.Error())
+		} else {
+			melde("DMARC", BefundGut, "p=none gesetzt — sammelt Berichte, weist nichts ab.")
+		}
+	}
+
+	return out, nil
+}
+
+// vorhandenesSPF sucht den SPF-Eintrag unter den TXT-Einträgen einer Domäne.
+func vorhandenesSPF(records []cfRecord) string {
+	for _, r := range records {
+		if strings.HasPrefix(strings.ToLower(r.Content), "v=spf1") {
+			return r.Content
+		}
+	}
+	return ""
+}

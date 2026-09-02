@@ -144,6 +144,25 @@ func (s *Server) handleEnableDKIM(c echo.Context) error {
 	return c.JSON(http.StatusOK, info)
 }
 
+// handlePublishDNS setzt SPF, DKIM und DMARC über Cloudflare.
+//
+// Im Scope des Aufrufers, mit dem Token seines Mandanten. Der Token liegt
+// verschlüsselt und wird nie herausgegeben — hier wird er benutzt, nicht
+// gezeigt.
+func (s *Server) handlePublishDNS(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	res, err := s.mail.PublishDNS(ctx, s.scopeFor(c), id)
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "mail.dns.publish", "id", c.Param("id"), "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, res)
+}
+
 // handleDKIM liefert den DNS-Eintrag noch einmal.
 func (s *Server) handleDKIM(c echo.Context) error {
 	id, err := pathID(c)

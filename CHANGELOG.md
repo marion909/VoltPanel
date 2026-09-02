@@ -15,6 +15,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.10 — 2026-09-02
+
+- SPF, DKIM und DMARC über Cloudflare setzen — statt sie abzuschreiben
+
 ## v0.4.9 — 2026-09-02
 
 - Zustellung über Dovecot, damit die Quota eines Postfachs überhaupt greift

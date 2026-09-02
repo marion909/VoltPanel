@@ -222,7 +222,14 @@ MX, SPF, DKIM gegen den hinterlegten Schlüssel, DMARC, TLS und die Zeile, ohne
 die der Server ein offenes Relay wäre — mit einem Rat je Befund statt nur einem
 roten Punkt.
 
-Blacklists prüft sie nicht. Das hieße, ein Dutzend fremder Dienste zu fragen,
+Und die Einträge, die dabei fehlen, setzt das Panel auf Wunsch selbst — über
+denselben Cloudflare-Token, der seit Phase 2 für die Wildcard-Zertifikate
+hinterlegt ist. DKIM wird überschrieben, weil es dem Panel gehört; ein
+vorhandener SPF- oder DMARC-Eintrag bleibt stehen. Er zählt womöglich einen
+Newsletter-Versand auf, und ihn zu ersetzen sperrte den aus — lautlos, bis
+sich jemand wundert, dass seine Rechnungen nicht ankommen.
+
+Blacklists prüft die Prüfung nicht. Das hieße, ein Dutzend fremder Dienste zu fragen,
 deren Antworten sich ständig ändern; wer dort steht, erfährt es ohnehin von
 seinen Empfängern. Der Agent schreibt daraus die Map-Dateien für
 Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
@@ -231,9 +238,6 @@ auf ein eigenes Postfach, und Postfächer zählen zum Paket.
 
 Offen ist der Rest:
 
-- SPF-, DKIM- und DMARC-Einträge automatisch über die Cloudflare-Anbindung aus
-  Phase 2 setzen. Den DKIM-Eintrag zeigt das Panel; ins DNS trägt ihn noch von
-  Hand, wer die Domäne verwaltet.
 - Rspamd bringt seine Regeln selbst mit; das Panel trägt es nur als zweiten
   Milter ein. Was es damit aussortiert, ist noch nirgends sichtbar.
 - Autoconfig und Autodiscover für Thunderbird und Outlook.

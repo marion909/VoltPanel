@@ -198,6 +198,7 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/mail/domains/:id", s.handleDeleteMailDomain)
 	auth.GET("/mail/domains/:id/dkim", s.handleDKIM)
 	auth.POST("/mail/domains/:id/dkim", s.handleEnableDKIM)
+	auth.POST("/mail/domains/:id/dns", s.handlePublishDNS)
 	auth.GET("/mail/mailboxes", s.handleListMailboxes)
 	auth.POST("/mail/mailboxes", s.handleCreateMailbox)
 	auth.PATCH("/mail/mailboxes/:id", s.handleUpdateMailbox)

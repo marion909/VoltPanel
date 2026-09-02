@@ -27,6 +27,7 @@ const boxForm = ref({ domain_id: null, local_part: '', password: '', quota_mb: 0
 const aliasForm = ref({ domain_id: null, source: '', destination: '' })
 const dkim = ref({})
 const check = ref(null)
+const dnsErgebnis = ref({})
 const settings = ref(null)
 const checkBusy = ref(false)
 
@@ -181,6 +182,14 @@ function umschalten(d) {
   offen.value = { ...offen.value, [d.id]: !offen.value[d.id] }
   if (offen.value[d.id] && dkim.value[d.id] === undefined) dkimZeigen(d)
 }
+
+// Die Einträge gleich setzen, statt sie abzuschreiben. Ein DKIM-Wert mit einem
+// falschen Zeichen prüft sich nicht mehr — und die Mail wird dann abgewertet
+// statt gar nicht unterschrieben.
+const dnsSetzen = (d) =>
+  fuehreAus(async () => {
+    dnsErgebnis.value = { ...dnsErgebnis.value, [d.id]: await api.post(`/mail/domains/${d.id}/dns`) }
+  })
 
 const dkimAnlegen = (d) =>
   fuehreAus(async () => {
@@ -554,6 +563,33 @@ onMounted(load)
                 <p class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
                   {{ t('mail.dkimHint') }}
                 </p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    class="rounded-md border px-2 py-1 text-[12px]"
+                    :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+                    :disabled="busy"
+                    @click="dnsSetzen(d)"
+                  >
+                    {{ t('mail.dnsPublish') }}
+                  </button>
+                  <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                    {{ t('mail.dnsPublishHint') }}
+                  </span>
+                </div>
+                <ul v-if="dnsErgebnis[d.id]" class="mt-2 space-y-0.5 text-[11px]">
+                  <li
+                    v-for="(e, i) in dnsErgebnis[d.id]"
+                    :key="i"
+                    class="flex items-center gap-2"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 shrink-0 rounded-full"
+                      :style="{ background: stufenFarbe[e.status] }"
+                    ></span>
+                    <span class="font-medium">{{ e.name }}</span>
+                    <span :style="{ color: 'var(--ink-secondary)' }">{{ e.text }}</span>
+                  </li>
+                </ul>
               </template>
               <template v-else>
                 <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
