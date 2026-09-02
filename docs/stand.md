@@ -255,8 +255,11 @@ Steht bereits:
 
 Offen:
 
-- SSRF-Filterung für ausgehende Aufrufe. Heute betrifft das die Cloudflare-API,
-  ab Phase 5 auch Git-Quellen und Webhooks.
+- SSRF-Filterung für ausgehende Aufrufe. Für Backup-Ziele steht sie
+  (`internal/transfer`, eigener Dialer mit Adressprüfung); für die
+  Cloudflare-API ist der Host fest, und für Git-Quellen begrenzt die
+  Adressprüfung in `internal/gitspec` die Form, nicht das Ziel — eine Adresse
+  auf 169.254.169.254 ginge dort noch durch.
 - Fail2ban-Anbindung und eine Oberfläche für die Firewall. Derzeit öffnet
   `install.sh` Ports in ufw, sofern ufw überhaupt läuft; bei nftables gibt es
   eine Warnung und sonst nichts. Port-Scan-Schutz fehlt ganz.
@@ -268,16 +271,20 @@ Offen:
 
 ## Bekannte Einschränkungen
 
-- Die Release-Signatur wird über cosign erzeugt, aber weder von `install.sh`
-  noch von `volt update` geprüft. Dort wirkt bisher nur der SHA-256-Vergleich
-  gegen `latest.json`.
+- `install.sh` prüft die Signatur nicht. `volt update` tut es seit dem
+  Signatur-Umbau: `latest.json` wird gegen einen eingebetteten Schlüssel
+  geprüft, und ohne gültige Signatur bricht das Update ab. Für `install.sh`
+  fehlt das noch — dort wirkt weiter nur der SHA-256-Vergleich gegen
+  `latest.json`, also gegen dieselbe Quelle.
+- Der Release-Schlüssel selbst ist im Quelltext leer. Er entsteht beim
+  Einrichten der Veröffentlichung; bis dahin lehnt `volt update` jeden Kanal
+  ab, statt ungeprüft zu aktualisieren. Siehe [release.md](release.md).
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
   Einstellungen → Zertifikat des Panels ersetzt es, `volt cert issue
   <panel_domain>` ebenso; die Übernahme braucht keinen Neustart.
 - Die Speicherquota greift gegen den Stand der letzten Messung (stündlich).
   Zwischen zwei Messungen lässt sie sich also knapp überschreiten — der bewusste
   Preis dafür, dass nicht jeder Upload einen Verzeichnisdurchlauf auslöst.
-- SSRF-Filterung für ausgehende Aufrufe fehlt (relevant ab Phase 5).
 - Das Web-Terminal ist Administratoren vorbehalten. Es für Kunden zu öffnen
   wäre vertretbar — ein Cronjob derselben Site läuft unter demselben Konto —,
   ist aber eine eigene Entscheidung und keine Nebenwirkung.

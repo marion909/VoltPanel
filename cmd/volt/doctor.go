@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/marion909/voltpanel/internal/agent"
+	"github.com/marion909/voltpanel/internal/release"
 	"github.com/marion909/voltpanel/internal/store"
 	"github.com/marion909/voltpanel/internal/version"
 	"github.com/spf13/cobra"
@@ -43,6 +44,7 @@ func (a *app) doctorCmd() *cobra.Command {
 			checks = append(checks, a.checkPort())
 			checks = append(checks, a.checkSharedConfig())
 			checks = append(checks, a.checkUserLocks())
+			checks = append(checks, a.checkUpdateSignature())
 			checks = append(checks, a.checkCerts(ctx)...)
 
 			var failed, warned int
@@ -156,6 +158,25 @@ func (a *app) checkPort() check {
 	}
 	conn.Close()
 	return check{"Panel-Port", "ok", addr}
+}
+
+// checkUpdateSignature sagt, ob dieses Panel ein Update überhaupt prüfen kann.
+//
+// Ein Update schreibt das Panel und den Root-Daemon neu. Wer die Angaben dazu
+// unterschieben kann, hat den Server — deshalb soll ein Betreiber das erfahren,
+// bevor das erste Update ansteht, und nicht erst, wenn es fehlschlägt.
+func (a *app) checkUpdateSignature() check {
+	switch {
+	case a.cfg.UpdateAllowUnsigned:
+		return check{"Update-Signatur", "warn",
+			"update_allow_unsigned steht in der config.yaml — Updates werden " +
+				"ohne Signaturprüfung eingespielt"}
+	case !release.Default().HasKey():
+		return check{"Update-Signatur", "warn",
+			"dieses Binary trägt keinen Release-Schlüssel; `volt update` lehnt " +
+				"deshalb jeden Kanal ab (siehe docs/release.md)"}
+	}
+	return check{"Update-Signatur", "ok", "latest.json wird gegen den eingebetteten Schlüssel geprüft"}
 }
 
 // checkUserLocks meldet liegengebliebene Sperrdateien von useradd.

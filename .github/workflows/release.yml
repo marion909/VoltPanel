@@ -44,3 +44,8 @@ jobs:
         run: scripts/release-assets.sh "$GITHUB_REF_NAME"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signiert latest.json. Ohne diese Secrets bleibt die Datei
+          # unsigniert, und `volt update` lehnt den Kanal ab — mit einer
+          # Meldung, die sagt warum. Siehe docs/release.md.
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}

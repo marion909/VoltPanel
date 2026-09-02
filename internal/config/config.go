@@ -62,6 +62,14 @@ type Config struct {
 	// Update
 	UpdateChannel string
 	UpdateBaseURL string
+	// UpdateAllowUnsigned lässt ein Update auch ohne gültige Signatur zu.
+	//
+	// Voreingestellt aus. Ein Update schreibt das Panel und den Root-Daemon
+	// neu; wer die Angaben dazu unterschieben kann, hat den Server. Die
+	// Möglichkeit steht hier trotzdem, weil ein Betreiber mit eigenem Kanal
+	// vielleicht keinen Schlüssel führt — aber sie muss ausdrücklich gesetzt
+	// werden, und `volt doctor` sagt es.
+	UpdateAllowUnsigned bool
 }
 
 func Default() *Config {
@@ -175,6 +183,10 @@ var fieldSetters = map[string]func(*Config, string) error{
 	"acme_directory":  func(c *Config, v string) error { c.ACMEDirectory = v; return nil },
 	"update_channel":  func(c *Config, v string) error { c.UpdateChannel = v; return nil },
 	"update_base_url": func(c *Config, v string) error { c.UpdateBaseURL = v; return nil },
+	"update_allow_unsigned": func(c *Config, v string) error {
+		c.UpdateAllowUnsigned = isTrue(v)
+		return nil
+	},
 }
 
 func (c *Config) set(key, val string) error {

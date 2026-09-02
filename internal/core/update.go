@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/release"
 	"github.com/marion909/voltpanel/internal/store"
 	"github.com/marion909/voltpanel/internal/version"
 )
@@ -31,6 +33,10 @@ type Updater struct {
 	store *store.Store
 	log   *slog.Logger
 	http  *http.Client
+
+	// verifier prüft die Signatur über latest.json. Voreingestellt der
+	// eingebettete Schlüssel; ein Test setzt seinen eigenen ein.
+	verifier *release.Verifier
 
 	// Der Kanal wird höchstens einmal je Stunde befragt. Ohne den
 	// Zwischenspeicher fragte jeder Aufruf des Dashboards nach außen — bei
@@ -56,7 +62,8 @@ func NewUpdater(cfg *config.Config, st *store.Store, log *slog.Logger) *Updater 
 	}
 	return &Updater{
 		cfg: cfg, store: st, log: log,
-		http: &http.Client{Timeout: 10 * time.Minute},
+		http:     &http.Client{Timeout: 10 * time.Minute},
+		verifier: release.Default(),
 	}
 }
 
@@ -188,8 +195,19 @@ func (u *Updater) LatestRelease(ctx context.Context) (*Release, error) {
 		return nil, fmt.Errorf("update-kanal antwortet mit %s", resp.Status)
 	}
 
+	// Der Rumpf zuerst als Bytes: signiert ist die Datei, nicht das Ergebnis
+	// des Parsens. Wer erst parst und dann prüft, prüft etwas anderes als das,
+	// wonach er sich richtet.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, fmt.Errorf("release-info lesen: %w", err)
+	}
+	if err := u.verifyManifest(ctx, body); err != nil {
+		return nil, err
+	}
+
 	var rel Release
-	if err := decodeJSON(resp.Body, &rel); err != nil {
+	if err := json.Unmarshal(body, &rel); err != nil {
 		return nil, fmt.Errorf("release-info unlesbar: %w", err)
 	}
 	if rel.Version == "" {
@@ -197,6 +215,56 @@ func (u *Updater) LatestRelease(ctx context.Context) (*Release, error) {
 	}
 	return &rel, nil
 }
+
+// verifyManifest prüft die Signatur über latest.json.
+//
+// latest.json enthält die Prüfsummen aller Bestandteile. Wer die Datei signiert
+// hat, hat damit auch die Binaries signiert — und nur so ist der
+// Prüfsummenvergleich beim Herunterladen mehr als eine Prüfung gegen dieselbe
+// Quelle. Vorher stand daneben, nur wer den Release signiert habe, kenne die
+// Summe; das stimmte nicht, beide kamen von derselben Adresse.
+func (u *Updater) verifyManifest(ctx context.Context, body []byte) error {
+	if u.cfg.UpdateAllowUnsigned {
+		u.log.Warn("update-signatur wird nicht geprüft",
+			"grund", "update_allow_unsigned steht in der config.yaml")
+		return nil
+	}
+	if !u.verifier.HasKey() {
+		return fmt.Errorf("dieses binary wurde ohne release-schlüssel gebaut — "+
+			"ein update ließe sich damit nicht prüfen. %s", updateUnsignedHinweis)
+	}
+
+	url := fmt.Sprintf("%s/%s/latest.json.sig",
+		strings.TrimRight(u.cfg.UpdateBaseURL, "/"), u.cfg.UpdateChannel)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "volt/"+version.Version)
+
+	resp, err := u.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("signatur nicht erreichbar: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("zu den release-angaben gibt es keine signatur (%s). %s",
+			resp.Status, updateUnsignedHinweis)
+	}
+	sig, err := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+	if err != nil {
+		return fmt.Errorf("signatur lesen: %w", err)
+	}
+	if err := u.verifier.Verify(body, string(sig)); err != nil {
+		return fmt.Errorf("%w — das update wird nicht ausgeführt", err)
+	}
+	return nil
+}
+
+// updateUnsignedHinweis steht in jeder Meldung, die an der Signatur scheitert.
+// Ohne ihn sucht jemand an der falschen Stelle.
+const updateUnsignedHinweis = "Wer bewusst einen unsignierten Kanal betreibt, " +
+	"setzt update_allow_unsigned: true in der config.yaml."
 
 // Snapshot ist der Stand vor einem Update, auf den zurückgerollt werden kann.
 type Snapshot struct {

@@ -2,17 +2,25 @@ package core
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	crand "crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/release"
 	"github.com/marion909/voltpanel/internal/store"
 )
 
@@ -229,5 +237,124 @@ func TestSameVersionIgnoresTagPrefix(t *testing.T) {
 		if sameVersion(c[0], c[1]) {
 			t.Errorf("%q und %q sind verschiedene Versionen", c[0], c[1])
 		}
+	}
+}
+
+// signierterKanal baut einen Update-Kanal mit latest.json und Signatur.
+func signierterKanal(t *testing.T, u *Updater, manifest string) (sig func(string), stop func()) {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.verifier = release.NewVerifier(
+		pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+
+	signatur := ""
+	mux := http.NewServeMux()
+	mux.HandleFunc("/stable/latest.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(manifest))
+	})
+	mux.HandleFunc("/stable/latest.json.sig", func(w http.ResponseWriter, _ *http.Request) {
+		if signatur == "" {
+			http.NotFound(w, nil)
+			return
+		}
+		w.Write([]byte(signatur))
+	})
+	srv := httptest.NewServer(mux)
+	u.cfg.UpdateBaseURL, u.cfg.UpdateChannel = srv.URL, "stable"
+
+	return func(body string) {
+			d := sha256.Sum256([]byte(body))
+			raw, err := ecdsa.SignASN1(crand.Reader, key, d[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			signatur = base64.StdEncoding.EncodeToString(raw)
+		}, func() {
+			srv.Close()
+		}
+}
+
+// TestUpdateOhneSignaturWirdAbgelehnt ist der Kern.
+//
+// Ein Update schreibt das Panel und den Root-Daemon neu. Wer die Angaben dazu
+// unterschieben kann, hat den Server. Der Prüfsummenvergleich beim
+// Herunterladen hilft dagegen nicht: die Summe steht in derselben Datei, die
+// von derselben Adresse kommt.
+func TestUpdateOhneSignaturWirdAbgelehnt(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	manifest := `{"version":"9.9.9","assets":{}}`
+	sig, stop := signierterKanal(t, env.updater, manifest)
+	defer stop()
+
+	// Ohne Signaturdatei am Kanal: Abbruch, nicht "dann eben ohne".
+	if _, err := env.updater.LatestRelease(context.Background()); err == nil {
+		t.Error("ein Kanal ohne Signatur wurde angenommen")
+	}
+
+	// Mit falscher Signatur: ebenfalls Abbruch.
+	sig(`{"version":"1.0.0","assets":{}}`)
+	if _, err := env.updater.LatestRelease(context.Background()); err == nil {
+		t.Error("eine Signatur über einen anderen Inhalt wurde angenommen")
+	}
+
+	// Mit der richtigen: geht durch.
+	sig(manifest)
+	rel, err := env.updater.LatestRelease(context.Background())
+	if err != nil {
+		t.Fatalf("die eigene Signatur wurde abgelehnt: %v", err)
+	}
+	if rel.Version != "9.9.9" {
+		t.Errorf("Version %q", rel.Version)
+	}
+}
+
+// TestUpdateOhneSchluesselImBinary: ein Binary ohne Schlüssel kann nicht
+// prüfen. Es soll das sagen, nicht stillschweigend aktualisieren.
+func TestUpdateOhneSchluesselImBinary(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	manifest := `{"version":"9.9.9","assets":{}}`
+	sig, stop := signierterKanal(t, env.updater, manifest)
+	defer stop()
+	sig(manifest)
+
+	env.updater.verifier = release.NewVerifier(nil)
+	_, err := env.updater.LatestRelease(context.Background())
+	if err == nil {
+		t.Fatal("ohne Schlüssel wurde das Update angenommen")
+	}
+	if !strings.Contains(err.Error(), "release-schlüssel") {
+		t.Errorf("abgelehnt, aber aus dem falschen Grund: %v", err)
+	}
+	// Und die Meldung sagt, was zu tun wäre.
+	if !strings.Contains(err.Error(), "update_allow_unsigned") {
+		t.Errorf("die Meldung nennt den Ausweg nicht: %v", err)
+	}
+}
+
+// TestUnsigniertNurAufAnsage: die Möglichkeit steht da, weil ein Betreiber mit
+// eigenem Kanal vielleicht keinen Schlüssel führt. Sie muss aber ausdrücklich
+// gesetzt werden — eine Voreinstellung, die Signaturen überspringt, wäre keine
+// Prüfung.
+func TestUnsigniertNurAufAnsage(t *testing.T) {
+	env := newUpdateEnv(t, true)
+	manifest := `{"version":"9.9.9","assets":{}}`
+	_, stop := signierterKanal(t, env.updater, manifest)
+	defer stop()
+	env.updater.verifier = release.NewVerifier(nil)
+
+	if env.updater.cfg.UpdateAllowUnsigned {
+		t.Fatal("update_allow_unsigned ist voreingestellt an")
+	}
+	env.updater.cfg.UpdateAllowUnsigned = true
+	if _, err := env.updater.LatestRelease(context.Background()); err != nil {
+		t.Errorf("mit update_allow_unsigned schlug es fehl: %v", err)
 	}
 }

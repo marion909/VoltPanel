@@ -121,6 +121,29 @@ NOTES_JSON="$(printf '%s' "$NOTES" | jq -Rs .)"
     printf '\n  }\n}\n'
 } > "$OUT/latest.json"
 
+# latest.json signieren.
+#
+# Die Datei traegt die Pruefsummen aller Bestandteile — wer sie signiert,
+# signiert damit auch die Binaries. Ohne Signatur ist der Pruefsummenvergleich
+# in `volt update` eine Pruefung gegen dieselbe Quelle: wer den Server
+# beherrscht, liefert ein anderes Binary *und* die passende Summe.
+#
+# Der private Schluessel steht in COSIGN_PRIVATE_KEY (als Secret im Workflow),
+# das Passwort in COSIGN_PASSWORD. Der oeffentliche gehoert nach
+# internal/release/release.pub — eingebettet, nicht heruntergeladen: ein
+# Schluessel von derselben Adresse wie die Datei, die er beglaubigen soll,
+# beglaubigt nichts.
+if [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
+    command -v cosign >/dev/null 2>&1 || { echo "cosign fehlt." >&2; exit 1; }
+    cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
+        --output-signature "$OUT/latest.json.sig" "$OUT/latest.json"
+    echo "latest.json signiert."
+else
+    echo "WARNUNG: COSIGN_PRIVATE_KEY ist nicht gesetzt — latest.json bleibt" >&2
+    echo "         unsigniert. \`volt update\` lehnt diesen Kanal ab, solange" >&2
+    echo "         update_allow_unsigned nicht gesetzt ist. Siehe docs/release.md." >&2
+fi
+
 echo
 echo "Kanal:    $CHANNEL"
 echo "Version:  $VERSION"
