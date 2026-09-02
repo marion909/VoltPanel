@@ -35,6 +35,7 @@ type Server struct {
 	ftp       *core.FTPService
 	cron      *core.CronService
 	apps      *core.AppService
+	mail      *core.MailService
 	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
@@ -88,6 +89,7 @@ func New(opts Options) (*Server, error) {
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
 		// sperrt zusätzlich das Konto; dieser hier bremst schon davor.
 		apps:      core.NewAppService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
+		mail:      core.NewMailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
@@ -176,6 +178,25 @@ func (s *Server) setupRoutes() {
 	auth.POST("/system/fail2ban/unban", s.handleUnban, s.requireRole(store.RoleAdmin))
 	auth.GET("/system/portscan", s.handlePortScanStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/portscan", s.handlePortScanSet, s.requireRole(store.RoleAdmin))
+
+	// Mail. Eine Maildomäne gehört einem Mandanten, deshalb entscheidet der
+	// Scope — wie bei Sites. Nur das Einrichten des Mailspeichers und der
+	// Zustandsbericht bleiben beim Administrator: das eine legt einen
+	// Systembenutzer an, das andere sagt etwas über die Maschine.
+	auth.GET("/mail/status", s.handleMailStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/mail/setup", s.handleMailSetup, s.requireRole(store.RoleAdmin))
+	auth.GET("/mail/domains", s.handleListMailDomains)
+	auth.POST("/mail/domains", s.handleCreateMailDomain)
+	auth.PATCH("/mail/domains/:id", s.handleUpdateMailDomain)
+	auth.DELETE("/mail/domains/:id", s.handleDeleteMailDomain)
+	auth.GET("/mail/mailboxes", s.handleListMailboxes)
+	auth.POST("/mail/mailboxes", s.handleCreateMailbox)
+	auth.PATCH("/mail/mailboxes/:id", s.handleUpdateMailbox)
+	auth.GET("/mail/mailboxes/:id/password", s.handleRevealMailbox)
+	auth.DELETE("/mail/mailboxes/:id", s.handleDeleteMailbox)
+	auth.GET("/mail/aliases", s.handleListMailAliases)
+	auth.POST("/mail/aliases", s.handleCreateMailAlias)
+	auth.DELETE("/mail/aliases/:id", s.handleDeleteMailAlias)
 	auth.POST("/system/services/:name/:action", s.handleServiceAction, s.requireRole(store.RoleAdmin))
 
 	// Den Stand darf jeder Angemeldete sehen — er steht als Hinweis in der
