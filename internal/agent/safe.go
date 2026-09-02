@@ -69,6 +69,14 @@ var allowedBinaries = map[string]string{
 	// Firewall und Fail2ban. nft nur lesend — siehe ops_firewall.go.
 	"nft":             "/usr/sbin/nft",
 	"fail2ban-client": "/usr/bin/fail2ban-client",
+	// Mail. postconf setzt die Einstellungen in main.cf — es kennt die Syntax
+	// der Datei und behält Kommentare, anders als ein selbst zusammengesetztes
+	// Schreiben. postmap erzeugt aus den Textdateien die .db, aus der Postfix
+	// wirklich liest. doveadm lädt Dovecot neu; das Passwort läuft nie über
+	// seine Kommandozeile, den Hash bildet der Agent selbst.
+	"postconf": "/usr/sbin/postconf",
+	"postmap":  "/usr/sbin/postmap",
+	"doveadm":  "/usr/bin/doveadm",
 	// Fuer Git-Deploy. git holt den Stand, ssh-keygen erzeugt den Deploy-Key,
 	// composer und npm bauen. Alle Argumente kommen aus festen Listen oder
 	// gehen vorher durch NormalizeGitURL bzw. ValidGitRef.

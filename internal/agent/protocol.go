@@ -127,6 +127,12 @@ const (
 	OpPortScanStatus Op = "firewall.portscan.status"
 	OpPortScanSet    Op = "firewall.portscan.set"
 
+	// Mail: das Panel beschreibt den Sollzustand, der Agent schreibt die
+	// Map-Dateien und lädt die Dienste neu.
+	OpMailStatus Op = "mail.status"
+	OpMailSetup  Op = "mail.setup"
+	OpMailApply  Op = "mail.apply"
+
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"
 	OpNodeInstall Op = "node.install"

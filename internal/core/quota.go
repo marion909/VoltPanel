@@ -42,6 +42,7 @@ const (
 	ResourceDatabases Resource = "databases"
 	ResourceCronjobs  Resource = "cronjobs"
 	ResourceFTP       Resource = "ftp"
+	ResourceMailboxes Resource = "mailboxes"
 	ResourceDisk      Resource = "disk"
 	ResourceTraffic   Resource = "traffic"
 )
@@ -51,6 +52,7 @@ var resourceLabels = map[Resource]string{
 	ResourceDatabases: "datenbanken",
 	ResourceCronjobs:  "cronjobs",
 	ResourceFTP:       "ftp-zugänge",
+	ResourceMailboxes: "postfächer",
 	ResourceDisk:      "speicherplatz",
 	ResourceTraffic:   "traffic",
 }
@@ -145,6 +147,10 @@ func (s *QuotaService) CheckCount(ctx context.Context, sc store.Scope, tenantID 
 		limit = plan.MaxCronjobs
 	case ResourceFTP:
 		limit = plan.MaxFTP
+	case ResourceMailboxes:
+		// Die Spalte stand seit 0001 im Schema und wurde von niemandem
+		// gelesen — es gab ja keine Postfächer. Jetzt gibt es sie.
+		limit = plan.MaxMailboxes
 	default:
 		return fmt.Errorf("für %q gibt es keine anzahl-grenze", res)
 	}
@@ -173,6 +179,8 @@ func (s *QuotaService) countFor(ctx context.Context, sc store.Scope, res Resourc
 		return s.store.CountCronjobs(ctx, sc)
 	case ResourceFTP:
 		return s.store.CountFTPAccounts(ctx, sc)
+	case ResourceMailboxes:
+		return s.store.CountMailboxes(ctx, sc.TenantID)
 	}
 	return 0, fmt.Errorf("unbekannte ressource %q", res)
 }

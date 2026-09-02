@@ -84,7 +84,7 @@ func (s *Server) handleLogin(c echo.Context) error {
 	// nur ein Feld: die Oberfläche zeigte den Mandanten als gesperrt an, und
 	// seine Leute meldeten sich weiter an, als wäre nichts.
 	if tenant, err := s.store.GetTenant(ctx, store.SystemScope(), user.TenantID); err == nil &&
-		tenant.Status != "active" {
+		tenant.Status != store.TenantActive {
 
 		s.auditLogin(ctx, user, req.Email, ip, "mandant gesperrt")
 		return echo.NewHTTPError(http.StatusForbidden, "dieser zugang ist gesperrt")

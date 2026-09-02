@@ -712,6 +712,29 @@ func (c *Client) SetPortScan(ctx context.Context, p PortScanParams) (string, err
 	return res.Text, err
 }
 
+// --- Mail --------------------------------------------------------------------
+
+// MailStatusOf sagt, was auf diesem Server für Mail bereitsteht.
+func (c *Client) MailStatusOf(ctx context.Context) (*MailStatus, error) {
+	var res MailStatus
+	err := c.Call(ctx, OpMailStatus, nil, &res)
+	return &res, err
+}
+
+// MailSetup richtet Benutzer, Verzeichnisse und Postfix-Einstellungen ein.
+func (c *Client) MailSetup(ctx context.Context) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpMailSetup, nil, &res)
+	return res.Text, err
+}
+
+// ApplyMail schreibt den vollständigen Sollzustand in die Map-Dateien.
+func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpMailApply, p, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

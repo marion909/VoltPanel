@@ -79,6 +79,28 @@ erwarte "veraendertes latest.json" abgelehnt  "$TMP/boese.json"  "$TMP/latest.js
 erwarte "Signatur fehlt"          abgelehnt  "$TMP/latest.json" "$TMP/gibtsnicht.sig"
 erwarte "fremder Schluessel"      abgelehnt  "$TMP/latest.json" "$TMP/fremd.sig"
 
+# Die Ansage schaltet die Pruefung ganz ab — jeden Fehlerfall, nicht nur einen.
+#
+# Das war einmal anders: VOLT_ALLOW_UNSIGNED=1 wirkte nur, wenn das Skript
+# keinen Schluessel trug. Bei einem Kanal ohne Unterschrift brach es trotzdem
+# ab und nannte in der Meldung dieselbe Variable, die gerade gesetzt war.
+erwarte_mit_ansage() {
+    local was="$1" soll="$2" datei="$3" sig="$4"
+    if VOLT_ALLOW_UNSIGNED=1 bash "$TMP/probe.sh" "$datei" "file://$sig" >/dev/null 2>&1; then
+        ergebnis="angenommen"
+    else
+        ergebnis="abgelehnt"
+    fi
+    if [ "$ergebnis" = "$soll" ]; then
+        printf '  ok   %-28s %s\n' "$was" "$ergebnis"
+    else
+        printf '  FEHL %-28s %s, erwartet %s\n' "$was" "$ergebnis" "$soll"
+        fehler=1
+    fi
+}
+erwarte_mit_ansage "auf Ansage: Signatur fehlt" angenommen "$TMP/latest.json" "$TMP/gibtsnicht.sig"
+erwarte_mit_ansage "auf Ansage: Signatur passt nicht" angenommen "$TMP/boese.json" "$TMP/latest.json.sig"
+
 # Und ohne Schluessel im Skript: nur auf ausdrueckliche Ansage.
 # shellcheck disable=SC2016
 {

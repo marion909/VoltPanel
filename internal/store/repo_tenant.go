@@ -13,6 +13,14 @@ var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$`)
 
 // CreateTenant legt einen Mandanten an. Nur mit tenant-übergreifendem Scope
 // erlaubt — ein Kunde darf sich keine Nachbarn erzeugen.
+// Der Zustand eines Mandanten. Zwei Werte, und sie standen bisher als
+// Zeichenkette an drei Stellen — im Store, in der API und seit Phase 6 auch
+// beim Mailversand. Drei Schreibweisen desselben Wortes sind zwei zu viel.
+const (
+	TenantActive    = "active"
+	TenantSuspended = "suspended"
+)
+
 func (s *Store) CreateTenant(ctx context.Context, sc Scope, t *Tenant) error {
 	if !sc.IsSystem() && !sc.Role.CanCrossTenant() {
 		return fmt.Errorf("%w: rolle %s darf keine tenants anlegen", ErrForbidden, sc.Role)
@@ -25,7 +33,7 @@ func (s *Store) CreateTenant(ctx context.Context, sc Scope, t *Tenant) error {
 		return errors.New("tenant braucht einen namen")
 	}
 	if t.Status == "" {
-		t.Status = "active"
+		t.Status = TenantActive
 	}
 
 	t.CreatedAt, t.UpdatedAt = now(), now()

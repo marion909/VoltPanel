@@ -1,0 +1,355 @@
+package agent
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha512"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/marion909/voltpanel/internal/templates"
+)
+
+// Mail: die Dateien, aus denen Postfix und Dovecot ihre Benutzer kennen.
+//
+// Der Aufbau folgt dem der Vhosts. Das Panel beschreibt den Zustand — welche
+// Domänen, welche Postfächer, welche Weiterleitungen —, der Agent schreibt
+// daraus die Dateien und lädt die Dienste neu. Postfix und Dovecot sehen die
+// Panel-Datenbank nie; ein Mailserver mit einer Kennung darauf wäre der Weg,
+// über eine Lücke im Mailserver an die Zugangsdaten aller Kunden zu kommen.
+//
+// Das Passwort kommt im Klartext über den Socket und verlässt diese Datei
+// nicht: der Agent bildet den Hash und schreibt nur den. Denselben Weg gehen
+// die FTP-Zugänge. Über die Kommandozeile eines Hilfsprogramms ginge es auch —
+// aber dann stünde es in der Prozessliste, und die kann jeder Benutzer des
+// Servers lesen.
+
+// Dieselben Muster wie im Store, hier noch einmal: der Agent darf nicht davon
+// abhängen, dass jemand dort später etwas lockert.
+var (
+	reMailLocal      = regexp.MustCompile(`^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$`)
+	reMailDomainTeil = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
+)
+
+const (
+	postfixMailDir = "/etc/postfix/volt"
+	dovecotMailDir = "/etc/dovecot/volt"
+	// vmailUser ist der Benutzer, dem alle Maildirs gehören.
+	//
+	// Einer für alle, nicht einer je Mandant. Das ist die übliche Bauart eines
+	// virtuellen Mailservers, und sie hat eine Grenze, die hier benannt gehört:
+	// die Trennung zwischen zwei Mandanten liegt in Dovecot, nicht im
+	// Dateisystem. Für die Websites ist es umgekehrt — dort hat jede Site ihre
+	// eigene Kennung.
+	vmailUser = "vmail"
+	vmailHome = "/var/vmail"
+)
+
+// MailboxParams ist ein Postfach, wie das Panel es beschreibt.
+type MailboxParams struct {
+	Address string `json:"address"`
+	// Password ist Klartext und wird hier zu einem Hash. Ist es leer, bleibt
+	// das bestehende Passwort stehen — dafür trägt der Aufrufer Hash mit.
+	Password string `json:"password"`
+	Hash     string `json:"hash"`
+	QuotaMB  int64  `json:"quota_mb"`
+}
+
+// MailAliasParams ist eine Weiterleitung. "@domain" ist der Catch-All.
+type MailAliasParams struct {
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+}
+
+// MailApplyParams ist der vollständige Sollzustand.
+//
+// Vollständig und nicht als Änderung: dieselbe Bauart wie bei den Vhosts. Wer
+// einzelne Zeilen schickt, hat irgendwann eine Datei, die zu keinem Stand der
+// Datenbank mehr passt — und niemand merkt es, bis eine Adresse Post bekommt,
+// die es nicht mehr geben sollte.
+type MailApplyParams struct {
+	Domains   []string          `json:"domains"`
+	Mailboxes []MailboxParams   `json:"mailboxes"`
+	Aliases   []MailAliasParams `json:"aliases"`
+}
+
+// MailStatus sagt, was auf diesem Server steht.
+type MailStatus struct {
+	PostfixInstalled bool `json:"postfix_installed"`
+	DovecotInstalled bool `json:"dovecot_installed"`
+	// Configured heißt: die Dateien des Panels stehen und Postfix zeigt darauf.
+	Configured bool `json:"configured"`
+	// HashScheme ist das Passwortschema, das die Datei benutzt.
+	HashScheme string   `json:"hash_scheme,omitempty"`
+	Mailboxes  int      `json:"mailboxes"`
+	Domains    int      `json:"domains"`
+	Hinweise   []string `json:"hinweise,omitempty"`
+}
+
+// opMailStatus berichtet, was da ist und was fehlt.
+func (s *Server) opMailStatus(_ context.Context, _ json.RawMessage) (any, error) {
+	res := MailStatus{HashScheme: "SSHA512"}
+	res.PostfixInstalled = fileExists(allowedBinaries["postconf"])
+	res.DovecotInstalled = fileExists(allowedBinaries["doveadm"])
+
+	if !res.PostfixInstalled {
+		res.Hinweise = append(res.Hinweise,
+			"Postfix ist auf diesem Server nicht installiert. Ohne es nimmt niemand Post an.")
+	}
+	if !res.DovecotInstalled {
+		res.Hinweise = append(res.Hinweise,
+			"Dovecot ist auf diesem Server nicht installiert. Ohne es kommt niemand an seine Post.")
+	}
+
+	if b, err := os.ReadFile(filepath.Join(postfixMailDir, "domains")); err == nil {
+		res.Configured = true
+		res.Domains = zaehleEintraege(string(b))
+	}
+	if b, err := os.ReadFile(filepath.Join(postfixMailDir, "mailboxes")); err == nil {
+		res.Mailboxes = zaehleEintraege(string(b))
+	}
+	return res, nil
+}
+
+// zaehleEintraege zählt die Zeilen einer Map, ohne Kopf und Leerzeilen.
+func zaehleEintraege(inhalt string) int {
+	var n int
+	for _, line := range strings.Split(inhalt, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			n++
+		}
+	}
+	return n
+}
+
+// opMailApply schreibt den Sollzustand in die Dateien.
+func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MailApplyParams](raw, OpMailApply)
+	if err != nil {
+		return nil, err
+	}
+	if !fileExists(allowedBinaries["postmap"]) {
+		return nil, opErr(OpMailApply, "postfix ist auf diesem server nicht installiert")
+	}
+
+	uid, gid, err := siteUserIDs(OpMailApply, vmailUser)
+	if err != nil {
+		return nil, opErr(OpMailApply,
+			"den benutzer %s gibt es noch nicht — `mail.setup` legt ihn an", vmailUser)
+	}
+
+	d := templates.MailData{
+		GeneratedAt: templates.NowStamp(),
+		MailRoot:    vmailHome,
+		VMailUID:    uid,
+		VMailGID:    gid,
+		Domains:     p.Domains,
+	}
+	for _, m := range p.Mailboxes {
+		hash := m.Hash
+		if m.Password != "" {
+			hash = hashSSHA512(m.Password)
+		}
+		// Das Maildir bildet der Agent aus der Adresse. Ein Pfad aus der
+		// Anfrage wäre ein Weg, ein Postfach an eine beliebige Stelle des
+		// Dateisystems zu legen — templates prüft ihn zwar, aber die Frage
+		// stellt sich gar nicht erst, wenn er hier entsteht.
+		verzeichnis, err := maildirFuer(m.Address)
+		if err != nil {
+			return nil, opInputErr(OpMailApply, "%v", err)
+		}
+		d.Mailboxes = append(d.Mailboxes, templates.MailboxEntry{
+			Address: m.Address, Hash: hash, QuotaMB: m.QuotaMB, Maildir: verzeichnis,
+		})
+	}
+	for _, a := range p.Aliases {
+		d.Aliases = append(d.Aliases, templates.AliasEntry{
+			Source: a.Source, Destination: a.Destination,
+		})
+	}
+
+	domains, err := templates.RenderPostfixDomains(d)
+	if err != nil {
+		return nil, opInputErr(OpMailApply, "%v", err)
+	}
+	boxen, err := templates.RenderPostfixMailboxes(d)
+	if err != nil {
+		return nil, opInputErr(OpMailApply, "%v", err)
+	}
+	aliase, err := templates.RenderPostfixAliases(d)
+	if err != nil {
+		return nil, opInputErr(OpMailApply, "%v", err)
+	}
+	users, err := templates.RenderDovecotUsers(d)
+	if err != nil {
+		return nil, opInputErr(OpMailApply, "%v", err)
+	}
+
+	for _, dir := range []string{postfixMailDir, dovecotMailDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, opErr(OpMailApply, "%s anlegen: %v", dir, err)
+		}
+	}
+
+	for name, inhalt := range map[string]string{
+		"domains":   domains,
+		"mailboxes": boxen,
+		"aliases":   aliase,
+	} {
+		pfad := filepath.Join(postfixMailDir, name)
+		if err := writeFileAtomic(pfad, []byte(inhalt), 0o644); err != nil {
+			return nil, opErr(OpMailApply, "%s schreiben: %v", pfad, err)
+		}
+		// postmap erzeugt die .db, aus der Postfix wirklich liest. Ohne diesen
+		// Schritt bleibt die Textdatei wirkungslos, und der Fehler sieht aus
+		// wie "die Adresse gibt es nicht".
+		if out, err := run(ctx, shortTimeout, "postmap", "hash:"+pfad); err != nil {
+			return nil, opErr(OpMailApply, "postmap %s: %s", name, truncate(out, 300))
+		}
+	}
+
+	// Die Passwortdatei ist die eine, die niemand lesen darf außer Dovecot.
+	// 0640 und die Gruppe des Dienstes; kommt der Benutzer nicht vor, bleibt
+	// es bei root — dann liest Dovecot sie als root, was es ohnehin tut.
+	pfad := filepath.Join(dovecotMailDir, "users")
+	if err := writeFileAtomic(pfad, []byte(users), 0o640); err != nil {
+		return nil, opErr(OpMailApply, "%s schreiben: %v", pfad, err)
+	}
+
+	var meldungen []string
+	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "postfix"); err != nil {
+		meldungen = append(meldungen, "postfix nicht neu geladen: "+truncate(out, 200))
+	}
+	if fileExists(allowedBinaries["doveadm"]) {
+		if out, err := run(ctx, shortTimeout, "doveadm", "reload"); err != nil {
+			meldungen = append(meldungen, "dovecot nicht neu geladen: "+truncate(out, 200))
+		}
+	}
+
+	text := fmt.Sprintf("%d domänen, %d postfächer, %d weiterleitungen geschrieben",
+		len(d.Domains), len(d.Mailboxes), len(d.Aliases))
+	if len(meldungen) > 0 {
+		text += " — " + strings.Join(meldungen, "; ")
+	}
+	return TextResult{Text: text}, nil
+}
+
+// maildirFuer bildet den Pfad eines Postfachs aus seiner Adresse.
+//
+// Zerlegt und neu gebaut, nicht durchgereicht: "domain/local" aus zwei
+// geprüften Teilen kann nichts anderes sein als das.
+func maildirFuer(address string) (string, error) {
+	local, domain, ok := strings.Cut(strings.ToLower(strings.TrimSpace(address)), "@")
+	if !ok {
+		return "", fmt.Errorf("%q ist keine adresse", address)
+	}
+	if !reMailLocal.MatchString(local) || !reMailDomainTeil.MatchString(domain) {
+		return "", fmt.Errorf("%q ist keine adresse", address)
+	}
+	return domain + "/" + local, nil
+}
+
+// hashSSHA512 erzeugt das Passwortfeld für Dovecot.
+//
+// {SSHA512} ist base64(sha512(passwort + salz) + salz) — die Schreibweise, die
+// Dovecot ohne zusätzliche Bibliothek versteht. ARGON2ID wäre die bessere
+// Ableitung, hängt in Dovecot aber an libsodium; wo das fehlt, wären alle
+// Postfächer auf einen Schlag nicht mehr anmeldbar, und der Grund stünde
+// nirgends.
+//
+// Das ist ein bewusster Tausch, kein Versehen: das Klartextpasswort liegt
+// ohnehin verschlüsselt in der Panel-Datenbank, weil ein Mailkonto in einem
+// Mailprogramm eingetragen wird. Wer die Datenbank hat, braucht den Hash nicht
+// zu brechen.
+func hashSSHA512(password string) string {
+	salz := make([]byte, 8)
+	if _, err := rand.Read(salz); err != nil {
+		// Ohne Zufall kein Hash. Ein fester Wert wäre schlimmer als ein
+		// Fehler, deshalb ein Feld, das die Prüfung in templates ablehnt.
+		return ""
+	}
+	return sshaMitSalz(password, salz)
+}
+
+// sshaMitSalz ist der Kern, mit gegebenem Salz — damit er sich prüfen lässt.
+func sshaMitSalz(password string, salz []byte) string {
+	sum := sha512.Sum512(append([]byte(password), salz...))
+	return "{SSHA512}" + base64.StdEncoding.EncodeToString(append(sum[:], salz...))
+}
+
+// opMailSetup richtet ein, was einmal eingerichtet werden muss.
+//
+// Der Benutzer für die Maildirs, die Verzeichnisse, und die Einstellungen in
+// Postfix, die auf die Dateien des Panels zeigen. Gesetzt werden sie mit
+// `postconf -e` und nicht durch Schreiben in main.cf: postconf kennt die
+// Syntax der Datei, behält Kommentare und ist wiederholbar. Eine von Hand
+// zusammengesetzte main.cf wäre genau das manuelle Patchen, das dieses Projekt
+// nicht tut.
+func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error) {
+	if !fileExists(allowedBinaries["postconf"]) {
+		return nil, opErr(OpMailSetup, "postfix ist auf diesem server nicht installiert")
+	}
+
+	var schritte []string
+	if out, err := run(ctx, longTimeout, "useradd",
+		"--home-dir", vmailHome, "--create-home", "--shell", "/usr/sbin/nologin",
+		"--user-group", "--comment", "voltpanel mail storage", vmailUser); err != nil {
+		if !strings.Contains(out, "already exists") {
+			return nil, opErr(OpMailSetup, "benutzer %s: %s", vmailUser, truncate(out, 300))
+		}
+		schritte = append(schritte, "benutzer "+vmailUser+" war schon da")
+	} else {
+		schritte = append(schritte, "benutzer "+vmailUser+" angelegt")
+	}
+
+	uid, gid, err := siteUserIDs(OpMailSetup, vmailUser)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(vmailHome, 0o750); err != nil {
+		return nil, opErr(OpMailSetup, "%s anlegen: %v", vmailHome, err)
+	}
+	if err := os.Chown(vmailHome, uid, gid); err != nil {
+		return nil, opErr(OpMailSetup, "%s übereignen: %v", vmailHome, err)
+	}
+
+	// Die Einstellungen, die Postfix auf die Dateien des Panels richten.
+	// Jede einzeln, damit eine falsche nicht die anderen mitnimmt.
+	einstellungen := [][2]string{
+		{"virtual_mailbox_domains", "hash:" + postfixMailDir + "/domains"},
+		{"virtual_mailbox_maps", "hash:" + postfixMailDir + "/mailboxes"},
+		{"virtual_alias_maps", "hash:" + postfixMailDir + "/aliases"},
+		{"virtual_mailbox_base", vmailHome},
+		{"virtual_uid_maps", "static:" + strconv.Itoa(uid)},
+		{"virtual_gid_maps", "static:" + strconv.Itoa(gid)},
+		// Ohne diese Zeile nimmt Postfix Post für jede Domäne an, die in
+		// virtual_mailbox_domains steht — und leitet sie an sich selbst weiter.
+		{"virtual_transport", "virtual"},
+	}
+	for _, e := range einstellungen {
+		if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
+			return nil, opErr(OpMailSetup, "postconf %s: %s", e[0], truncate(out, 200))
+		}
+	}
+	schritte = append(schritte, "postfix zeigt auf "+postfixMailDir)
+
+	// Leere Maps anlegen, damit Postfix beim Neuladen nicht über eine fehlende
+	// Datei stolpert. Der erste echte Stand kommt mit mail.apply.
+	leer := MailApplyParams{}
+	if raw, err := json.Marshal(leer); err == nil {
+		if _, err := s.opMailApply(ctx, raw); err != nil {
+			schritte = append(schritte, "die leeren maps konnten noch nicht geschrieben werden")
+		} else {
+			schritte = append(schritte, "leere maps geschrieben")
+		}
+	}
+
+	return TextResult{Text: strings.Join(schritte, "; ")}, nil
+}

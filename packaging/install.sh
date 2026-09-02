@@ -211,20 +211,32 @@ download_verified() {
 verify_manifest() {
     local file="$1" sig_url="$2" keyfile sigfile
 
-    if [ -z "$VOLT_RELEASE_KEY_PEM" ]; then
-        if [ "$VOLT_ALLOW_UNSIGNED" != "1" ]; then
-            printf '%sFehler:%s Dieses Installationsskript traegt keinen Release-Schluessel.\n' "$C_RED" "$C_RESET" >&2
-            printf '        Die Angaben unter %s liessen sich damit nicht pruefen,\n' "$sig_url" >&2
-            printf '        und ohne Pruefung wird hier nichts installiert.\n\n' >&2
-            printf '        Der Kanal ist noch nicht signiert. Zwei Wege:\n\n' >&2
-            printf '          1. Signieren (siehe docs/release.md). Danach traegt das\n' >&2
-            printf '             veroeffentlichte Skript den Schluessel und diese Meldung bleibt aus.\n' >&2
-            printf '          2. Bewusst ohne Pruefung installieren:\n\n' >&2
-            printf '             VOLT_ALLOW_UNSIGNED=1 bash <(curl -fsSL %s/install.sh)\n\n' "$VOLT_BASE_URL" >&2
-            exit 1
-        fi
+    # Die Ansage zuerst, und zwar fuer jeden Grund.
+    #
+    # Sie stand vorher nur im Fall "kein Schluessel im Skript" — bei einem
+    # Kanal ohne Unterschrift lief das Skript trotzdem in den Abbruch und
+    # nannte in derselben Meldung die Variable, die gerade gesetzt war.
+    #
+    # VOLT_ALLOW_UNSIGNED=1 schaltet die Pruefung ganz ab, nicht nur einen
+    # ihrer Fehlerfaelle. Das ist dasselbe, was update_allow_unsigned im Panel
+    # tut, und es ist die ehrlichere Auslegung: wer "ohne Pruefung" sagt, will
+    # nicht an einer anderen Stelle doch geprueft werden. Der Preis steht in
+    # der Warnung darunter.
+    if [ "$VOLT_ALLOW_UNSIGNED" = "1" ]; then
         warn "Ohne Signaturpruefung installiert (VOLT_ALLOW_UNSIGNED=1)."
         return 0
+    fi
+
+    if [ -z "$VOLT_RELEASE_KEY_PEM" ]; then
+        printf '%sFehler:%s Dieses Installationsskript traegt keinen Release-Schluessel.\n' "$C_RED" "$C_RESET" >&2
+        printf '        Die Angaben unter %s liessen sich damit nicht pruefen,\n' "$sig_url" >&2
+        printf '        und ohne Pruefung wird hier nichts installiert.\n\n' >&2
+        printf '        Der Kanal ist noch nicht signiert. Zwei Wege:\n\n' >&2
+        printf '          1. Signieren (siehe docs/release.md). Danach traegt das\n' >&2
+        printf '             veroeffentlichte Skript den Schluessel und diese Meldung bleibt aus.\n' >&2
+        printf '          2. Bewusst ohne Pruefung installieren:\n\n' >&2
+        printf '             VOLT_ALLOW_UNSIGNED=1 bash <(curl -fsSL %s/install.sh)\n\n' "$VOLT_BASE_URL" >&2
+        exit 1
     fi
 
     command -v openssl >/dev/null 2>&1 || die "openssl fehlt — ohne es laesst sich die Signatur nicht pruefen."
