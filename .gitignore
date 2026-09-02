@@ -24,3 +24,10 @@ coverage.html
 /.env
 /tmp/
 .DS_Store
+
+# Der private Release-Schlüssel. Wer ihn hat, kann Updates für jede
+# Installation ausliefern — er gehört in den Secret-Speicher des Repositorys
+# (RELEASE_SIGNING_KEY), nicht hierher. Der öffentliche Teil steht in
+# internal/release/release.pub und wird eingebettet.
+/release.key
+/cosign.key
