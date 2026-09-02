@@ -6,7 +6,36 @@
 # Sie ersetzt sie nicht: was hier nicht steht, bleibt, wie das Paket es
 # ausliefert. Dieselbe Bauart wie bei den eigenen Nginx-Direktiven einer Site.
 
-protocols = imap
+protocols = imap lmtp
+
+# Zugestellt wird über Dovecot, nicht durch Postfix selbst.
+#
+# Der Unterschied ist die Quota: schreibt Postfix die Mail ins Maildir, kennt
+# niemand die Grenze des Postfachs, und ein volles Postfach füllt die Platte
+# weiter. Über LMTP fragt Postfix bei der Zustellung nach, und Dovecot lehnt
+# ab, wenn kein Platz mehr ist — mit einer Meldung, die der Absender bekommt.
+mail_plugins = $mail_plugins quota
+
+plugin {
+  # Die Regel je Postfach kommt aus der Passwortdatei (userdb_quota_rule).
+  # Hier steht nur, woran gemessen wird.
+  quota = maildir:User quota
+  quota_exceeded_message = Das Postfach ist voll.
+}
+
+protocol lmtp {
+  mail_plugins = $mail_plugins quota
+  # Dovecot startet LMTP nicht ohne diese Angabe.
+  postmaster_address = postmaster@{{ .Hostname }}
+}
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
 
 # Die Postfächer liegen dort, wo die Passwortdatei es sagt: home ist
 # {{ .MailRoot }}/<domain>/<name>, und darin liegt das Maildir direkt.

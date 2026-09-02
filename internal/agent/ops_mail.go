@@ -562,10 +562,20 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 	// nicht, die der Agent schreibt — die Postfächer stünden da und niemand
 	// käme herein.
 	if dirExists(dovecotConfD) {
+		// Der Hostname für postmaster_address kommt aus Postfix, nicht aus
+		// einer Anfrage. Fehlt er oder taugt er nicht, bleibt es bei der
+		// Zustellung durch Postfix — eine Dovecot-Konfiguration, die nicht
+		// startet, hielte jede Mail in der Warteschlange fest.
+		hostname := ""
+		if out, err := run(ctx, shortTimeout, "postconf", "-h", "myhostname"); err == nil {
+			hostname = strings.TrimSpace(out)
+		}
+
 		conf, err := templates.RenderDovecotConf(templates.DovecotData{
 			GeneratedAt: templates.NowStamp(),
 			MailRoot:    vmailHome,
 			UsersFile:   filepath.Join(dovecotMailDir, "users"),
+			Hostname:    hostname,
 			VMailUID:    uid,
 			VMailGID:    gid,
 			CertPath:    cert,
@@ -582,6 +592,17 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 			schritte = append(schritte, "dovecot nicht neu geladen: "+truncate(out, 150))
 		} else {
 			schritte = append(schritte, "dovecot kennt die postfächer")
+
+			// Erst wenn Dovecot wirklich neu geladen hat, wird die Zustellung
+			// umgestellt. Andersherum zeigte Postfix auf einen LMTP-Dienst,
+			// den es noch nicht gibt — die Mail ginge dabei nicht verloren,
+			// sie bliebe in der Warteschlange, aber sie käme eben nicht an.
+			if out, err := run(ctx, shortTimeout, "postconf", "-e",
+				"virtual_transport=lmtp:unix:private/dovecot-lmtp"); err != nil {
+				schritte = append(schritte, "zustellung nicht umgestellt: "+truncate(out, 150))
+			} else {
+				schritte = append(schritte, "zustellung über dovecot — damit greift die quota")
+			}
 		}
 	} else {
 		schritte = append(schritte, "dovecot fehlt — die postfächer sind nicht abrufbar")

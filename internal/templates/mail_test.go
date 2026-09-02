@@ -161,6 +161,7 @@ func TestDovecotConfNenntDiePasswortdatei(t *testing.T) {
 		GeneratedAt: "2026-09-02T12:00:00+02:00",
 		MailRoot:    "/var/vmail",
 		UsersFile:   "/etc/dovecot/volt/users",
+		Hostname:    "mail.example.at",
 		VMailUID:    5000,
 		VMailGID:    5000,
 		CertPath:    "/var/lib/volt/certs/panel/fullchain.pem",
@@ -188,6 +189,34 @@ func TestDovecotConfNenntDiePasswortdatei(t *testing.T) {
 	if !strings.Contains(out, "scheme=SSHA512") {
 		t.Error("ohne scheme= liest dovecot den hash als klartext")
 	}
+
+	// Und die Zustellung über LMTP, ohne die keine Quota greift.
+	for _, will := range []string{
+		"protocols = imap lmtp",
+		"quota = maildir:User quota",
+		"postmaster_address = postmaster@mail.example.at",
+		"/var/spool/postfix/private/dovecot-lmtp",
+	} {
+		if !strings.Contains(out, will) {
+			t.Errorf("%q fehlt:\n%s", will, out)
+		}
+	}
+}
+
+// Der Hostname landet in postmaster_address. Ohne ihn startet Dovecots LMTP
+// nicht, und dann bleibt jede Mail in der Warteschlange von Postfix.
+func TestDovecotConfBrauchtEinenHostnamen(t *testing.T) {
+	basis := DovecotData{
+		GeneratedAt: "x", MailRoot: "/var/vmail",
+		UsersFile: "/etc/dovecot/volt/users", VMailUID: 5000, VMailGID: 5000,
+	}
+	for _, name := range []string{"", "localhost", "mail", "mail.example.at\nfoo = bar", "-mail.at"} {
+		d := basis
+		d.Hostname = name
+		if _, err := RenderDovecotConf(d); err == nil {
+			t.Errorf("%q wurde als hostname angenommen", name)
+		}
+	}
 }
 
 // Ein Zertifikat ohne Schlüssel ergibt eine Konfiguration, mit der Dovecot
@@ -195,7 +224,8 @@ func TestDovecotConfNenntDiePasswortdatei(t *testing.T) {
 func TestDovecotConfLehntHalbesZertifikatAb(t *testing.T) {
 	basis := DovecotData{
 		GeneratedAt: "x", MailRoot: "/var/vmail",
-		UsersFile: "/etc/dovecot/volt/users", VMailUID: 5000, VMailGID: 5000,
+		UsersFile: "/etc/dovecot/volt/users", Hostname: "mail.example.at",
+		VMailUID: 5000, VMailGID: 5000,
 	}
 	nurCert := basis
 	nurCert.CertPath = "/a/fullchain.pem"

@@ -237,8 +237,8 @@ Offen ist der Rest:
 - Rspamd bringt seine Regeln selbst mit; das Panel trägt es nur als zweiten
   Milter ein. Was es damit aussortiert, ist noch nirgends sichtbar.
 - Autoconfig und Autodiscover für Thunderbird und Outlook.
-- Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
-  sie noch nicht auf einem laufenden Server.
+- Die Quota greift jetzt, weil Dovecot zustellt und nicht Postfix — auf einem
+  laufenden Server erprobt ist sie damit noch nicht.
 - Webmail (Roundcube) als Plugin
 
 Eine Grenze gehört benannt: alle Maildirs gehören einem Benutzer (`vmail`), so

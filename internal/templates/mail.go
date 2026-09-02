@@ -242,8 +242,11 @@ type DovecotData struct {
 	GeneratedAt string
 	MailRoot    string
 	UsersFile   string
-	VMailUID    int
-	VMailGID    int
+	// Hostname steht in postmaster_address. Ohne die Angabe startet Dovecots
+	// LMTP nicht — und dann bleibt jede Mail in der Warteschlange von Postfix.
+	Hostname string
+	VMailUID int
+	VMailGID int
 	// CertPath und KeyPath dürfen leer sein. Dann läuft Dovecot mit dem
 	// selbstsignierten Zertifikat des Pakets — sichtbar für jeden, der ein
 	// Mailprogramm einrichtet, und das ist die richtige Auskunft.
@@ -266,6 +269,10 @@ func RenderDovecotConf(d DovecotData) (string, error) {
 	case d.VMailUID < 1000 || d.VMailGID < 1000:
 		return "", fmt.Errorf("die kennung für die maildirs ist zu niedrig (%d:%d)",
 			d.VMailUID, d.VMailGID)
+	case !reMailDomainEntry.MatchString(d.Hostname):
+		// Der Name landet in postmaster_address. Was dort einen Zeilenumbruch
+		// hätte, schriebe die nächste Direktive.
+		return "", fmt.Errorf("%q ist kein zulässiger hostname", d.Hostname)
 	}
 	for _, p := range []string{d.CertPath, d.KeyPath} {
 		if p != "" && (!strings.HasPrefix(p, "/") || strings.ContainsAny(p, " \n\t\r")) {
