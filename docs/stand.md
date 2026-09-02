@@ -204,22 +204,38 @@ installiert je Benutzer, und in diesem Panel hat jede Site einen eigenen —
 dieselbe Fassung läge dann zwanzigmal auf der Platte. Das System-Node bleibt
 als „node" wählbar.
 
-**Phase 6 — Mailserver**
+**Phase 6 — Mailserver** (angefangen)
 
-- Eigener Stack: Postfix, Dovecot, Rspamd, OpenDKIM, virtuelle Domänen aus der
-  Datenbank. Die Roadmap ließ Mailcow als Alternative offen; die Entscheidung
-  ist gegen sie gefallen.
-- Multidomain: Domänen, Postfächer, Aliase, Catch-All, Weiterleitungen, Quota
+Entschieden und gebaut ist der Unterbau: eigener Stack — Postfix, Dovecot,
+Rspamd, OpenDKIM — mit virtuellen Domänen aus der Datenbank. Die Roadmap ließ
+Mailcow als Alternative offen; die Entscheidung ist gegen sie gefallen: ein
+Docker-Stack, den das Panel nur verwaltet, wäre ein zweites Panel mit eigener
+Datenhaltung und eigener Vorstellung davon, wem was gehört.
+
+Es steht: Domänen, Postfächer, Weiterleitungen und Catch-All in Datenbank,
+Dienst, API und Oberfläche. Der Agent schreibt daraus die Map-Dateien für
+Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
+nie. Ein gesperrter Mandant nimmt keine Post mehr an, ein Catch-All zeigt nur
+auf ein eigenes Postfach, und Postfächer zählen zum Paket.
+
+Offen ist der Rest:
+
 - DKIM-Schlüssel erzeugen, SPF-, DKIM- und DMARC-Einträge automatisch über die
-  Cloudflare-Anbindung aus Phase 2 setzen
+  Cloudflare-Anbindung aus Phase 2 setzen. Die Spalten dafür stehen im Schema,
+  gefüllt werden sie noch nicht.
+- Rspamd und OpenDKIM einrichten — bisher richtet `mail.setup` nur Postfix und
+  den Mailspeicher ein.
+- TLS für SMTP und IMAP aus den vorhandenen Zertifikaten.
+- Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
+  sie noch nicht auf einem laufenden Server.
 - Webmail (Roundcube) als Plugin
 - Autoconfig und Autodiscover für Thunderbird und Outlook
 - Deliverability-Prüfung im Panel: PTR, Blacklists, offene Relays, TLS
 
-Vorbereitet ist zweierlei: `postfix`, `dovecot`, `rspamd` und `opendkim` stehen
-bereits auf der Dienst-Whitelist, und der verschlüsselte Cloudflare-Token je
-Mandant ist genau das, was die DNS-Einträge brauchen. Beides ist Vorarbeit,
-keine Entscheidung.
+Eine Grenze gehört benannt: alle Maildirs gehören einem Benutzer (`vmail`), so
+wie es bei einem virtuellen Mailserver üblich ist. Die Trennung zwischen zwei
+Mandanten liegt damit in Dovecot, nicht im Dateisystem — bei den Websites ist
+es umgekehrt, dort hat jede Site ihre eigene Kennung.
 
 Der schwierige Teil ist auch nicht der Code. Ob eine Mail bei Gmail im
 Posteingang landet, hängt an PTR-Eintrag, Reputation der IP und daran, dass

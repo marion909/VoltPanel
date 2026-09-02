@@ -5,6 +5,7 @@ import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
 import Sites from './views/Sites.vue'
 import Apps from './views/Apps.vue'
+import Mail from './views/Mail.vue'
 import Deploys from './views/Deploys.vue'
 import SiteDetail from './views/SiteDetail.vue'
 import Databases from './views/Databases.vue'
@@ -29,6 +30,7 @@ const routes = [
   { path: '/sql', name: 'sql', component: SQL },
   { path: '/files', name: 'files', component: Files },
   { path: '/ftp', name: 'ftp', component: FTP },
+  { path: '/mail', name: 'mail', component: Mail },
   { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/backups', name: 'backups', component: Backups },
   { path: '/services', name: 'services', component: Services },

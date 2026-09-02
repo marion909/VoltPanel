@@ -20,6 +20,7 @@ const nav = computed(() =>
     { to: "/databases", key: "nav.databases", icon: "database" },
     { to: "/sql", key: "nav.sql", icon: "database" },
     { to: "/ftp", key: "nav.ftp", icon: "folder" },
+    { to: "/mail", key: "nav.mail", icon: "mail" },
     { to: "/cronjobs", key: "nav.cron", icon: "clock" },
     { to: "/backups", key: "nav.backups", icon: "archive" },
     { to: "/services", key: "nav.services", icon: "server", minRole: "admin" },
@@ -56,6 +57,7 @@ const paths = {
   box: "M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v10",
   branch: "M6 3v12M6 21a3 3 0 100-6 3 3 0 000 6zM6 6a3 3 0 100-6 3 3 0 000 6zM18 9a3 3 0 100-6 3 3 0 000 6zM18 6v1a4 4 0 01-4 4h-2a6 6 0 00-6 6",
   folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
+  mail: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2zM3 8l9 6 9-6",
   database:
     "M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",

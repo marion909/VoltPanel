@@ -16,6 +16,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 - Port-Scan-Erkennung: die abgewiesenen Pakete zählen
 - Changelog — und er wird zu dem, was vor dem Update dasteht
 - Signieren ohne cosign: `RELEASE_SIGNING_KEY` und zwei openssl-Zeilen
+- Der Release-Schlüssel steht
+- install.sh: VOLT_ALLOW_UNSIGNED wirkte nur im halben Fall
+- Die Seite nahm die Signatur nie mit
+- Phase 6: Datenhaltung, Dienst, Maps und Oberfläche für Mail
 
 ## v0.3.9 — 2026-09-02
 
