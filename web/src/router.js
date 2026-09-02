@@ -9,6 +9,7 @@ import Apps from './views/Apps.vue'
 import Mail from './views/Mail.vue'
 import Deploys from './views/Deploys.vue'
 import SiteDetail from './views/SiteDetail.vue'
+import DatabaseArea from './views/DatabaseArea.vue'
 import Databases from './views/Databases.vue'
 import SQL from './views/SQL.vue'
 import Backups from './views/Backups.vue'
@@ -41,8 +42,16 @@ const routes = [
   },
   { path: '/apps', redirect: { name: 'apps' } },
   { path: '/deploys', redirect: { name: 'deploys' } },
-  { path: '/databases', name: 'databases', component: Databases },
-  { path: '/sql', name: 'sql', component: SQL },
+  {
+    path: '/databases',
+    component: DatabaseArea,
+    children: [
+      { path: '', redirect: { name: 'databases' } },
+      { path: 'manage', name: 'databases', component: Databases },
+      { path: 'sql', name: 'sql', component: SQL },
+    ],
+  },
+  { path: '/sql', redirect: { name: 'sql' } },
   { path: '/files', name: 'files', component: Files },
   { path: '/ftp', name: 'ftp', component: FTP },
   { path: '/mail', name: 'mail', component: Mail },
