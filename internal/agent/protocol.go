@@ -119,6 +119,12 @@ const (
 	OpAppStatus   Op = "app.status"
 	OpAppRuntimes Op = "app.runtimes"
 
+	// Git-Deploy: holen, bauen, umschalten. Der Umschalter ist ein Symlink.
+	OpDeployRun      Op = "deploy.run"
+	OpDeployKey      Op = "deploy.key"
+	OpDeployList     Op = "deploy.list"
+	OpDeployRollback Op = "deploy.rollback"
+
 	// Echte Dateisystem-Quotas ueber Project Quota (ext4/XFS).
 	OpQuotaStatus  Op = "quota.status"
 	OpQuotaProject Op = "quota.project"

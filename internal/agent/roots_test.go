@@ -18,6 +18,9 @@ var notARoot = map[string]bool{
 	// jeden datei-basierten Endpunkt erreichbar — und in den Dateien darin
 	// stehen die Passwörter der Apps.
 	"AppDir": true,
+	// DeployDir hält die privaten Deploy-Keys. Auch dorthin kommt kein Pfad
+	// aus einer Anfrage — er entsteht aus dem geprüften Namen der Site.
+	"DeployDir": true,
 }
 
 // TestJedesVerzeichnisIstEineWurzel hält die Wurzelliste an den Optionen fest.

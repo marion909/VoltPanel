@@ -564,6 +564,38 @@ func (c *Client) AppRuntimes(ctx context.Context) ([]RuntimeInfo, error) {
 	return res, err
 }
 
+// --- Git-Deploy -------------------------------------------------------------
+
+// Deploy holt den Stand, baut ihn und schaltet um.
+func (c *Client) Deploy(ctx context.Context, p DeployParams) (*DeployResult, error) {
+	var res DeployResult
+	err := c.Call(ctx, OpDeployRun, p, &res)
+	return &res, err
+}
+
+// DeployKey liefert den öffentlichen Deploy-Key und legt ihn an, wenn es noch
+// keinen gibt. Der private Teil verlässt den Server nie.
+func (c *Client) DeployKey(ctx context.Context, name, systemUser string) (*DeployKeyResult, error) {
+	var res DeployKeyResult
+	err := c.Call(ctx, OpDeployKey, DeployKeyParams{Name: name, SystemUser: systemUser}, &res)
+	return &res, err
+}
+
+// DeployList sagt, welche Stände dastehen und welcher gilt.
+func (c *Client) DeployList(ctx context.Context, rootPath string) (*DeployListResult, error) {
+	var res DeployListResult
+	err := c.Call(ctx, OpDeployList, DeployListParams{RootPath: rootPath}, &res)
+	return &res, err
+}
+
+// DeployRollback zeigt current auf einen älteren Stand.
+func (c *Client) DeployRollback(ctx context.Context, systemUser, rootPath, release string) error {
+	var res TextResult
+	return c.Call(ctx, OpDeployRollback, DeployRollbackParams{
+		SystemUser: systemUser, RootPath: rootPath, Release: release,
+	}, &res)
+}
+
 // --- Echte Dateisystem-Quotas ----------------------------------------------
 
 // QuotaStatus sagt, ob unter einem Pfad Project Quota möglich ist.

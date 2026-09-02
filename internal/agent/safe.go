@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -65,6 +66,13 @@ var allowedBinaries = map[string]string{
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",
 	"ufw":     "/usr/sbin/ufw",
+	// Fuer Git-Deploy. git holt den Stand, ssh-keygen erzeugt den Deploy-Key,
+	// composer und npm bauen. Alle Argumente kommen aus festen Listen oder
+	// gehen vorher durch NormalizeGitURL bzw. ValidGitRef.
+	"git":        "/usr/bin/git",
+	"ssh-keygen": "/usr/bin/ssh-keygen",
+	"composer":   "/usr/bin/composer",
+	"ln":         "/usr/bin/ln",
 	// Laufzeitumgebungen fuer Apps. Zwei Eintraege je Programm, weil node und
 	// npm je nach Herkunft unter /usr/bin oder unter /usr/local/bin liegen —
 	// und weil jeder Pfad, den der Agent je ausfuehrt, in dieser einen Liste
@@ -154,6 +162,50 @@ func checkDomain(d string) error {
 // Interpreter noch einmal zerlegt.
 func run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
 	return runEnv(ctx, timeout, nil, name, args...)
+}
+
+// runAsUser fuehrt ein Kommando unter der Kennung eines anderen Benutzers aus.
+//
+// Fuer alles, was in einem Kundenverzeichnis arbeitet: ein Klon, ein Build, ein
+// Symlink. Als root ausgefuehrt gehoerte jede erzeugte Datei root, und der
+// Kunde koennte sein eigenes Verzeichnis nicht mehr benutzen — schlimmer noch,
+// ein Buildschritt ist fremder Code aus einem Repository, und der liefe dann
+// als root.
+//
+// Groups ist leer: keine Nebengruppen, auch nicht die des Agents.
+func runAsUser(ctx context.Context, timeout time.Duration, uid, gid int, dir string,
+	env []string, name string, args ...string) (string, error) {
+
+	bin, ok := allowedBinaries[name]
+	if !ok {
+		return "", fmt.Errorf("%w: binary %q", errNotAllow, name)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
+	cmd.Env = append(baseEnv(), env...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(uid), Gid: uint32(gid), Groups: []uint32{},
+		},
+	}
+
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if ctx.Err() == context.DeadlineExceeded {
+		return text, fmt.Errorf("%s: zeitüberschreitung nach %s", name, timeout)
+	}
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return text, fmt.Errorf("%s beendet mit code %d", name, ee.ExitCode())
+		}
+		return text, fmt.Errorf("%s: %w", name, err)
+	}
+	return text, nil
 }
 
 // baseEnv ist das Environment jedes Kindprozesses: minimal, fest, nichts vom
