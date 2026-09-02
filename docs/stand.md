@@ -145,7 +145,7 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   sich weiter an. Den eigenen Mandanten zu sperren lehnt das Panel ab — das
   wäre der kürzeste Weg, sich selbst auszusperren.
 
-**Phase 5 — Docker, Node.js, Git-Deploy** (angefangen)
+**Phase 5 — Docker, Node.js, Git-Deploy** (teilweise)
 
 - Eine App ist eine systemd-Unit plus Reverse-Proxy: Laufzeitumgebung,
   Argumente und Umgebungsvariablen über die Oberfläche, Auto-Restart, Port und
@@ -175,17 +175,26 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
 **Phase 5 — Docker, Node.js, Git-Deploy**
 
-- Compose-Projekte. Bewusst offen: eine Compose-Datei kommt aus dem Repository
-  des Kunden, und in ihr stünden genau die Schalter wieder, die im Panel nicht
-  vorgesehen sind.
-- `docker exec`. Ebenfalls bewusst: für eine Shell gibt es das Terminal der
-  Site, das unter derselben Kennung läuft und über dieselbe Whitelist.
+Noch zu bauen:
+
+- Auslastung laufender Container (`docker stats`). Der Zustand steht im Panel,
+  der Verbrauch nicht — wer wissen will, was ein Container gerade zieht, muss
+  auf die Shell.
+- Images verwalten. Geholt werden sie beim Anlegen einer App, entfernt nie:
+  eine abgeschaltete App lässt ihr Image liegen, und aufgeräumt wird bis auf
+  weiteres von Hand.
+
+Bewusst nicht gebaut — offen, aber nicht als Rückstand gemeint:
+
+- Compose-Projekte. Eine Compose-Datei kommt aus dem Repository des Kunden, und
+  in ihr stünden genau die Schalter wieder, die im Panel nicht vorgesehen sind.
+- `docker exec`. Für eine Shell gibt es das Terminal der Site, das unter
+  derselben Kennung läuft und über dieselbe Whitelist.
 - Eigene Netzwerke und benannte Volumes. Bisher nur Bind-Mounts aus dem
   Verzeichnis der Site — mehr braucht keine der Anwendungen, um die es hier
   geht.
 
-App, Container und Git-Deploy stehen (oben unter „Fertig"). Offen bleibt, was
-aus gutem Grund offen bleibt — siehe die Begründungen oben.
+App, Container, Node-Fassungen und Git-Deploy stehen (oben unter „Fertig").
 
 Statt fnm liegen die Node-Fassungen systemweit unter `/opt/volt/node`. fnm
 installiert je Benutzer, und in diesem Panel hat jede Site einen eigenen —
