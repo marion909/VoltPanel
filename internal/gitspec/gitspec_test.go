@@ -1,6 +1,9 @@
 package gitspec
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestGitAdresseIstKeinKommando ist der Kern.
 //
@@ -81,6 +84,66 @@ func TestBranchNameIstKeineOption(t *testing.T) {
 	} {
 		if ValidRef(schlecht) {
 			t.Errorf("%q ging durch", schlecht)
+		}
+	}
+}
+
+// TestKeinAufrufNachInnen: `git clone` holt von einer Adresse, die der Kunde
+// bestimmt. Zeigt sie auf den Server selbst oder auf den Metadatendienst der
+// Cloud, ist das ein Aufruf von innen, den jemand von außen ausgelöst hat — und
+// die Antwort landet im Protokoll des Deploys, wo er sie lesen kann.
+func TestKeinAufrufNachInnen(t *testing.T) {
+	// Diese hier fängt die Adressprüfung.
+	nachInnen := []string{
+		"https://169.254.169.254/latest/meta-data", // AWS, Azure, GCP
+		"https://127.0.0.1/x.git",
+		"https://127.0.0.1:8080/x.git",
+		"https://0.0.0.0/x.git",
+		"https://224.0.0.1/x.git",
+		"git@169.254.169.254:x.git",
+	}
+	for _, url := range nachInnen {
+		got, err := NormalizeURL(url)
+		if err == nil {
+			t.Errorf("%q wurde angenommen als %q", url, got)
+			continue
+		}
+		// Auf den Grund geprüft: sonst wäre der Test auch dann grün, wenn nur
+		// die Formprüfung zufällig zuschlägt — und die Adressprüfung könnte
+		// ersatzlos verschwinden, ohne dass es auffällt.
+		if !strings.Contains(err.Error(), "server selbst") &&
+			!strings.Contains(err.Error(), "link-local") &&
+			!strings.Contains(err.Error(), "multicast") &&
+			!strings.Contains(err.Error(), "keine adresse") {
+			t.Errorf("%q abgelehnt, aber nicht von der Adressprüfung: %v", url, err)
+		}
+	}
+
+	// Und diese hier fängt schon die Formprüfung: der Doppelpunkt steht nicht
+	// im Zeichenvorrat eines Hostnamens, IPv6-Literale kommen also gar nicht
+	// bis zur Adressprüfung. Eine Einschränkung, keine Lücke — aufgeschrieben,
+	// weil ich sie zuerst für eine Adressprüfung gehalten habe.
+	for _, url := range []string{
+		"https://[fe80::1]/x.git",
+		"https://[::1]/x.git",
+		"https://[::ffff:127.0.0.1]/x.git",
+	} {
+		if got, err := NormalizeURL(url); err == nil {
+			t.Errorf("%q wurde angenommen als %q", url, got)
+		}
+	}
+
+	// Ein selbst betriebenes Gitea im eigenen Netz ist der Normalfall in genau
+	// der Art von Umgebung, für die dieses Panel gedacht ist.
+	nachDrinnen := []string{
+		"https://10.0.0.5/x/y.git",
+		"https://192.168.1.20:3000/x/y.git",
+		"git@172.16.0.9:x/y.git",
+		"https://gitea.intern/x/y.git",
+	}
+	for _, url := range nachDrinnen {
+		if _, err := NormalizeURL(url); err != nil {
+			t.Errorf("%q wurde abgelehnt: %v", url, err)
 		}
 	}
 }

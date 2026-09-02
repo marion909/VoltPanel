@@ -13,6 +13,7 @@ package gitspec
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"sort"
@@ -127,8 +128,8 @@ func normalizeScheme(s string) (string, error) {
 	}
 
 	host, port := u.Hostname(), u.Port()
-	if !reGitHost.MatchString(host) {
-		return "", fmt.Errorf("%w: hostname %q", ErrInvalid, host)
+	if err := checkHost(host); err != nil {
+		return "", err
 	}
 	if port != "" && !regexp.MustCompile(`^[0-9]{1,5}$`).MatchString(port) {
 		return "", fmt.Errorf("%w: port %q", ErrInvalid, port)
@@ -165,14 +166,66 @@ func normalizeSCP(s string) (string, error) {
 	if !reGitUser.MatchString(user) {
 		return "", fmt.Errorf("%w: benutzername %q", ErrInvalid, user)
 	}
-	if !reGitHost.MatchString(host) {
-		return "", fmt.Errorf("%w: hostname %q", ErrInvalid, host)
+	if err := checkHost(host); err != nil {
+		return "", err
 	}
 	clean, err := cleanPath(pfad)
 	if err != nil {
 		return "", err
 	}
 	return user + "@" + host + ":" + clean, nil
+}
+
+// checkHost prüft den Hostnamen einer Repository-Adresse.
+//
+// Zwei Dinge. Erstens die Form: ein Hostname beginnt mit einem Buchstaben oder
+// einer Ziffer, nie mit einem Bindestrich — das ist die Zeile, die
+// CVE-2017-1000117 schließt.
+//
+// Zweitens das Ziel, soweit es hier schon feststeht. Steht dort eine
+// IP-Adresse, wird sie angesehen: eine Adresse im Link-Local-Bereich ist der
+// Metadatendienst der Cloud (169.254.169.254), eine Loopback-Adresse ist der
+// Server selbst. Ein `git clone` dorthin ist ein Aufruf von innen, den ein
+// Kunde von außen ausgelöst hat — und die Antwort landet im Protokoll des
+// Deploys, wo er sie lesen kann.
+//
+// Private Netze bleiben erlaubt. Ein selbst betriebenes Gitea auf 10.0.0.5 ist
+// der Normalfall in genau der Art von Umgebung, für die dieses Panel gedacht
+// ist; sie zu sperren hieße, ein echtes Bedürfnis für einen geringen Gewinn
+// aufzugeben.
+//
+// Das ist keine vollständige SSRF-Abwehr: ein Name, der auf 169.254.169.254
+// zeigt, geht weiterhin durch, und gegen DNS-Rebinding hilft ohnehin nur ein
+// Proxy, der die aufgelöste Adresse prüft. Es schließt den bequemen Weg, nicht
+// jeden.
+//
+// IPv6-Literale kommen hier gar nicht erst an: der Doppelpunkt steht nicht im
+// Zeichenvorrat eines Hostnamens, "https://[::1]/x.git" scheitert also schon
+// eine Zeile höher. Das ist eine Einschränkung — eine Adresse in eckigen
+// Klammern lässt sich nicht als Repository angeben —, aber keine, die jemandem
+// im Weg steht: Hoster haben Namen.
+func checkHost(host string) error {
+	if !reGitHost.MatchString(host) {
+		return fmt.Errorf("%w: hostname %q", ErrInvalid, host)
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		// Kein Literal, sondern ein Name — mehr lässt sich hier nicht sagen.
+		return nil
+	}
+	switch {
+	case addr.IsLoopback():
+		return fmt.Errorf("%w: %s zeigt auf diesen server selbst", ErrInvalid, addr)
+	case addr.IsUnspecified():
+		return fmt.Errorf("%w: %s ist keine adresse, die man aufrufen kann", ErrInvalid, addr)
+	case addr.IsLinkLocalUnicast(), addr.IsLinkLocalMulticast():
+		return fmt.Errorf("%w: %s ist eine link-local-adresse — dort antwortet auf "+
+			"vielen servern der metadaten-dienst der cloud, nicht ein repository",
+			ErrInvalid, addr)
+	case addr.IsMulticast(), addr.IsInterfaceLocalMulticast():
+		return fmt.Errorf("%w: %s ist eine multicast-adresse", ErrInvalid, addr)
+	}
+	return nil
 }
 
 // cleanPath prüft den Pfadteil und nimmt führende Schrägstriche weg.
