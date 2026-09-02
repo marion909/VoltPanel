@@ -154,13 +154,15 @@ func (s *Server) opDockerRun(ctx context.Context, raw json.RawMessage) (any, err
 }
 
 func dockerCLIFehlt(ctx context.Context) string {
-	for _, pkg := range []string{"docker.io", "docker-ce-cli"} {
-		if packageInstalled(ctx, pkg) {
-			return pkg + " ist laut dpkg installiert, aber " +
-				allowedBinaries["docker"] + " fehlt. Die Docker-CLI ist unvollständig " +
-				"installiert oder liegt an einem Pfad, den der Agent nicht ausführt. " +
-				"Der Installieren-Knopf repariert das Paket mit apt-get install --reinstall."
-		}
+	if packageInstalled(ctx, "docker-cli") {
+		return "docker-cli ist laut dpkg installiert, aber " +
+			allowedBinaries["docker"] + " fehlt. Die Docker-CLI ist unvollständig " +
+			"installiert oder liegt an einem Pfad, den der Agent nicht ausführt. " +
+			"Der Installieren-Knopf repariert die Docker-Pakete mit apt-get install --reinstall."
+	}
+	if packageInstalled(ctx, "docker.io") {
+		return "docker.io ist installiert, aber docker-cli fehlt. Debian 13 liefert " +
+			allowedBinaries["docker"] + " im Paket docker-cli; der Installieren-Knopf zieht es nach."
 	}
 	return "Docker ist auf diesem Server nicht installiert."
 }

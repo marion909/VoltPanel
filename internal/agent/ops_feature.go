@@ -22,7 +22,7 @@ import (
 // featurePakete ist die ganze Liste. Sie ist absichtlich kurz: hier gehört nur
 // hinein, was das Panel danach auch verwaltet.
 var featurePakete = map[string][]string{
-	"docker":   {"docker.io"},
+	"docker":   {"docker.io", "docker-cli"},
 	"fail2ban": {"fail2ban"},
 	// Postfix zieht bei der Installation einen debconf-Dialog hoch; aptInstall
 	// setzt DEBIAN_FRONTEND=noninteractive, deshalb geht es durch. Die
@@ -89,8 +89,8 @@ func (s *Server) opFeatureInstall(ctx context.Context, raw json.RawMessage) (any
 }
 
 func (s *Server) featurePaketeInstallieren(ctx context.Context, feature string, pakete []string) (string, error) {
-	if feature == "docker" && dockerPaketOhneCLI(ctx) {
-		s.log.Warn("docker.io ist installiert, aber docker-cli fehlt — paket wird neu installiert")
+	if feature == "docker" && dockerCLIPaketOhneBinary(ctx) {
+		s.log.Warn("docker-cli ist installiert, aber docker-binary fehlt — paket wird neu installiert")
 		return s.aptReinstall(ctx, pakete...)
 	}
 	return s.aptInstall(ctx, pakete...)
@@ -111,8 +111,8 @@ func (s *Server) featureDiensteStarten(ctx context.Context, feature string) erro
 	return nil
 }
 
-func dockerPaketOhneCLI(ctx context.Context) bool {
-	return packageInstalled(ctx, "docker.io") && !fileExists(allowedBinaries["docker"])
+func dockerCLIPaketOhneBinary(ctx context.Context) bool {
+	return packageInstalled(ctx, "docker-cli") && !fileExists(allowedBinaries["docker"])
 }
 
 func (s *Server) featureNachpruefen(ctx context.Context, feature string) error {

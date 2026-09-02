@@ -283,18 +283,13 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="fade-in">
+  <div class="fade-in px-8 py-6">
     <header class="mb-5 flex items-center justify-between gap-3">
-      <div>
-        <h1 class="text-[17px] font-semibold tracking-tight">{{ t('apps.title') }}</h1>
-        <p class="mt-0.5 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
-          {{ t('apps.subtitle') }}
-        </p>
-      </div>
+      <h1 class="text-[18px] font-semibold tracking-tight">{{ t('apps.title') }}</h1>
       <button
         v-if="freieSites.length"
-        class="rounded-md border px-3 py-1.5 text-[12px]"
-        :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
+        :style="{ background: 'var(--series-1)' }"
         @click="showForm = !showForm"
       >
         {{ t('apps.new') }}
@@ -303,11 +298,9 @@ onMounted(load)
 
     <p
       v-if="error"
-      class="mb-4 rounded-md px-3 py-2 text-[12px]"
-      :style="{
-        background: 'color-mix(in srgb, var(--status-critical) 12%, var(--surface-card))',
-        color: 'var(--ink-primary)',
-      }"
+      class="mb-4 text-[13px]"
+      :style="{ color: 'var(--status-critical)' }"
+      role="alert"
     >
       {{ error }}
     </p>
@@ -568,21 +561,21 @@ onMounted(load)
         <button
           type="submit"
           :disabled="busy"
-          class="rounded-md px-3 py-1.5 text-[12px]"
-          :style="{ background: 'var(--series-1)', color: 'var(--surface-page)' }"
+          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
+          :style="{ background: 'var(--series-1)' }"
         >
-          {{ t('common.create') }}
+          {{ busy ? t('common.loading') : t('common.create') }}
         </button>
       </div>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-secondary)' }">
+    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
       {{ t('common.loading') }}
     </p>
     <p
       v-else-if="!apps.length"
-      class="rounded-lg border p-6 text-center text-[13px]"
-      :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+      class="text-[13px]"
+      :style="{ color: 'var(--ink-muted)' }"
     >
       {{ t('apps.empty') }}
     </p>
@@ -674,8 +667,8 @@ onMounted(load)
             {{ t('apps.envReplaces') }}
           </p>
           <button
-            class="mt-1 rounded-md border px-2 py-1 text-[11px]"
-            :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+            class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
+            :style="{ background: 'var(--series-1)' }"
             :disabled="busy"
             @click="saveEnv(app)"
           >
@@ -725,5 +718,5 @@ onMounted(load)
         </footer>
       </article>
     </div>
-  </section>
+  </div>
 </template>

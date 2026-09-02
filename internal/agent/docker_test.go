@@ -183,7 +183,7 @@ func TestDockerStatusUnterscheidetInstalliertVonVerfuegbar(t *testing.T) {
 	}
 }
 
-func TestDockerStatusMeldetInstalliertesPaketOhneCLI(t *testing.T) {
+func TestDockerStatusMeldetInstalliertesDockerIOOhneCLI(t *testing.T) {
 	srv, _ := testServer(t)
 	dir := t.TempDir()
 	dpkg := filepath.Join(dir, "dpkg-query")
@@ -209,10 +209,38 @@ func TestDockerStatusMeldetInstalliertesPaketOhneCLI(t *testing.T) {
 	if st.Installed {
 		t.Fatal("fehlende Docker-CLI darf nicht als installiert gelten")
 	}
-	if len(st.Warnings) == 0 || !strings.Contains(st.Warnings[0], "laut dpkg installiert") {
-		t.Fatalf("kaputtes docker.io-Paket wird nicht erklärt: %+v", st)
+	if len(st.Warnings) == 0 || !strings.Contains(st.Warnings[0], "docker-cli fehlt") {
+		t.Fatalf("fehlendes docker-cli-Paket wird nicht erklärt: %+v", st)
 	}
-	if !strings.Contains(st.Warnings[0], "--reinstall") {
+	if !strings.Contains(st.Warnings[0], "zieht es nach") {
+		t.Fatalf("Installationshinweis fehlt: %+v", st)
+	}
+}
+
+func TestDockerStatusMeldetKaputtesCLIPaket(t *testing.T) {
+	srv, _ := testServer(t)
+	dir := t.TempDir()
+	dpkg := filepath.Join(dir, "dpkg-query")
+	skript := "#!/bin/sh\nif [ \"$4\" = docker-cli ]; then printf 'install ok installed'; exit 0; fi\nexit 1\n"
+	if err := os.WriteFile(dpkg, []byte(skript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	altDocker := allowedBinaries["docker"]
+	altDpkg := allowedBinaries["dpkg-query"]
+	allowedBinaries["docker"] = filepath.Join(dir, "docker-fehlt")
+	allowedBinaries["dpkg-query"] = dpkg
+	t.Cleanup(func() {
+		allowedBinaries["docker"] = altDocker
+		allowedBinaries["dpkg-query"] = altDpkg
+	})
+
+	out, err := srv.opDockerStatus(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := out.(DockerStatus)
+	if len(st.Warnings) == 0 || !strings.Contains(st.Warnings[0], "--reinstall") {
 		t.Fatalf("Reparaturhinweis fehlt: %+v", st)
 	}
 }
