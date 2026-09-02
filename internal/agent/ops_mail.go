@@ -7,11 +7,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/marion909/voltpanel/internal/templates"
 )
@@ -344,6 +347,37 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// mailPorts sind die Ports, ohne die ein Mailserver keiner ist.
+//
+//	25   die Post von anderen Servern
+//	587  die Einlieferung durch eigene Kunden, mit Ausweis
+//	993  IMAP über TLS
+//
+// Nicht dabei: 110 und 143 (POP3 und IMAP im Klartext) sowie 465. Die ersten
+// beiden würden Passwörter über das Netz schicken, der dritte ist die alte
+// Schreibweise für dasselbe wie 587 — ein Port weniger ist ein Port weniger.
+var mailPorts = []string{"25/tcp", "587/tcp", "993/tcp"}
+
+// openMailPorts gibt sie in ufw frei, sofern ufw überhaupt läuft.
+//
+// Feste Argumente, wie bei FTP. Für nftables geschieht bewusst nichts: dort
+// gibt es kein Regelwerk, in das sich eine Zeile gefahrlos einfügen ließe.
+func (s *Server) openMailPorts(ctx context.Context) string {
+	out, err := run(ctx, shortTimeout, "ufw", "status")
+	if err != nil || !strings.Contains(out, "Status: active") {
+		return "Die Ports 25, 587 und 993 müssen in der Firewall offen sein."
+	}
+	for _, regel := range mailPorts {
+		if out, err := run(ctx, shortTimeout, "ufw", "allow", regel); err != nil {
+			s.log.Warn("ufw-regel nicht gesetzt", "regel", regel, "err", err,
+				"out", truncate(out, 200))
+			return "Die Firewall-Regeln konnten nicht gesetzt werden — bitte 25, 587 " +
+				"und 993 selbst freigeben."
+		}
+	}
+	return "ufw: 25, 587 und 993 sind freigegeben."
+}
+
 // mailCert sucht das Zertifikat, das Postfix und Dovecot benutzen sollen.
 //
 // Dasselbe wie beim Panel und bei FTP: die Pfade entstehen aus der
@@ -584,5 +618,102 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		}
 	}
 
+	schritte = append(schritte, s.openMailPorts(ctx))
+
 	return TextResult{Text: strings.Join(schritte, "; ")}, nil
+}
+
+// MailFacts ist, was nur der Server über sich selbst weiß.
+//
+// Getrennt von der Bewertung: der Agent sagt, was ist — welche Adressen, was
+// horcht, was in der Postfix-Konfiguration steht. Ob das gut ist, entscheidet
+// das Panel. Zwei Gründe: die Bewertung braucht DNS-Auskünfte, die der Agent
+// nicht einholen soll, und eine Beurteilung im Agent wäre eine, die sich nur
+// mit einem neuen Agent ändern lässt.
+type MailFacts struct {
+	// Hostname ist myhostname aus der Postfix-Konfiguration. Er steht im
+	// HELO und ist der Name, für den der PTR-Eintrag passen muss.
+	Hostname string `json:"hostname"`
+	// PublicIPs sind die Adressen, unter denen dieser Server von außen zu
+	// sehen ist — soweit sie an einer Schnittstelle hängen. Hinter NAT bleibt
+	// die Liste leer, und dann kann das Panel den PTR-Eintrag nicht prüfen.
+	PublicIPs []string `json:"public_ips"`
+	// Listening sind die Ports aus mailPorts, auf denen wirklich etwas
+	// antwortet.
+	Listening []int `json:"listening"`
+	// TLSCert ist der Pfad, den Postfix benutzt — leer heißt unverschlüsselt.
+	TLSCert string `json:"tls_cert"`
+	// RelayRestrictions ist die Zeile im Wortlaut. Ohne
+	// reject_unauth_destination darin ist der Server ein offenes Relay.
+	RelayRestrictions string `json:"relay_restrictions"`
+	// DKIMDomains sind die Domänen, für die eine Schlüsseldatei dasteht.
+	DKIMDomains []string `json:"dkim_domains"`
+}
+
+// opMailFacts sammelt die Tatsachen ein.
+func (s *Server) opMailFacts(ctx context.Context, _ json.RawMessage) (any, error) {
+	res := MailFacts{PublicIPs: []string{}, Listening: []int{}, DKIMDomains: []string{}}
+
+	if out, err := run(ctx, shortTimeout, "postconf", "-h", "myhostname"); err == nil {
+		res.Hostname = strings.TrimSpace(out)
+	}
+	if out, err := run(ctx, shortTimeout, "postconf", "-h", "smtpd_tls_cert_file"); err == nil {
+		res.TLSCert = strings.TrimSpace(out)
+	}
+	if out, err := run(ctx, shortTimeout, "postconf", "-h", "smtpd_relay_restrictions"); err == nil {
+		res.RelayRestrictions = strings.TrimSpace(out)
+	}
+
+	res.PublicIPs = oeffentlicheAdressen()
+
+	// Horcht da etwas? Eine Verbindung nach 127.0.0.1 beantwortet das ohne
+	// zusätzliches Werkzeug: ein Dienst auf 0.0.0.0 nimmt sie an.
+	for _, p := range []int{25, 587, 993} {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(p)),
+			2*time.Second)
+		if err == nil {
+			_ = conn.Close()
+			res.Listening = append(res.Listening, p)
+		}
+	}
+
+	if eintraege, err := os.ReadDir(filepath.Join(opendkimDir, "keys")); err == nil {
+		for _, e := range eintraege {
+			if e.IsDir() && reMailDomainTeil.MatchString(e.Name()) {
+				res.DKIMDomains = append(res.DKIMDomains, e.Name())
+			}
+		}
+	}
+	return res, nil
+}
+
+// oeffentlicheAdressen sind die Adressen, unter denen der Server von außen zu
+// sehen sein könnte.
+//
+// Private und Loopback-Adressen fallen weg: für einen PTR-Eintrag taugen sie
+// nicht. Bleibt nichts übrig, steht der Server hinter NAT — dann lässt sich
+// von hier aus nicht sagen, welche Adresse die Welt sieht, und das ist eine
+// ehrlichere Auskunft als eine geratene.
+func oeffentlicheAdressen() []string {
+	out := []string{}
+	adressen, err := net.InterfaceAddrs()
+	if err != nil {
+		return out
+	}
+	for _, a := range adressen {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		addr, ok := netip.AddrFromSlice(ipnet.IP)
+		if !ok {
+			continue
+		}
+		addr = addr.Unmap()
+		if !addr.IsGlobalUnicast() || addr.IsPrivate() || addr.IsLinkLocalUnicast() {
+			continue
+		}
+		out = append(out, addr.String())
+	}
+	return out
 }

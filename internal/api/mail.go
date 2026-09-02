@@ -35,6 +35,19 @@ func (s *Server) handleMailSetup(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"log": out})
 }
 
+// handleMailCheck prüft, was der Zustellbarkeit im Weg steht.
+//
+// Im Scope des Aufrufers: geprüft werden die eigenen Domänen. Die Befunde über
+// den Server selbst — PTR, TLS, offenes Relay — stehen trotzdem darin, und das
+// ist richtig so: sie betreffen jeden, der über diesen Server sendet.
+func (s *Server) handleMailCheck(c echo.Context) error {
+	res, err := s.mail.Check(c.Request().Context(), s.scopeFor(c))
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
 func (s *Server) handleListMailDomains(c echo.Context) error {
 	list, err := s.store.ListMailDomains(c.Request().Context(), s.scopeFor(c))
 	if err != nil {

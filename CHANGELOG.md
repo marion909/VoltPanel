@@ -15,6 +15,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.7 — 2026-09-02
+
+- Zustellbarkeitsprüfung: PTR, MX, SPF, DKIM, DMARC, TLS, offenes Relay
+- Fehlt ein Dienst, steht jetzt der Knopf daneben
+- Mailports in der Firewall freigeben
+
 ## v0.4.6 — 2026-09-02
 
 - Dovecot kennt die Postfächer, Postfix den Ausweis

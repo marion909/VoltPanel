@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import InstallHint from '../components/InstallHint.vue'
 
 const apps = ref([])
 const sites = ref([])
@@ -326,8 +327,16 @@ onMounted(load)
       Docker-Daemons. Sie lässt sich nicht je Container nachholen, deshalb steht
       hier ein Hinweis und keine Schaltfläche.
     -->
+    <!-- Fehlt Docker ganz, gehört der Knopf daneben; die übrigen Hinweise
+         sind Einstellungen des Daemons und lassen sich nicht nachinstallieren. -->
+    <InstallHint
+      v-if="docker && !docker.available"
+      feature="docker"
+      :text="t('apps.needDocker')"
+      @installed="load"
+    />
     <p
-      v-for="w in (docker && docker.warnings) || []"
+      v-for="w in (docker && docker.available && docker.warnings) || []"
       :key="w"
       class="mb-4 rounded-md px-3 py-2 text-[12px]"
       :style="{

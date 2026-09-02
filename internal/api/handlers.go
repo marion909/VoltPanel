@@ -430,6 +430,31 @@ func applyIf[T any](src *T, dst *T) {
 //
 // ErrForbidden wird bewusst zu 404, nicht zu 403: eine 403 würde bestätigen,
 // dass die fremde ID existiert.
+// handleInstallFeature holt nach, was das Panel verwaltet.
+//
+// Administratoren vorbehalten: es installiert Pakete auf dem Server. Und es
+// nimmt keinen Paketnamen entgegen, sondern eine Fähigkeit aus der festen
+// Liste des Agents — `apt-get install` mit fremder Eingabe wäre eine
+// Rootshell mit Umweg.
+func (s *Server) handleInstallFeature(c echo.Context) error {
+	feature := c.Param("name")
+	ctx := c.Request().Context()
+
+	out, err := s.agent.InstallFeature(ctx, feature)
+	if err != nil {
+		s.audit(ctx, currentUser(c), "feature.install", "feature", feature,
+			"fehler", c.RealIP(), err)
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "feature.install", "feature", feature, "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, map[string]string{"log": out})
+}
+
+// handleFeatures sagt, was sich nachinstallieren lässt.
+func (s *Server) handleFeatures(c echo.Context) error {
+	return c.JSON(http.StatusOK, agent.FeatureNames())
+}
+
 func storeError(err error) error {
 	switch {
 	case err == nil:

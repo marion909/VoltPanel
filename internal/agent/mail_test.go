@@ -74,3 +74,22 @@ func TestMaildirKommtAusDerAdresse(t *testing.T) {
 		}
 	}
 }
+
+// Der Aufrufer nennt eine Fähigkeit, keinen Paketnamen. `apt-get install` mit
+// einer Eingabe aus dem Browser wäre eine Rootshell mit Umweg — apt führt
+// Postinst-Skripte als root aus.
+func TestFeatureNimmtKeinenPaketnamen(t *testing.T) {
+	for _, name := range FeatureNames() {
+		if !ValidFeature(name) {
+			t.Errorf("%q steht in der liste, gilt aber nicht", name)
+		}
+	}
+	for _, name := range []string{
+		"", "nginx", "docker.io", "docker;bash", "../../etc", "sl",
+		"fail2ban fail2ban", "DOCKER", "node", "nodejs",
+	} {
+		if ValidFeature(name) {
+			t.Errorf("%q wurde als fähigkeit angenommen", name)
+		}
+	}
+}

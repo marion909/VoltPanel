@@ -132,6 +132,11 @@ const (
 	OpMailStatus Op = "mail.status"
 	OpMailSetup  Op = "mail.setup"
 	OpMailApply  Op = "mail.apply"
+	OpMailFacts  Op = "mail.facts"
+
+	// OpFeatureInstall holt nach, was das Panel verwaltet — aus einer festen
+	// Liste, nie mit einem Paketnamen aus der Anfrage.
+	OpFeatureInstall Op = "feature.install"
 
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"

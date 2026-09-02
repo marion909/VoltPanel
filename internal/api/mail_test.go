@@ -118,3 +118,23 @@ func TestMailPasswortStehtNichtInDerListe(t *testing.T) {
 		}
 	}
 }
+
+// Nachinstallieren ist eine Serversache. Wer keine Dienste starten darf, darf
+// erst recht keine Pakete installieren — apt führt Postinst-Skripte als root
+// aus.
+func TestFeatureInstallNurFuerAdmins(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // Kunde
+
+	for _, pfad := range []string{"/api/v1/system/features", "/api/v1/system/features/docker"} {
+		methode := http.MethodGet
+		if strings.HasSuffix(pfad, "/docker") {
+			methode = http.MethodPost
+		}
+		rec := ts.do(methode, pfad, nil)
+		if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
+			t.Errorf("%s %s: Status %d, erwartet 403 — %s",
+				methode, pfad, rec.Code, rec.Body.String())
+		}
+	}
+}

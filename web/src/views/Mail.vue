@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { isAdmin } from '../stores/session'
+import InstallHint from '../components/InstallHint.vue'
 
 // Mail: Domänen, Postfächer, Weiterleitungen.
 //
@@ -25,6 +26,8 @@ const domainForm = ref('')
 const boxForm = ref({ domain_id: null, local_part: '', password: '', quota_mb: 0 })
 const aliasForm = ref({ domain_id: null, source: '', destination: '' })
 const dkim = ref({})
+const check = ref(null)
+const checkBusy = ref(false)
 
 const inputStyle = {
   borderColor: 'var(--line-axis)',
@@ -74,6 +77,26 @@ async function fuehreAus(fn) {
 }
 
 const setup = () => fuehreAus(() => api.post('/mail/setup'))
+
+// Die Zustellbarkeitsprüfung. Sie fragt DNS und dauert deshalb einen Moment —
+// darum auf Knopfdruck und nicht bei jedem Aufruf der Seite.
+async function pruefen() {
+  checkBusy.value = true
+  error.value = ''
+  try {
+    check.value = await api.get('/mail/check')
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    checkBusy.value = false
+  }
+}
+
+const stufenFarbe = {
+  gut: 'var(--status-good)',
+  warnung: 'var(--status-warning)',
+  kritisch: 'var(--status-critical)',
+}
 
 const domainAnlegen = () =>
   fuehreAus(async () => {
@@ -179,6 +202,63 @@ onMounted(load)
       {{ error }}
     </p>
 
+    <!--
+      Der schwierige Teil eines Mailservers ist nicht der Code, sondern die
+      Frage, ob eine Mail im Posteingang landet. Daran hängt ein Dutzend
+      Kleinigkeiten, die alle woanders stehen — hier stehen sie zusammen.
+    -->
+    <div
+      v-if="domains.length"
+      class="mb-5 rounded-lg border p-4"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-[14px] font-medium">{{ t('mail.checkTitle') }}</h2>
+          <p class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            {{ t('mail.checkHint') }}
+          </p>
+        </div>
+        <button
+          class="rounded-md border px-3 py-1.5 text-[12px] disabled:opacity-60"
+          :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+          :disabled="checkBusy"
+          @click="pruefen"
+        >
+          {{ checkBusy ? t('mail.checking') : t('mail.check') }}
+        </button>
+      </div>
+
+      <table v-if="check" class="mt-3 w-full text-[12px]">
+        <tbody>
+          <tr v-for="(b, i) in check.befunde" :key="i" class="align-top">
+            <td class="w-24 py-1 pr-2">
+              <span class="inline-flex items-center gap-1.5">
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full"
+                  :style="{ background: stufenFarbe[b.stufe] }"
+                ></span>
+                <!-- Die Stufe steht als Wort da, nicht nur als Farbe. -->
+                <span :style="{ color: 'var(--ink-muted)' }">{{ t('mail.level.' + b.stufe) }}</span>
+              </span>
+            </td>
+            <td class="w-28 py-1 pr-2 font-medium">
+              {{ b.was }}
+              <div v-if="b.domain" class="font-normal" :style="{ color: 'var(--ink-muted)' }">
+                {{ b.domain }}
+              </div>
+            </td>
+            <td class="py-1">
+              <div>{{ b.text }}</div>
+              <div v-if="b.rat" class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                {{ b.rat }}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- Nicht eingerichtet: ohne Mailspeicher hilft eine Liste niemandem. -->
     <div
       v-if="status && !bereit"
@@ -189,14 +269,21 @@ onMounted(load)
       <p class="mb-3 whitespace-pre-line text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
         {{ t('mail.setupHint') }}
       </p>
-      <p
-        v-for="h in status.hinweise || []"
-        :key="h"
-        class="mb-2 text-[12px]"
-        :style="{ color: 'var(--status-warning)' }"
-      >
-        {{ h }}
-      </p>
+      <!-- Fehlt ein Dienst, steht der Knopf daneben. Ein Hinweis ohne Weg
+           weiter schickt den Betreiber auf die Shell. -->
+      <InstallHint
+        v-if="status && !status.postfix_installed"
+        feature="postfix"
+        :text="t('mail.needPostfix')"
+        @installed="load"
+      />
+      <InstallHint
+        v-if="status && !status.dovecot_installed"
+        feature="dovecot"
+        :text="t('mail.needDovecot')"
+        @installed="load"
+      />
+      <InstallHint feature="opendkim" :text="t('mail.needOpendkim')" @installed="load" />
       <button
         v-if="isAdmin() && status.postfix_installed"
         :disabled="busy"

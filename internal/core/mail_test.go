@@ -6,9 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
+	"net"
 	"strings"
 	"testing"
 
+	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/store"
 )
 
@@ -338,4 +341,111 @@ func TestDKIMKommtInDenSollzustand(t *testing.T) {
 	if len(p.DKIM) != 0 {
 		t.Errorf("eine abgeschaltete domäne unterschreibt weiter: %+v", p.DKIM)
 	}
+}
+
+// Ein DKIM-Eintrag, der zu einem anderen Schlüssel gehört, ist schlechter als
+// keiner: die Unterschrift schlägt fehl, statt zu fehlen. Das muss die Prüfung
+// als kritisch melden und nicht als Hinweis.
+func TestCheckMeldetFalschenDKIMEintrag(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	svc := mailService(env)
+
+	alice := seedMailTenant(t, env, "alice")
+	scA := store.Scope{TenantID: alice, Role: store.RoleOwner}
+	domA := ersteDomain(t, env, alice)
+	if _, err := svc.EnableDKIM(ctx, scA, domA); err != nil {
+		t.Logf("schreiben scheiterte (erwartbar): %v", err)
+	}
+	d, err := env.store.GetMailDomain(ctx, scA, domA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setzeDNS(t, map[string][]string{
+		"volt._domainkey.alice.example.at": {"v=DKIM1; h=sha256; k=rsa; p=EinGanzAndererSchluessel"},
+	})
+
+	c := &MailCheck{}
+	c.pruefeDKIM(ctx, d)
+	if len(c.Befunde) != 1 {
+		t.Fatalf("%d befunde", len(c.Befunde))
+	}
+	if c.Befunde[0].Stufe != BefundKritisch {
+		t.Errorf("stufe = %q, erwartet %q — ein falscher eintrag ist schlechter als keiner",
+			c.Befunde[0].Stufe, BefundKritisch)
+	}
+
+	// Und der richtige Eintrag ist in Ordnung.
+	setzeDNS(t, map[string][]string{
+		"volt._domainkey.alice.example.at": {"v=DKIM1; h=sha256; k=rsa; p=" + d.DKIMPublic},
+	})
+	c = &MailCheck{}
+	c.pruefeDKIM(ctx, d)
+	if c.Befunde[0].Stufe != BefundGut {
+		t.Errorf("der passende eintrag wurde als %q gemeldet: %+v",
+			c.Befunde[0].Stufe, c.Befunde[0])
+	}
+
+	// Fehlt er ganz, ist es ein Hinweis — nicht kritisch. Keine Unterschrift
+	// wertet eine Mail nur nicht auf; eine kaputte wertet sie ab.
+	setzeDNS(t, map[string][]string{})
+	c = &MailCheck{}
+	c.pruefeDKIM(ctx, d)
+	if c.Befunde[0].Stufe != BefundWarnung {
+		t.Errorf("ein fehlender eintrag wurde als %q gemeldet", c.Befunde[0].Stufe)
+	}
+}
+
+// Ohne reject_unauth_destination ist der Server ein offenes Relay — und das
+// merkt man daran, dass die IP binnen Stunden auf jeder Sperrliste steht.
+func TestCheckMeldetOffenesRelay(t *testing.T) {
+	ctx := context.Background()
+	setzeDNS(t, map[string][]string{})
+
+	offen := &agent.MailFacts{
+		Hostname:          "mail.example.at",
+		Listening:         []int{25, 587, 993},
+		TLSCert:           "/x/fullchain.pem",
+		RelayRestrictions: "permit_mynetworks,permit_sasl_authenticated",
+	}
+	c := &MailCheck{}
+	c.pruefeServer(ctx, offen)
+	if stufeVon(c, "Relay") != BefundKritisch {
+		t.Errorf("ein offenes relay wurde als %q gemeldet", stufeVon(c, "Relay"))
+	}
+
+	zu := *offen
+	zu.RelayRestrictions = "permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination"
+	c = &MailCheck{}
+	c.pruefeServer(ctx, &zu)
+	if stufeVon(c, "Relay") != BefundGut {
+		t.Errorf("ein geschlossenes relay wurde als %q gemeldet", stufeVon(c, "Relay"))
+	}
+}
+
+func stufeVon(c *MailCheck, was string) string {
+	for _, b := range c.Befunde {
+		if b.Was == was {
+			return b.Stufe
+		}
+	}
+	return ""
+}
+
+// setzeDNS ersetzt die Auskünfte für die Dauer eines Tests.
+func setzeDNS(t *testing.T, txt map[string][]string) {
+	t.Helper()
+	altTXT, altMX, altHost, altAddr := dnsTXT, dnsMX, dnsHost, dnsAddr
+	t.Cleanup(func() { dnsTXT, dnsMX, dnsHost, dnsAddr = altTXT, altMX, altHost, altAddr })
+
+	dnsTXT = func(_ context.Context, name string) ([]string, error) {
+		if v, ok := txt[name]; ok {
+			return v, nil
+		}
+		return nil, errors.New("kein eintrag")
+	}
+	dnsMX = func(context.Context, string) ([]*net.MX, error) { return nil, errors.New("kein eintrag") }
+	dnsHost = func(context.Context, string) ([]string, error) { return nil, errors.New("kein eintrag") }
+	dnsAddr = func(context.Context, string) ([]string, error) { return nil, errors.New("kein eintrag") }
 }

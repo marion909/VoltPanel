@@ -728,10 +728,24 @@ func (c *Client) MailSetup(ctx context.Context) (string, error) {
 	return res.Text, err
 }
 
+// MailFactsOf sammelt, was nur der Server über sich selbst weiß.
+func (c *Client) MailFactsOf(ctx context.Context) (*MailFacts, error) {
+	var res MailFacts
+	err := c.Call(ctx, OpMailFacts, nil, &res)
+	return &res, err
+}
+
 // ApplyMail schreibt den vollständigen Sollzustand in die Map-Dateien.
 func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, error) {
 	var res TextResult
 	err := c.Call(ctx, OpMailApply, p, &res)
+	return res.Text, err
+}
+
+// InstallFeature holt die Pakete einer Fähigkeit nach.
+func (c *Client) InstallFeature(ctx context.Context, feature string) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpFeatureInstall, map[string]string{"feature": feature}, &res)
 	return res.Text, err
 }
 

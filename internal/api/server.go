@@ -176,6 +176,11 @@ func (s *Server) setupRoutes() {
 	auth.POST("/system/firewall", s.handleFirewallRule, s.requireRole(store.RoleAdmin))
 	auth.GET("/system/fail2ban", s.handleFail2banStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/fail2ban/unban", s.handleUnban, s.requireRole(store.RoleAdmin))
+	// Nachinstallieren, was das Panel verwaltet. Der Pfad nennt eine
+	// Fähigkeit, keinen Paketnamen — welche Pakete dazugehören, weiß der
+	// Agent, und nur er.
+	auth.GET("/system/features", s.handleFeatures, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/features/:name", s.handleInstallFeature, s.requireRole(store.RoleAdmin))
 	auth.GET("/system/portscan", s.handlePortScanStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/portscan", s.handlePortScanSet, s.requireRole(store.RoleAdmin))
 
@@ -185,6 +190,7 @@ func (s *Server) setupRoutes() {
 	// Systembenutzer an, das andere sagt etwas über die Maschine.
 	auth.GET("/mail/status", s.handleMailStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/mail/setup", s.handleMailSetup, s.requireRole(store.RoleAdmin))
+	auth.GET("/mail/check", s.handleMailCheck)
 	auth.GET("/mail/domains", s.handleListMailDomains)
 	auth.POST("/mail/domains", s.handleCreateMailDomain)
 	auth.PATCH("/mail/domains/:id", s.handleUpdateMailDomain)

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import InstallHint from './InstallHint.vue'
 
 // Firewall und Fail2ban. Beides betrifft den ganzen Server, nicht eine Site —
 // der Endpunkt lehnt jeden ab, der kein Administrator ist, und diese Komponente
@@ -201,7 +202,13 @@ onMounted(load)
       class="rounded-lg border p-4 text-[12px]"
       :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
     >
-      <p v-if="scan && scan.hinweis" :style="{ color: 'var(--ink-secondary)' }">
+      <InstallHint
+        v-if="scan && !scan.available"
+        feature="fail2ban"
+        :text="t('fw.needFail2ban')"
+        @installed="load"
+      />
+      <p v-else-if="scan && scan.hinweis" :style="{ color: 'var(--ink-secondary)' }">
         {{ scan.hinweis }}
       </p>
 
@@ -261,7 +268,13 @@ onMounted(load)
       class="rounded-lg border p-4 text-[12px]"
       :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
     >
-      <p v-if="f2b && f2b.hinweis" :style="{ color: 'var(--ink-secondary)' }">
+      <InstallHint
+        v-if="f2b && f2b.available === false"
+        feature="fail2ban"
+        :text="t('fw.needFail2ban')"
+        @installed="load"
+      />
+      <p v-else-if="f2b && f2b.hinweis" :style="{ color: 'var(--ink-secondary)' }">
         {{ f2b.hinweis }}
       </p>
 

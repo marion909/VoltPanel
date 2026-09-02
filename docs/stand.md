@@ -217,7 +217,14 @@ Datenbank, Dienst, API und Oberfläche. Dazu die Konfiguration, ohne die das
 alles nur in Dateien stünde: Dovecot kennt die Passwortdatei des Panels,
 Postfix fragt Dovecot nach dem Ausweis eines Absenders, TLS kommt aus dem
 Zertifikat des Panels, und eingeliefert wird auf 587 — nur verschlüsselt und
-nur mit Ausweis. Der Agent schreibt daraus die Map-Dateien für
+nur mit Ausweis. Und die Zustellbarkeitsprüfung: PTR vorwärts wie rückwärts,
+MX, SPF, DKIM gegen den hinterlegten Schlüssel, DMARC, TLS und die Zeile, ohne
+die der Server ein offenes Relay wäre — mit einem Rat je Befund statt nur einem
+roten Punkt.
+
+Blacklists prüft sie nicht. Das hieße, ein Dutzend fremder Dienste zu fragen,
+deren Antworten sich ständig ändern; wer dort steht, erfährt es ohnehin von
+seinen Empfängern. Der Agent schreibt daraus die Map-Dateien für
 Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
 nie. Ein gesperrter Mandant nimmt keine Post mehr an, ein Catch-All zeigt nur
 auf ein eigenes Postfach, und Postfächer zählen zum Paket.
@@ -229,11 +236,10 @@ Offen ist der Rest:
   Hand, wer die Domäne verwaltet.
 - Rspamd einrichten — bisher richtet `mail.setup` Postfix, den Mailspeicher und
   den OpenDKIM-Milter ein, aber keine Spamprüfung.
+- Autoconfig und Autodiscover für Thunderbird und Outlook.
 - Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
   sie noch nicht auf einem laufenden Server.
 - Webmail (Roundcube) als Plugin
-- Autoconfig und Autodiscover für Thunderbird und Outlook
-- Deliverability-Prüfung im Panel: PTR, Blacklists, offene Relays, TLS
 
 Eine Grenze gehört benannt: alle Maildirs gehören einem Benutzer (`vmail`), so
 wie es bei einem virtuellen Mailserver üblich ist. Die Trennung zwischen zwei
@@ -323,6 +329,11 @@ Offen:
   Fassung wird zu den Release-Notes im Panel); eine eigene Seite mit Anleitungen
   gibt es noch nicht.
 - Closed Beta mit zwei bis drei fremden Nutzern, erst danach öffentlich
+
+Fehlt ein Dienst, steht der Knopf daneben: Docker, Fail2ban, Postfix, Dovecot,
+OpenDKIM und Rspamd lassen sich aus dem Panel nachinstallieren. Über die
+Leitung geht dabei ein Name aus einer festen Liste, nie ein Paketname — apt
+führt Postinst-Skripte als root aus.
 
 ## Bekannte Einschränkungen
 
