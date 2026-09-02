@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/store"
 )
 
@@ -116,5 +117,48 @@ func TestNodeFassungWirdNichtUnterAppsWeggezogen(t *testing.T) {
 	if err := svc.RemoveNode(ctx, sys, 20); err != nil &&
 		strings.Contains(err.Error(), "wird von") {
 		t.Errorf("node20 galt als benutzt: %v", err)
+	}
+}
+
+// Ein Image, auf das noch eine App zeigt, darf nicht wegzuräumen sein.
+//
+// Docker selbst schützt nur, was einen vorhandenen Container hat. Eine App,
+// deren Container gerade nicht existiert — gestoppt, weggeräumt, oder der
+// Server neu aufgesetzt —, wäre für Docker unsichtbar und ihr Image frei; beim
+// nächsten Start fehlte es, und der Grund läge Tage zurück.
+func TestNutzerVonFindetAppsMitStillschweigendemTag(t *testing.T) {
+	apps := []*store.App{
+		{Name: "shop", Kind: store.AppDocker, Image: "nginx"},
+		{Name: "blog", Kind: store.AppDocker, Image: "nginx:1.27"},
+		{Name: "api", Kind: store.AppDocker, Image: "registry.example.at:5000/team/api:3"},
+		{Name: "alt", Kind: store.AppDocker, Image: "a1b2c3d4e5f6"},
+		// Eine native App hat kein Image und darf nichts blockieren.
+		{Name: "worker", Kind: store.AppNative, Runtime: "node22"},
+	}
+
+	faelle := []struct {
+		img  agent.ImageInfo
+		will []string
+	}{
+		// "nginx" meint "nginx:latest" — das ist der Fall, der ohne
+		// NormalizeRef durchginge und ein benutztes Image freigäbe.
+		{agent.ImageInfo{ID: "111111111111", Repo: "nginx", Tag: "latest", Ref: "nginx:latest"},
+			[]string{"shop"}},
+		{agent.ImageInfo{ID: "222222222222", Repo: "nginx", Tag: "1.27", Ref: "nginx:1.27"},
+			[]string{"blog"}},
+		{agent.ImageInfo{ID: "333333333333", Repo: "registry.example.at:5000/team/api",
+			Tag: "3", Ref: "registry.example.at:5000/team/api:3"}, []string{"api"}},
+		// Über die Kennung angelegt: dieselbe App, anderer Weg.
+		{agent.ImageInfo{ID: "a1b2c3d4e5f6789", Repo: "<none>", Tag: "<none>",
+			Ref: "a1b2c3d4e5f6789", Dangling: true}, []string{"alt"}},
+		// Und ein Image, das wirklich niemand braucht.
+		{agent.ImageInfo{ID: "999999999999", Repo: "redis", Tag: "7", Ref: "redis:7"}, nil},
+	}
+
+	for _, f := range faelle {
+		got := nutzerVon(f.img, apps)
+		if strings.Join(got, ",") != strings.Join(f.will, ",") {
+			t.Errorf("nutzerVon(%s) = %v, erwartet %v", f.img.Ref, got, f.will)
+		}
 	}
 }

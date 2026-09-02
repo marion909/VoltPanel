@@ -11,6 +11,7 @@ import (
 	"github.com/marion909/voltpanel/internal/agent"
 	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/config"
+	"github.com/marion909/voltpanel/internal/dockerspec"
 	"github.com/marion909/voltpanel/internal/store"
 )
 
@@ -372,6 +373,138 @@ func (s *AppService) ContainerLogs(ctx context.Context, sc store.Scope, id int64
 		return "", fmt.Errorf("%s läuft nicht als container", app.Name)
 	}
 	return s.agent.ContainerLogs(ctx, app.Name, lines)
+}
+
+// AppStats ist der Verbrauch einer App, die als Container läuft.
+type AppStats struct {
+	agent.ContainerStats
+	AppID  int64  `json:"app_id"`
+	App    string `json:"app"`
+	Domain string `json:"domain"`
+}
+
+// ContainerStats liefert den Verbrauch — nur den der eigenen Apps.
+//
+// Der Agent kennt den Mandanten nicht; er liefert alles, was dem Panel gehört.
+// Gefiltert wird deshalb hier, und zwar über die Apps, die im Scope stehen:
+// dieselbe Regel wie überall sonst, nicht eine zweite Antwort auf die Frage,
+// was jemandem gehört.
+func (s *AppService) ContainerStats(ctx context.Context, sc store.Scope) ([]AppStats, error) {
+	apps, err := s.store.ListApps(ctx, sc)
+	if err != nil {
+		return nil, err
+	}
+	meine := map[string]*store.App{}
+	for _, a := range apps {
+		if a.Kind == store.AppDocker {
+			meine[dockerspec.ContainerName(a.Name)] = a
+		}
+	}
+	if len(meine) == 0 {
+		return []AppStats{}, nil
+	}
+
+	sites, err := s.store.ListSites(ctx, sc)
+	if err != nil {
+		return nil, err
+	}
+	domain := make(map[int64]string, len(sites))
+	for _, site := range sites {
+		domain[site.ID] = site.Domain
+	}
+
+	roh, err := s.agent.ContainerStatsOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AppStats, 0, len(roh))
+	for _, st := range roh {
+		app, ok := meine[st.Name]
+		if !ok {
+			continue
+		}
+		out = append(out, AppStats{
+			ContainerStats: st,
+			AppID:          app.ID,
+			App:            app.Name,
+			Domain:         domain[app.SiteID],
+		})
+	}
+	return out, nil
+}
+
+// ImageView ist ein Image mit der Auskunft, wer es braucht.
+type ImageView struct {
+	agent.ImageInfo
+	// UsedBy sind die Apps, die darauf zeigen. Ist die Liste leer, lässt sich
+	// das Image entfernen.
+	UsedBy []string `json:"used_by"`
+}
+
+// Images listet, was auf der Platte liegt, und wer es benutzt.
+func (s *AppService) Images(ctx context.Context) ([]ImageView, error) {
+	images, err := s.agent.Images(ctx)
+	if err != nil {
+		return nil, err
+	}
+	apps, err := s.store.ListApps(ctx, store.SystemScope())
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]ImageView, 0, len(images))
+	for _, img := range images {
+		out = append(out, ImageView{ImageInfo: img, UsedBy: nutzerVon(img, apps)})
+	}
+	return out, nil
+}
+
+// RemoveImage entfernt ein Image, wenn keine App darauf zeigt.
+//
+// Wie bei einer Node-Fassung: Docker selbst schützt nur laufende und
+// vorhandene Container. Eine App, deren Container gerade nicht existiert —
+// gestoppt und weggeräumt, oder nach einem Neustart des Servers — wäre für
+// Docker unsichtbar und ihr Image damit frei. Beim nächsten Start fehlte es,
+// und der Grund läge Tage zurück.
+func (s *AppService) RemoveImage(ctx context.Context, ref string) (string, error) {
+	images, err := s.agent.Images(ctx)
+	if err != nil {
+		return "", err
+	}
+	apps, err := s.store.ListApps(ctx, store.SystemScope())
+	if err != nil {
+		return "", err
+	}
+
+	for _, img := range images {
+		if img.Ref != ref && img.ID != ref {
+			continue
+		}
+		if nutzer := nutzerVon(img, apps); len(nutzer) > 0 {
+			return "", fmt.Errorf("%s wird von %d app(s) benutzt: %s",
+				img.Ref, len(nutzer), strings.Join(nutzer, ", "))
+		}
+	}
+	return s.agent.RemoveImage(ctx, ref)
+}
+
+// nutzerVon sagt, welche Apps auf ein Image zeigen.
+//
+// Verglichen wird gegen den ergänzten Namen: eine App mit "nginx" meint
+// "nginx:latest", und genau so steht es in der Liste. Die Kennung zählt
+// ebenfalls, weil eine App auch über sie angelegt worden sein kann.
+func nutzerVon(img agent.ImageInfo, apps []*store.App) []string {
+	var out []string
+	for _, a := range apps {
+		if a.Kind != store.AppDocker || a.Image == "" {
+			continue
+		}
+		ref := dockerspec.NormalizeRef(a.Image)
+		if ref == img.Ref || a.Image == img.ID || strings.HasPrefix(img.ID, a.Image) {
+			out = append(out, a.Name)
+		}
+	}
+	return out
 }
 
 // NodeVersions sagt, welche Node-Fassungen installiert sind.

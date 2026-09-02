@@ -132,13 +132,16 @@ const (
 
 	// Docker. Der Aufrufer beschreibt, was er will; die Kommandozeile baut
 	// der Agent. Es gibt kein Feld fuer einen Schalter.
-	OpDockerStatus Op = "docker.status"
-	OpDockerRun    Op = "docker.run"
-	OpDockerEnv    Op = "docker.env"
-	OpDockerAction Op = "docker.action"
-	OpDockerList   Op = "docker.list"
-	OpDockerLogs   Op = "docker.logs"
-	OpDockerPull   Op = "docker.pull"
+	OpDockerStatus      Op = "docker.status"
+	OpDockerRun         Op = "docker.run"
+	OpDockerEnv         Op = "docker.env"
+	OpDockerAction      Op = "docker.action"
+	OpDockerList        Op = "docker.list"
+	OpDockerLogs        Op = "docker.logs"
+	OpDockerPull        Op = "docker.pull"
+	OpDockerStats       Op = "docker.stats"
+	OpDockerImages      Op = "docker.images"
+	OpDockerImageRemove Op = "docker.image.remove"
 
 	// Git-Deploy: holen, bauen, umschalten. Der Umschalter ist ein Symlink.
 	OpDeployRun      Op = "deploy.run"

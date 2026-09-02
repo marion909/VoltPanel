@@ -66,6 +66,51 @@ func (s *Server) handlePullImage(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"log": out})
 }
 
+// handleAppStats liefert den Verbrauch der eigenen Container.
+//
+// Im Scope des Anfragenden, nicht als Serverauskunft: ein Kunde sieht, was
+// seine Apps ziehen, und sonst nichts. Ein Server ohne Docker liefert eine
+// leere Liste statt eines Fehlers — die Übersicht soll auch dort stehen.
+func (s *Server) handleAppStats(c echo.Context) error {
+	st, err := s.apps.ContainerStats(c.Request().Context(), s.scopeFor(c))
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, st)
+}
+
+// handleImages listet die Images des Servers.
+//
+// Administratoren vorbehalten. Ein Image trägt keinen Mandanten — es liegt
+// einmal auf der Platte und wird von jedem benutzt, der es angibt. Die Liste
+// aufzuteilen ginge nicht ehrlich, also bekommt sie, wen sie angeht.
+func (s *Server) handleImages(c echo.Context) error {
+	list, err := s.apps.Images(c.Request().Context())
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, list)
+}
+
+// handleRemoveImage entfernt ein Image, an dem keine App hängt.
+func (s *Server) handleRemoveImage(c echo.Context) error {
+	var req struct {
+		Ref string `json:"ref"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+	ctx := c.Request().Context()
+	out, err := s.apps.RemoveImage(ctx, req.Ref)
+	if err != nil {
+		s.audit(ctx, currentUser(c), "app.image.remove", "image", req.Ref,
+			"fehler", c.RealIP(), err)
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "app.image.remove", "image", req.Ref, "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, map[string]string{"log": out})
+}
+
 // handleAppLogs liefert die letzten Zeilen eines Containers.
 func (s *Server) handleAppLogs(c echo.Context) error {
 	id, err := pathID(c)

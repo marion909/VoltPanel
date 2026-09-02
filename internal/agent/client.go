@@ -668,6 +668,27 @@ func (c *Client) PullImage(ctx context.Context, image string) (string, error) {
 	return res.Text, err
 }
 
+// ContainerStatsOf fragt den Verbrauch der laufenden Container ab.
+func (c *Client) ContainerStatsOf(ctx context.Context) ([]ContainerStats, error) {
+	var res []ContainerStats
+	err := c.Call(ctx, OpDockerStats, nil, &res)
+	return res, err
+}
+
+// Images listet, was auf der Platte liegt.
+func (c *Client) Images(ctx context.Context) ([]ImageInfo, error) {
+	var res []ImageInfo
+	err := c.Call(ctx, OpDockerImages, nil, &res)
+	return res, err
+}
+
+// RemoveImage entfernt ein Image — ohne Gewalt, siehe Agent.
+func (c *Client) RemoveImage(ctx context.Context, ref string) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpDockerImageRemove, map[string]string{"ref": ref}, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

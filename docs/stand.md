@@ -145,7 +145,7 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   sich weiter an. Den eigenen Mandanten zu sperren lehnt das Panel ab — das
   wäre der kürzeste Weg, sich selbst auszusperren.
 
-**Phase 5 — Docker, Node.js, Git-Deploy** (teilweise)
+**Phase 5 — Docker, Node.js, Git-Deploy**
 
 - Eine App ist eine systemd-Unit plus Reverse-Proxy: Laufzeitumgebung,
   Argumente und Umgebungsvariablen über die Oberfläche, Auto-Restart, Port und
@@ -163,26 +163,24 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   unter der Kennung der Site, ohne jede Capability, mit Speicher- und
   CPU-Grenze und nur auf 127.0.0.1 erreichbar. Es gibt kein Eingabefeld für
   einen docker-Schalter — die Kommandozeile baut der Agent.
+- Auslastung und Images. An der App steht, was ihr Container gerade zieht —
+  CPU, belegter Speicher gegen die eigene Grenze. Daneben die Liste dessen, was
+  auf der Platte liegt, mit der Angabe, welche App darauf zeigt; entfernen
+  lässt sich nur, worauf keine zeigt, und erzwungen wird dabei nichts. Die
+  Liste gilt für den ganzen Server und ist deshalb Administratoren
+  vorbehalten — ein Image trägt keinen Mandanten.
 - Git-Deploy je Site: Deploy-Key, Branch-Auswahl, Buildschritte aus einer
   festen Liste, Releases-Verzeichnis mit Symlink-Wechsel und Rollback per
   Klick. Der Webhook-Endpunkt liegt außerhalb des Zugriffspfads und weist sich
   über eine HMAC-Signatur aus; das Protokoll des letzten Laufs steht im Panel,
   auch wenn er fehlgeschlagen ist.
 
-Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
+Phase 0 bis 2, Phase 4 und Phase 5 sind damit abgeschlossen — bei Phase 5
+steht unter „Offen" nur noch, was dort mit Absicht steht.
 
 ## Offen
 
 **Phase 5 — Docker, Node.js, Git-Deploy**
-
-Noch zu bauen:
-
-- Auslastung laufender Container (`docker stats`). Der Zustand steht im Panel,
-  der Verbrauch nicht — wer wissen will, was ein Container gerade zieht, muss
-  auf die Shell.
-- Images verwalten. Geholt werden sie beim Anlegen einer App, entfernt nie:
-  eine abgeschaltete App lässt ihr Image liegen, und aufgeräumt wird bis auf
-  weiteres von Hand.
 
 Bewusst nicht gebaut — offen, aber nicht als Rückstand gemeint:
 
@@ -194,7 +192,7 @@ Bewusst nicht gebaut — offen, aber nicht als Rückstand gemeint:
   Verzeichnis der Site — mehr braucht keine der Anwendungen, um die es hier
   geht.
 
-App, Container, Node-Fassungen und Git-Deploy stehen (oben unter „Fertig").
+Alles andere steht (oben unter „Fertig").
 
 Statt fnm liegen die Node-Fassungen systemweit unter `/opt/volt/node`. fnm
 installiert je Benutzer, und in diesem Panel hat jede Site einen eigenen —
@@ -203,13 +201,13 @@ als „node" wählbar.
 
 **Phase 6 — Mailserver**
 
-- Entscheidung vorab: eigener Stack (Postfix, Dovecot, Rspamd, OpenDKIM,
-  virtuelle Domänen aus der Datenbank) oder Mailcow als Docker-Stack, den das
-  Panel nur verwaltet
+- Eigener Stack: Postfix, Dovecot, Rspamd, OpenDKIM, virtuelle Domänen aus der
+  Datenbank. Die Roadmap ließ Mailcow als Alternative offen; die Entscheidung
+  ist gegen sie gefallen.
 - Multidomain: Domänen, Postfächer, Aliase, Catch-All, Weiterleitungen, Quota
 - DKIM-Schlüssel erzeugen, SPF-, DKIM- und DMARC-Einträge automatisch über die
   Cloudflare-Anbindung aus Phase 2 setzen
-- Webmail (Roundcube oder SnappyMail) als Plugin
+- Webmail (Roundcube) als Plugin
 - Autoconfig und Autodiscover für Thunderbird und Outlook
 - Deliverability-Prüfung im Panel: PTR, Blacklists, offene Relays, TLS
 
@@ -220,9 +218,9 @@ keine Entscheidung.
 
 Der schwierige Teil ist auch nicht der Code. Ob eine Mail bei Gmail im
 Posteingang landet, hängt an PTR-Eintrag, Reputation der IP und daran, dass
-kein Kunde über den Server Spam verschickt. Die Roadmap sagt dazu selbst:
-Mailcow-Variante ernsthaft prüfen, Phase 6 spät ansetzen. Solange das nicht
-entschieden ist, wäre jede Zeile Mailserver-Code eine Wette.
+kein Kunde über den Server Spam verschickt. Daran ändert die Entscheidung für
+den eigenen Stack nichts — sie sagt nur, womit gebaut wird, nicht dass es schon
+losgeht. Die Roadmap setzt Phase 6 spät an, und dabei bleibt es.
 
 **Phase 7 — App Store und Plugin-System**
 

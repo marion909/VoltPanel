@@ -262,3 +262,52 @@ func TestAufraeumenLaesstDenGueltigenStehen(t *testing.T) {
 		}
 	}
 }
+
+// Derselbe Fall, aber ohne sich auf das Temporärverzeichnis der Plattform zu
+// verlassen: die Site liegt hinter einem Symlink.
+//
+// Das ist keine Erfindung für den Test. /home, das auf /srv/home zeigt, oder
+// ein Site-Verzeichnis auf einer nachträglich eingehängten Platte — dann ist
+// der aufgelöste Pfad ein anderer als der gespeicherte, und wer die beiden
+// Zeichenketten vergleicht, räumt den Stand weg, der gerade ausgeliefert wird.
+//
+// Gefunden hat das nicht dieser Test, sondern der darüber: unter macOS liegt
+// das Temporärverzeichnis hinter /var -> /private/var, und dort fiel es auf.
+// Auf Linux wäre es erst einem Kunden aufgefallen.
+func TestAufraeumenErkenntDenGueltigenHinterEinemSymlink(t *testing.T) {
+	tmp := t.TempDir()
+	echt := filepath.Join(tmp, "echt")
+	if err := os.MkdirAll(echt, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	verweis := filepath.Join(tmp, "verweis")
+	if err := os.Symlink(echt, verweis); err != nil {
+		t.Fatal(err)
+	}
+
+	// Der Server kennt die Site nur über den Weg durch den Symlink.
+	root := filepath.Join(verweis, "site")
+	var alle []string
+	for _, name := range []string{
+		"20260101-000000", "20260102-000000", "20260103-000000", "20260104-000000",
+		"20260105-000000", "20260106-000000", "20260107-000000",
+	} {
+		d := filepath.Join(root, releasesDir, name)
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		alle = append(alle, d)
+	}
+
+	srv, _ := testServer(t)
+	plan := &deployPlan{root: root, uid: os.Getuid(), gid: os.Getgid()}
+	if err := srv.switchCurrent(t.Context(), plan, alle[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	srv.pruneReleases(plan)
+
+	if _, err := os.Stat(alle[0]); err != nil {
+		t.Error("hinter einem symlink wurde der gültige stand aufgeräumt")
+	}
+}

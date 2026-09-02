@@ -319,7 +319,7 @@ func (s *Server) pruneReleases(plan *deployPlan) int {
 	var weg int
 	for _, name := range namen[keepReleases:] {
 		path := filepath.Join(dir, name)
-		if aktiv != "" && path == aktiv {
+		if aktiv != "" && istGleicherPfad(path, aktiv) {
 			continue
 		}
 		if err := os.RemoveAll(path); err == nil {
@@ -327,6 +327,31 @@ func (s *Server) pruneReleases(plan *deployPlan) int {
 		}
 	}
 	return weg
+}
+
+// istGleicherPfad sagt, ob zwei Pfade dasselbe Verzeichnis meinen.
+//
+// Beide Seiten werden aufgelöst, und das ist der Punkt. `aktiv` kommt aus
+// EvalSymlinks und ist deshalb schon aufgelöst; der Kandidat ist es nicht. Ist
+// irgendein Teil des Weges ein Symlink — /home, das auf /srv/home zeigt, oder
+// ein Site-Verzeichnis auf einer eingehängten Platte —, dann unterscheiden
+// sich die beiden Zeichenketten, obwohl sie dasselbe Verzeichnis bezeichnen.
+// Der Vergleich schlüge fehl, und weggeräumt würde ausgerechnet der Stand, der
+// gerade ausgeliefert wird.
+//
+// Aufgefallen ist das nicht auf einem Server, sondern im Test: unter macOS
+// liegt das Temporärverzeichnis hinter /var -> /private/var. Auf Linux fällt
+// derselbe Fehler erst auf, wenn jemand seine Sites hinter einen Symlink legt
+// — und dann als gelöschte Website.
+func istGleicherPfad(a, b string) bool {
+	if a == b {
+		return true
+	}
+	echtA, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		return false
+	}
+	return echtA == b
 }
 
 // deployKeyPath bildet den Pfad des Deploy-Keys aus dem geprüften Namen.

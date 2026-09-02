@@ -157,6 +157,49 @@ func checkImageParts(s string) error {
 	return nil
 }
 
+// NormalizeRef ergänzt den Tag, den Docker stillschweigend annimmt.
+//
+// "nginx" und "nginx:latest" sind dasselbe Image; in der Liste von
+// `docker images` steht immer die zweite Form. Wer beides vergleichen will,
+// ohne das hier zu tun, findet ein benutztes Image für unbenutzt — und
+// entfernt es.
+//
+// Die Zerlegung ist dieselbe wie in checkImageParts: was nach dem letzten
+// Schrägstrich einen Doppelpunkt hat, trägt einen Tag. Ein Digest bleibt, wie
+// er ist.
+func NormalizeRef(s string) string {
+	if strings.Contains(s, "@") {
+		return s
+	}
+	rest := s
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		rest = s[i+1:]
+	}
+	if strings.Contains(rest, ":") {
+		return s
+	}
+	return s + ":latest"
+}
+
+// reImageID ist die Kennung eines Images, wie `docker images` sie ausgibt:
+// zwölf Stellen, oder die volle Prüfsumme mit oder ohne Präfix.
+var reImageID = regexp.MustCompile(`^(sha256:)?[0-9a-f]{12,64}$`)
+
+// ValidImageRef prüft, was sich entfernen lässt: ein Name oder eine Kennung.
+//
+// Die Kennung muss dazu, weil ein Image ohne Namen — übrig geblieben, nachdem
+// ein neuer Stand denselben Tag übernommen hat — sich anders gar nicht
+// benennen lässt. Und genau die sind es, die aufzuräumen sich lohnt.
+func ValidImageRef(s string) error {
+	if reImageID.MatchString(s) {
+		return nil
+	}
+	if err := ValidImage(s); err != nil {
+		return fmt.Errorf("%w: weder ein image-name noch eine kennung", ErrInvalid)
+	}
+	return nil
+}
+
 // checkContainerPath prüft einen Pfad im Container.
 func CheckContainerPath(p string) error {
 	switch {

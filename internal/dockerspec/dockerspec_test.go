@@ -51,3 +51,60 @@ func TestNurEigeneContainer(t *testing.T) {
 		}
 	}
 }
+
+// Entfernen darf man ein Image über seinen Namen oder über seine Kennung.
+// Alles andere ist ein Schalter für docker, kein Image.
+func TestValidImageRef(t *testing.T) {
+	gut := []string{
+		"nginx:1.27",
+		"nginx",
+		"registry.example.at:5000/team/app:2026-08-30",
+		"a1b2c3d4e5f6",
+		// Zu kurz für eine Kennung, aber ein zulässiger Repository-Name —
+		// und deshalb erlaubt. Docker liest ihn genauso.
+		"a1b2c3",
+		"sha256:" + strings.Repeat("ab", 32),
+		strings.Repeat("f", 64),
+	}
+	for _, s := range gut {
+		if err := ValidImageRef(s); err != nil {
+			t.Errorf("ValidImageRef(%q) = %v, sollte gehen", s, err)
+		}
+	}
+
+	schlecht := []string{
+		"",
+		"-f",
+		"--force",
+		"--all",
+		"nginx; rm -rf /",
+		"nginx && docker rmi -f alles",
+		"nginx $(id)",
+		"<none>:<none>", // steht so in der Ausgabe, ist aber kein Image
+		"nginx:1.27 --force",
+	}
+	for _, s := range schlecht {
+		if err := ValidImageRef(s); err == nil {
+			t.Errorf("ValidImageRef(%q) = nil, sollte abgelehnt werden", s)
+		}
+	}
+}
+
+// "nginx" und "nginx:latest" sind dasselbe Image. Wer das nicht ergänzt, hält
+// ein benutztes Image für unbenutzt — und entfernt es.
+func TestNormalizeRef(t *testing.T) {
+	faelle := map[string]string{
+		"nginx":                             "nginx:latest",
+		"nginx:1.27":                        "nginx:1.27",
+		"team/app":                          "team/app:latest",
+		"team/app:2":                        "team/app:2",
+		"registry.example.at:5000/app":      "registry.example.at:5000/app:latest",
+		"registry.example.at:5000/app:2026": "registry.example.at:5000/app:2026",
+		"nginx@sha256:" + strings.Repeat("cd", 32): "nginx@sha256:" + strings.Repeat("cd", 32),
+	}
+	for in, will := range faelle {
+		if got := NormalizeRef(in); got != will {
+			t.Errorf("NormalizeRef(%q) = %q, erwartet %q", in, got, will)
+		}
+	}
+}

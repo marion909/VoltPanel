@@ -28,6 +28,10 @@ const logs = ref({})
 // Die installierten Node-Fassungen. Sie liegen systemweit; installieren und
 // entfernen darf sie nur ein Administrator, ansehen jeder.
 const nodes = ref([])
+const stats = ref([])
+const images = ref([])
+const showImages = ref(false)
+const imageBusy = ref(false)
 const nodeWunsch = ref('')
 const nodeBusy = ref(false)
 const showNodes = ref(false)
@@ -61,22 +65,29 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [appList, siteList, runtimeList, dockerState, nodeList] = await Promise.all([
-      api.get('/apps'),
-      api.get('/sites'),
-      // Ohne laufenden Agent gibt es keine Auskunft über Laufzeitumgebungen.
-      // Die Liste der Apps soll deswegen nicht leer bleiben.
-      api.get('/apps/runtimes').catch(() => []),
-      // Scheitert für alle außer Administratoren an der Rolle, und das ist in
-      // Ordnung.
-      api.get('/apps/docker').catch(() => null),
-      api.get('/apps/node').catch(() => []),
-    ])
+    const [appList, siteList, runtimeList, dockerState, nodeList, statList, imageList] =
+      await Promise.all([
+        api.get('/apps'),
+        api.get('/sites'),
+        // Ohne laufenden Agent gibt es keine Auskunft über Laufzeitumgebungen.
+        // Die Liste der Apps soll deswegen nicht leer bleiben.
+        api.get('/apps/runtimes').catch(() => []),
+        // Scheitert für alle außer Administratoren an der Rolle, und das ist in
+        // Ordnung.
+        api.get('/apps/docker').catch(() => null),
+        api.get('/apps/node').catch(() => []),
+        // Auslastung und Images sind Zugaben: ohne Docker auf dem Server
+        // bleiben sie leer, und die Übersicht steht trotzdem.
+        api.get('/apps/stats').catch(() => []),
+        api.get('/apps/images').catch(() => []),
+      ])
     apps.value = appList
     sites.value = siteList
     runtimes.value = runtimeList
     docker.value = dockerState
     nodes.value = nodeList
+    stats.value = statList
+    images.value = imageList
   } catch (err) {
     error.value = err.message
   } finally {
@@ -207,6 +218,47 @@ async function nodeEntfernen(v) {
     error.value = err.message
   } finally {
     nodeBusy.value = false
+  }
+}
+
+// statFor sucht die Auslastung zu einer App.
+//
+// Über die App-Kennung, nicht über den Namen: der Name des Containers entsteht
+// zwar aus dem der App, aber der Server hat ihn schon zugeordnet — das hier
+// noch einmal nachzubauen hieße, dieselbe Frage zweimal zu beantworten.
+function statFor(app) {
+  return stats.value.find((s) => s.app_id === app.id)
+}
+
+// Bytes in etwas, das man lesen kann. Zweierpotenzen, wie `docker stats` sie
+// meint.
+function bytes(n) {
+  if (!n) return '0 B'
+  const einheiten = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+  let i = 0
+  let v = n
+  while (v >= 1024 && i < einheiten.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${einheiten[i]}`
+}
+
+function imagesGesamt() {
+  return images.value.reduce((n, i) => n + (i.size || 0), 0)
+}
+
+async function imageEntfernen(img) {
+  if (!confirm(t('apps.imagesConfirmDelete', { ref: img.ref }))) return
+  imageBusy.value = true
+  error.value = ''
+  try {
+    await api.post('/apps/images/remove', { ref: img.ref })
+    await load()
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    imageBusy.value = false
   }
 }
 
@@ -346,6 +398,57 @@ onMounted(load)
         </div>
         <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
           {{ t('apps.nodeHint') }}
+        </p>
+      </div>
+    </div>
+
+    <!--
+      Images liegen einmal auf der Platte und gehören keinem Mandanten. Die
+      Liste ist deshalb Administratoren vorbehalten; für alle anderen scheitert
+      der Aufruf an der Rolle, und die Klappe erscheint gar nicht.
+    -->
+    <div
+      v-if="images.length"
+      class="mb-5 rounded-lg border p-4"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <button
+        class="flex w-full items-center justify-between text-[12px]"
+        :style="{ color: 'var(--ink-secondary)' }"
+        @click="showImages = !showImages"
+      >
+        <span>{{ t('apps.images') }} — {{ images.length }}, {{ bytes(imagesGesamt()) }}</span>
+        <span aria-hidden="true">{{ showImages ? '\u2212' : '+' }}</span>
+      </button>
+
+      <div v-if="showImages" class="mt-3 space-y-2">
+        <div
+          v-for="img in images"
+          :key="img.id"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
+        >
+          <code class="font-mono">{{ img.dangling ? img.id : img.ref }}</code>
+          <span :style="{ color: 'var(--ink-muted)' }">{{ bytes(img.size) }}</span>
+          <span v-if="img.dangling" :style="{ color: 'var(--ink-muted)' }">
+            {{ t('apps.imagesDangling') }}
+          </span>
+          <span v-if="img.used_by && img.used_by.length" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.imagesUsedBy') }} {{ img.used_by.join(', ') }}
+          </span>
+          <template v-else>
+            <span :style="{ color: 'var(--ink-muted)' }">{{ t('apps.imagesUnused') }}</span>
+            <button
+              class="underline"
+              :style="{ color: 'var(--status-critical)' }"
+              :disabled="imageBusy"
+              @click="imageEntfernen(img)"
+            >
+              {{ t('common.delete') }}
+            </button>
+          </template>
+        </div>
+        <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          {{ t('apps.imagesHint') }}
         </p>
       </div>
     </div>
@@ -498,6 +601,38 @@ onMounted(load)
             <template v-else>{{ app.runtime }} {{ (app.args || []).join(' ') }}</template>
           </span>
         </header>
+
+        <!--
+          Die Auslastung steht nur da, wenn wirklich etwas läuft. Ein Balken
+          mit Null darin sähe aus wie eine Messung und wäre keine.
+        -->
+        <div v-if="statFor(app)" class="mb-3">
+          <div class="flex items-baseline justify-between text-[11px]">
+            <span :style="{ color: 'var(--ink-secondary)' }">{{ t('apps.usage') }}</span>
+            <span class="font-mono" :style="{ color: 'var(--ink-secondary)' }">
+              {{ statFor(app).cpu_perc.toFixed(1) }}% CPU &middot;
+              {{ bytes(statFor(app).mem_used) }}
+              <template v-if="statFor(app).mem_max">
+                / {{ bytes(statFor(app).mem_max) }}
+              </template>
+            </span>
+          </div>
+          <div
+            class="mt-1 h-1 w-full overflow-hidden rounded-full"
+            :style="{ background: 'var(--surface-sunken)' }"
+            role="img"
+            :aria-label="statFor(app).mem_perc.toFixed(0) + '%'"
+          >
+            <div
+              class="h-full rounded-full"
+              :style="{
+                width: Math.min(100, statFor(app).mem_perc) + '%',
+                background:
+                  statFor(app).mem_perc > 90 ? 'var(--status-critical)' : 'var(--series-1)',
+              }"
+            ></div>
+          </div>
+        </div>
 
         <div class="text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
           {{ t('apps.env') }}:
