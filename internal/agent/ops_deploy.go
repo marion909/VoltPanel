@@ -201,15 +201,16 @@ func (s *Server) prepareDirs(plan *deployPlan, log *strings.Builder) error {
 func (s *Server) cloneRelease(ctx context.Context, plan *deployPlan, target string,
 	log *strings.Builder) error {
 
-	// "--" vor der Adresse: ohne das läse git eine Adresse, die mit einem
-	// Bindestrich beginnt, als Option. NormalizeGitURL schließt das schon aus;
-	// beides zusammen heißt, dass hier auch dann nichts passiert, wenn dort
-	// einmal etwas durchrutscht.
-	args := []string{
-		"clone", "--depth", "1", "--single-branch",
-		"--branch", plan.ref, "--config", "advice.detachedHead=false",
-		"--", plan.repoURL, target,
+	// Erst nachsehen, wohin der Name zeigt. Das ist keine Formalie: bis hierhin
+	// ist nur geprüft, wie die Adresse aussieht, nicht wo sie hinführt.
+	ziel, err := checkRepoTarget(ctx, plan.repoURL)
+	if err != nil {
+		fmt.Fprintf(log, "$ git clone %s\n%v\n", plan.repoURL, err)
+		return err
 	}
+	fmt.Fprintf(log, "ziel: %s\n", ziel.hostFuerLog())
+
+	args := cloneArgs(plan, ziel, target)
 	out, err := runAsUser(ctx, cloneTimeout, plan.uid, plan.gid, plan.root,
 		s.gitEnv(plan), "git", args...)
 	fmt.Fprintf(log, "$ git clone %s (%s)\n%s\n", plan.repoURL, plan.ref, out)

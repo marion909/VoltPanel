@@ -228,6 +228,55 @@ func checkHost(host string) error {
 	return nil
 }
 
+// Endpoint zerlegt eine bereits geprüfte Adresse in ihre Bestandteile.
+//
+// Eingabe ist, was NormalizeURL zurückgibt — nicht, was ein Kunde eingetippt
+// hat. Deshalb steht hier keine Prüfung mehr: die drei Formen sind bekannt,
+// und was ihnen nicht entspricht, ist nie durch NormalizeURL gegangen.
+//
+// Gebraucht wird das eine Ebene höher, unmittelbar vor dem Aufruf von git: der
+// Hostname muss dort aufgelöst und die Adresse dahinter geprüft werden, und
+// dafür muss man wissen, welcher Teil der Adresse der Hostname ist.
+func Endpoint(canonical string) (scheme, host, port string, err error) {
+	rest, mitSchema := "", true
+	switch {
+	case strings.HasPrefix(canonical, "https://"):
+		scheme, rest = "https", strings.TrimPrefix(canonical, "https://")
+	case strings.HasPrefix(canonical, "ssh://"):
+		scheme, rest = "ssh", strings.TrimPrefix(canonical, "ssh://")
+	default:
+		// Die Kurzform benutzer@host:pfad. Sie spricht immer ssh, und sie
+		// kennt keinen Port — der Doppelpunkt trennt dort den Pfad ab.
+		scheme, rest, mitSchema = "ssh", canonical, false
+	}
+	if _, hinter, ok := strings.Cut(rest, "@"); ok {
+		rest = hinter
+	}
+
+	if mitSchema {
+		// Beim Schema trennt der erste Schrägstrich den Pfad ab; was davor
+		// steht, ist host[:port].
+		if i := strings.Index(rest, "/"); i >= 0 {
+			rest = rest[:i]
+		}
+		host = rest
+		if h, p, ok := strings.Cut(rest, ":"); ok {
+			host, port = h, p
+		}
+	} else {
+		// Kurzform: der erste Doppelpunkt trennt den Pfad ab. Ihn als Port zu
+		// lesen wäre der Fehler, den diese Verzweigung verhindert —
+		// "git@github.com:marion909/VoltPanel.git" hätte sonst den Port
+		// "marion909".
+		host, _, _ = strings.Cut(rest, ":")
+	}
+
+	if host == "" {
+		return "", "", "", fmt.Errorf("%w: in %q steht kein host", ErrInvalid, canonical)
+	}
+	return scheme, host, port, nil
+}
+
 // cleanPath prüft den Pfadteil und nimmt führende Schrägstriche weg.
 func cleanPath(p string) (string, error) {
 	p = strings.TrimPrefix(p, "/")

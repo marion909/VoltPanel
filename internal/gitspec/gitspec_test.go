@@ -147,3 +147,31 @@ func TestKeinAufrufNachInnen(t *testing.T) {
 		}
 	}
 }
+
+// Endpoint muss den Doppelpunkt der Kurzform als Pfadtrenner lesen, nicht als
+// Port. "git@github.com:marion909/VoltPanel.git" hat keinen Port "marion909" —
+// und wer ihn dafür hält, löst hinterher den falschen Namen auf.
+func TestEndpoint(t *testing.T) {
+	faelle := []struct {
+		in                 string
+		scheme, host, port string
+	}{
+		{"https://github.com/marion909/VoltPanel.git", "https", "github.com", ""},
+		{"https://git.example.at:8443/team/app.git", "https", "git.example.at", "8443"},
+		{"ssh://git@git.example.at/team/app.git", "ssh", "git.example.at", ""},
+		{"ssh://git@git.example.at:2222/team/app.git", "ssh", "git.example.at", "2222"},
+		{"git@github.com:marion909/VoltPanel.git", "ssh", "github.com", ""},
+		{"git@10.0.0.5:team/app.git", "ssh", "10.0.0.5", ""},
+	}
+	for _, f := range faelle {
+		scheme, host, port, err := Endpoint(f.in)
+		if err != nil {
+			t.Errorf("Endpoint(%q) = %v", f.in, err)
+			continue
+		}
+		if scheme != f.scheme || host != f.host || port != f.port {
+			t.Errorf("Endpoint(%q) = %q %q %q, erwartet %q %q %q",
+				f.in, scheme, host, port, f.scheme, f.host, f.port)
+		}
+	}
+}
