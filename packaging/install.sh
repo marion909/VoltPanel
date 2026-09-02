@@ -28,6 +28,24 @@ VOLT_SITES_DIR="/var/www"
 # der Weg, den die Entwicklung und die CI-Tests gehen.
 VOLT_LOCAL_DIR="${VOLT_LOCAL_DIR:-}"
 
+# Wer ohne Signaturpruefung installieren will, sagt es ausdruecklich. Das ist
+# dieselbe Entscheidung wie update_allow_unsigned in der config.yaml, nur
+# einen Schritt frueher.
+VOLT_ALLOW_UNSIGNED="${VOLT_ALLOW_UNSIGNED:-0}"
+
+# Der oeffentliche Release-Schluessel.
+#
+# Im Quelltext leer; scripts/build-pages.sh setzt beim Veroeffentlichen den
+# Inhalt von internal/release/release.pub ein — dieselbe Datei, die auch im
+# Binary steckt, damit Installer und `volt update` gegen denselben Schluessel
+# pruefen.
+#
+# Er steht hier und wird nicht nachgeladen: ein Schluessel, den man sich bei
+# derselben Adresse holt wie die Datei, die er beglaubigen soll, beglaubigt
+# gar nichts. Wer dieses Skript ueber https von get.voltpanel.dev laedt,
+# vertraut ihm ohnehin schon — es laeuft gleich als root.
+VOLT_RELEASE_KEY_PEM=''
+
 # --- Ausgabe ---------------------------------------------------------------
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -179,6 +197,50 @@ download_verified() {
     rm -f "$tmp"
 }
 
+# Die Signatur ueber latest.json.
+#
+# Der Pruefsummenvergleich in download_verified allein schuetzt nichts: die
+# Summe steht in derselben Datei, die von derselben Adresse kommt. Wer den
+# Server oder die Leitung dorthin beherrscht, liefert ein anderes Binary und
+# die passende Summe gleich mit — und das naechste volt-agent laeuft als root.
+#
+# Deshalb wird die Datei signiert, die die Summen traegt. Format wie bei
+# `volt update`: `cosign sign-blob --key`, also eine base64-kodierte
+# ECDSA-Signatur im DER-Format ueber den SHA-256 des Rumpfs. Das prueft
+# openssl direkt.
+verify_manifest() {
+    local file="$1" sig_url="$2" keyfile sigfile
+
+    if [ -z "$VOLT_RELEASE_KEY_PEM" ]; then
+        if [ "$VOLT_ALLOW_UNSIGNED" != "1" ]; then
+            die "Dieses Installationsskript traegt keinen Release-Schluessel; die Angaben unter $sig_url liessen sich damit nicht pruefen. Die veroeffentlichte Fassung unter https://get.voltpanel.dev/install.sh traegt ihn. Wer bewusst einen unsignierten Kanal betreibt, setzt VOLT_ALLOW_UNSIGNED=1."
+        fi
+        warn "Ohne Signaturpruefung installiert (VOLT_ALLOW_UNSIGNED=1)."
+        return 0
+    fi
+
+    command -v openssl >/dev/null 2>&1 || die "openssl fehlt — ohne es laesst sich die Signatur nicht pruefen."
+
+    keyfile="$(mktemp)"; sigfile="$(mktemp)"
+    printf '%s\n' "$VOLT_RELEASE_KEY_PEM" > "$keyfile"
+
+    if ! curl -fsSL --retry 3 --retry-delay 2 "$sig_url" -o "$sigfile.b64"; then
+        rm -f "$keyfile" "$sigfile" "$sigfile.b64"
+        die "Zu den Release-Angaben gibt es keine Signatur ($sig_url). Wer bewusst einen unsignierten Kanal betreibt, setzt VOLT_ALLOW_UNSIGNED=1."
+    fi
+    if ! base64 -d < "$sigfile.b64" > "$sigfile" 2>/dev/null; then
+        rm -f "$keyfile" "$sigfile" "$sigfile.b64"
+        die "Die Signatur unter $sig_url ist kein base64."
+    fi
+
+    if ! openssl dgst -sha256 -verify "$keyfile" -signature "$sigfile" "$file" >/dev/null 2>&1; then
+        rm -f "$keyfile" "$sigfile" "$sigfile.b64"
+        die "Die Signatur der Release-Angaben stimmt nicht. Hier wird nichts installiert."
+    fi
+    rm -f "$keyfile" "$sigfile" "$sigfile.b64"
+    info "Signatur der Release-Angaben geprueft"
+}
+
 # Die jq-Filter unten stehen absichtlich in einfachen Anfuehrungszeichen: $k
 # ist eine jq-Variable aus --arg, keine der Shell. Genau hier ist SC2016 nicht
 # zutreffend — und nur hier.
@@ -191,11 +253,18 @@ if [ -n "$VOLT_LOCAL_DIR" ]; then
     info "Binaries aus $VOLT_LOCAL_DIR übernommen"
 else
     MANIFEST_URL="${VOLT_BASE_URL}/${VOLT_CHANNEL}/latest.json"
-    MANIFEST="$(curl -fsSL --retry 3 --retry-delay 2 "$MANIFEST_URL")" \
+    MANIFEST_FILE="$(mktemp)"
+    curl -fsSL --retry 3 --retry-delay 2 "$MANIFEST_URL" -o "$MANIFEST_FILE" \
         || die "Kanal $VOLT_CHANNEL nicht erreichbar: $MANIFEST_URL"
 
+    verify_manifest "$MANIFEST_FILE" "${MANIFEST_URL}.sig"
+
+    # Aus der Datei und nicht aus einer Variablen: geprueft wurden die Bytes
+    # auf der Platte. Wer sie erst in eine Variable liest, prueft etwas
+    # anderes als das, wonach er sich richtet — die Kommandosubstitution
+    # schneidet Zeilenumbraeche am Ende ab.
     manifest_field() {
-        printf '%s' "$MANIFEST" | jq -r --arg k "linux_${VOLT_ARCH}" "$1" 2>/dev/null
+        jq -r --arg k "linux_${VOLT_ARCH}" "$1" "$MANIFEST_FILE" 2>/dev/null
     }
 
     REL_VERSION="$(manifest_field '.version // empty')"

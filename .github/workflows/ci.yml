@@ -65,6 +65,14 @@ jobs:
           # betroffene Zeile, nicht in den Aufruf.
           shellcheck $(git ls-files '*.sh')
 
+      # Der Installer laeuft als root und tauscht Binaries ein. Eine
+      # Signaturpruefung darin, die niemand je hat fallen sehen, ist keine —
+      # dieser Lauf setzt einen Wegwerf-Schluessel ein und haelt die Pruefung
+      # gegen ein veraendertes latest.json, eine fehlende und eine fremde
+      # Signatur.
+      - name: Signaturpruefung des Installers
+        run: scripts/test-install-signature.sh
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

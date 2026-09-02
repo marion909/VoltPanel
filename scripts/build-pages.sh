@@ -59,8 +59,26 @@ done
 
 echo "$DOMAIN" > "$OUT/CNAME"
 
-# Der Einzeiler holt sich genau diese Datei.
-install -m 0644 packaging/install.sh "$OUT/install.sh"
+# Der Einzeiler holt sich genau diese Datei — mit dem Release-Schluessel darin.
+#
+# Eingesetzt wird hier und nicht im Quelltext, damit es genau eine Quelle
+# gibt: internal/release/release.pub steckt ueber //go:embed im Binary und
+# landet ueber diese Zeilen im Installer. Zwei gepflegte Kopien desselben
+# Schluessels waeren die Stelle, an der sie auseinanderlaufen.
+#
+# Ist die Datei leer, bleibt der Installer ohne Schluessel — und lehnt dann
+# jede Installation ab, die nicht ausdruecklich VOLT_ALLOW_UNSIGNED=1 setzt.
+# Das ist gewollt: ein Installer, der ohne Schluessel stillschweigend
+# durchwinkt, prueft nichts.
+KEY_FILE="internal/release/release.pub"
+if [ -s "$KEY_FILE" ]; then
+    scripts/embed-release-key.sh packaging/install.sh "$KEY_FILE" > "$OUT/install.sh"
+    chmod 0644 "$OUT/install.sh"
+    echo "Release-Schluessel in install.sh eingesetzt"
+else
+    install -m 0644 packaging/install.sh "$OUT/install.sh"
+    echo "WARNUNG: $KEY_FILE ist leer — der Installer prueft keine Signatur." >&2
+fi
 install -m 0644 packaging/systemd/* "$OUT/$CHANNEL/systemd/"
 
 # latest.json kommt aus dem Release, damit Fahrplan und Binaries garantiert

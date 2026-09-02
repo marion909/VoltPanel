@@ -16,7 +16,12 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Schema-Versionierung mit Abbruch bei zu neuer Datenbank
 - Agent/Web-Trennung mit typisiertem Socket-Protokoll und Whitelist
 - `install.sh`: OS- und Architekturerkennung, Sury-Repo, Benutzer, Verzeichnisse,
-  systemd-Units, Firewall, Ersteinrichtung mit erzeugtem Passwort
+  systemd-Units, Firewall, Ersteinrichtung mit erzeugtem Passwort. Vor dem
+  ersten Binary prüft er die Signatur über `latest.json` — er läuft als root,
+  und der Prüfsummenvergleich allein hilft dort so wenig wie beim Update: die
+  Summe steht in derselben Datei, die von derselben Adresse kommt. Der
+  Schlüssel wird beim Veröffentlichen aus `internal/release/release.pub`
+  eingesetzt, also aus derselben Datei, die im Binary steckt.
 - `volt update`: Snapshot, Prüfsummenvergleich, atomarer Tausch beider
   Binaries, Migration, automatischer Rollback bei Fehler, `--check` und
   `--dry-run`. Über die Oberfläche auslösbar: das Panel meldet neue Versionen
@@ -291,11 +296,6 @@ Offen:
 
 ## Bekannte Einschränkungen
 
-- `install.sh` prüft die Signatur nicht. `volt update` tut es seit dem
-  Signatur-Umbau: `latest.json` wird gegen einen eingebetteten Schlüssel
-  geprüft, und ohne gültige Signatur bricht das Update ab. Für `install.sh`
-  fehlt das noch — dort wirkt weiter nur der SHA-256-Vergleich gegen
-  `latest.json`, also gegen dieselbe Quelle.
 - Der Release-Schlüssel selbst ist im Quelltext leer. Er entsteht beim
   Einrichten der Veröffentlichung; bis dahin lehnt `volt update` jeden Kanal
   ab, statt ungeprüft zu aktualisieren. Siehe [release.md](release.md).

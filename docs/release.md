@@ -39,6 +39,12 @@ Das ergibt `cosign.key` (verschlüsselt mit der eingegebenen Passphrase) und
    Er wird über `//go:embed` in jedes Binary aufgenommen. Ohne ihn lehnt
    `volt update` jeden Kanal ab, und `volt doctor` sagt es.
 
+   Dieselbe Datei landet beim Veröffentlichen im Installer:
+   `scripts/build-pages.sh` setzt sie über `scripts/embed-release-key.sh` in
+   die Kopie ein, die unter `get.voltpanel.dev/install.sh` liegt. Eine zweite
+   gepflegte Kopie des Schlüssels gibt es also nicht — sie wäre die Stelle, an
+   der die beiden auseinanderlaufen.
+
 2. Den **privaten** Teil und die Passphrase als Secrets im Repository
    hinterlegen:
 
@@ -66,6 +72,18 @@ Fehlt `COSIGN_PRIVATE_KEY`, warnt das Skript und liefert unsigniert aus. Der
 Kanal ist dann für jedes Panel unbrauchbar, dessen Betreiber nicht ausdrücklich
 `update_allow_unsigned: true` gesetzt hat. Das ist Absicht: eine
 Signaturprüfung, die ohne Schlüssel stillschweigend durchwinkt, ist keine.
+
+Der Installer prüft dieselbe Signatur, bevor er das erste Binary anfasst — er
+läuft als root, und der Prüfsummenvergleich allein hilft dort so wenig wie
+beim Update. Trägt das Skript keinen Schlüssel (der Fall im Quelltext), bricht
+es ab, statt weiterzumachen; wer bewusst einen unsignierten Kanal betreibt,
+setzt `VOLT_ALLOW_UNSIGNED=1`.
+
+`scripts/test-install-signature.sh` hält diese Prüfung gegen vier Fälle: eine
+gültige Signatur, ein verändertes `latest.json`, eine fehlende Signatur und
+eine mit fremdem Schlüssel. Herausgeschnitten wird die Funktion aus der
+erzeugten Datei, nicht nachgebaut — eine Kopie im Test prüfte die Kopie. Der
+Lauf hängt in der CI hinter shellcheck.
 
 ### Einen Schlüssel wechseln
 
