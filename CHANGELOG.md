@@ -15,6 +15,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.12 — 2026-09-02
+
+- OpenDKIM-Installation wartet lang genug
+
 ## v0.4.11 — 2026-09-02
 
 - Proxy-Sites schreiben die gemeinsame Nginx-Config vor dem Vhost

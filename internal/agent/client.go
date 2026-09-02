@@ -744,6 +744,10 @@ func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, erro
 
 // InstallFeature holt die Pakete einer Fähigkeit nach.
 func (c *Client) InstallFeature(ctx context.Context, feature string) (string, error) {
+	// Paketinstallationen dauern länger als die Vorgabe des Clients.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
 	var res TextResult
 	err := c.Call(ctx, OpFeatureInstall, map[string]string{"feature": feature}, &res)
 	return res.Text, err

@@ -295,7 +295,12 @@ onMounted(load)
         :text="t('mail.needDovecot')"
         @installed="load"
       />
-      <InstallHint feature="opendkim" :text="t('mail.needOpendkim')" @installed="load" />
+      <InstallHint
+        v-if="status && !status.opendkim_installed"
+        feature="opendkim"
+        :text="t('mail.needOpendkim')"
+        @installed="load"
+      />
       <button
         v-if="isAdmin() && status.postfix_installed"
         :disabled="busy"

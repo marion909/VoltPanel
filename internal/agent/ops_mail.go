@@ -106,8 +106,9 @@ type DKIMParams struct {
 
 // MailStatus sagt, was auf diesem Server steht.
 type MailStatus struct {
-	PostfixInstalled bool `json:"postfix_installed"`
-	DovecotInstalled bool `json:"dovecot_installed"`
+	PostfixInstalled  bool `json:"postfix_installed"`
+	DovecotInstalled  bool `json:"dovecot_installed"`
+	OpendkimInstalled bool `json:"opendkim_installed"`
 	// Configured heißt: die Dateien des Panels stehen und Postfix zeigt darauf.
 	Configured bool `json:"configured"`
 	// HashScheme ist das Passwortschema, das die Datei benutzt.
@@ -122,6 +123,7 @@ func (s *Server) opMailStatus(_ context.Context, _ json.RawMessage) (any, error)
 	res := MailStatus{HashScheme: "SSHA512"}
 	res.PostfixInstalled = fileExists(allowedBinaries["postconf"])
 	res.DovecotInstalled = fileExists(allowedBinaries["doveadm"])
+	res.OpendkimInstalled = fileExists(allowedBinaries["opendkim-testkey"]) || dirExists(opendkimDir)
 
 	if !res.PostfixInstalled {
 		res.Hinweise = append(res.Hinweise,
