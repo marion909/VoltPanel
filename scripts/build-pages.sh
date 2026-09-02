@@ -53,6 +53,12 @@ for other in stable beta; do
     if curl -fsSL "$BASE/$other/latest.json" -o /tmp/other-latest.json 2>/dev/null; then
         mkdir -p "$OUT/$other"
         mv /tmp/other-latest.json "$OUT/$other/latest.json"
+        # Die Signatur gehoert dazu. Ohne sie stuende der Kanal da, waere aber
+        # fuer jedes Panel unbrauchbar, das seine Signatur prueft — und die
+        # Meldung lautete "keine Signatur", obwohl es eine gibt.
+        if curl -fsSL "$BASE/$other/latest.json.sig" -o /tmp/other-latest.sig 2>/dev/null; then
+            mv /tmp/other-latest.sig "$OUT/$other/latest.json.sig"
+        fi
         echo "Kanal $other unverändert übernommen"
     fi
 done
@@ -82,12 +88,35 @@ fi
 install -m 0644 packaging/systemd/* "$OUT/$CHANNEL/systemd/"
 
 # latest.json kommt aus dem Release, damit Fahrplan und Binaries garantiert
-# aus demselben Lauf stammen.
+# aus demselben Lauf stammen. Die Signatur daneben ebenso: sie wird von hier
+# geladen, nicht vom Release — `volt update` und install.sh kennen nur die
+# Adresse des Kanals.
+#
+# Diese Zeilen fehlten. Der Kanal wurde also veroeffentlicht, die Signatur
+# blieb am Release haengen, und beide Seiten meldeten "keine Signatur" — was
+# nach einem unsignierten Release aussieht und in Wahrheit ein verlorenes
+# Artefakt war.
 if [ -f dist/channel/latest.json ]; then
     install -m 0644 dist/channel/latest.json "$OUT/$CHANNEL/latest.json"
+    if [ -f dist/channel/latest.json.sig ]; then
+        install -m 0644 dist/channel/latest.json.sig "$OUT/$CHANNEL/latest.json.sig"
+    fi
 else
     command -v gh >/dev/null 2>&1 || { echo "gh fehlt und dist/channel/latest.json auch." >&2; exit 1; }
     gh release download "$TAG" --repo "$REPO" --pattern latest.json --dir "$OUT/$CHANNEL"
+    # Eigener Aufruf: "latest.json" trifft als Muster nicht "latest.json.sig".
+    # Und er darf scheitern — ein unsignierter Kanal ist ein Zustand, kein
+    # Fehler des Seitenbaus.
+    gh release download "$TAG" --repo "$REPO" --pattern 'latest.json.sig' \
+        --dir "$OUT/$CHANNEL" 2>/dev/null || true
+fi
+
+if [ -f "$OUT/$CHANNEL/latest.json.sig" ]; then
+    echo "Signatur uebernommen: $CHANNEL/latest.json.sig"
+else
+    echo "WARNUNG: zu $CHANNEL/latest.json gibt es keine Signatur. Panels, die" >&2
+    echo "         eine pruefen, lehnen diesen Kanal ab — und install.sh bricht" >&2
+    echo "         ab. Siehe docs/release.md." >&2
 fi
 
 cat > "$OUT/index.html" <<HTML
