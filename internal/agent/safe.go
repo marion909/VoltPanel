@@ -134,6 +134,16 @@ func checkService(name string) error {
 	return fmt.Errorf("%w: dienst %q steht nicht auf der whitelist", errNotAllow, base)
 }
 
+// ServiceAllowed sagt, ob checkService einen festen (nicht generierten)
+// Dienstnamen durchließe.
+//
+// Exportiert für genau einen Zweck: internal/core hält seinen Plugin-Katalog
+// dagegen (TestKatalogDiensteSindWhitelistKompatibel). Ein Plugin, dessen
+// Dienst hier nicht steht, scheiterte bei jeder Installation an derselben
+// Stelle — und zwar erst beim ersten Klick, nicht beim Bauen. Das soll ein
+// Test verhindern, keine Erinnerung im Kommentar.
+func ServiceAllowed(name string) bool { return allowedServices[name] }
+
 func checkUsername(u string) error {
 	if !reUsername.MatchString(u) {
 		return fmt.Errorf("%w: benutzername %q", errBadInput, u)

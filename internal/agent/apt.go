@@ -36,6 +36,19 @@ func (s *Server) aptReinstall(ctx context.Context, packages ...string) (string, 
 	return s.aptInstallOptions(ctx, []string{"--reinstall"}, packages...)
 }
 
+// aptPurge entfernt Pakete samt ihrer Konfigurationsdateien.
+//
+// purge statt remove: ein Plugin, das jemand wieder installiert, soll mit
+// einem sauberen Stand anfangen — nicht mit der Konfiguration, die von der
+// letzten Installation liegen geblieben ist und die niemand mehr zuordnen
+// kann. Die Daten des Dienstes (bei Redis etwa /var/lib/redis) räumt das hier
+// nicht weg; das wäre der Unterschied zwischen einer Einstellung und einem
+// Datenverlust, und den entscheidet dieser Aufruf nicht mit.
+func (s *Server) aptPurge(ctx context.Context, packages ...string) (string, error) {
+	args := append([]string{"purge", "-y"}, packages...)
+	return s.aptRun(ctx, args...)
+}
+
 func (s *Server) aptInstallOptions(ctx context.Context, options []string, packages ...string) (string, error) {
 	defer s.blockServiceStarts()()
 

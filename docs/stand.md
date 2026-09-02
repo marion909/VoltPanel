@@ -256,28 +256,65 @@ kein Kunde über den Server Spam verschickt. Daran ändert die Entscheidung für
 den eigenen Stack nichts — sie sagt nur, womit gebaut wird, nicht dass es schon
 losgeht. Die Roadmap setzt Phase 6 spät an, und dabei bleibt es.
 
-**Phase 7 — App Store und Plugin-System**
+**Phase 7 — App Store und Plugin-System** (angefangen)
 
-- Plugin-Format: Manifest mit Name, Version, Abhängigkeiten, Hooks und
-  benötigten Rechten, dazu Install-, Uninstall- und Update-Skript und ein
-  optionales UI-Bundle
-- Stabile interne Plugin-API
-- Signierte Pakete, eigenes Repository aus statischem JSON und Tarballs
-- Erste Plugins: Redis, phpMyAdmin, Fail2ban-Verwaltung, Backup-Werkzeug,
-  Webmail, WordPress mit einem Klick
-- Später Game-Server-Verwaltung als Plugin statt als zweites System
+Der Name der Phase ist zwei Dinge, und gebaut ist bisher nur die eine Hälfte:
+ein Plugin-Mechanismus für Fähigkeiten des Servers selbst. Der App-Store —
+ein Klick, und es steht eine fertige Website mit Datenbank da — ist noch
+offen.
 
-Die Auslieferung existiert schon in der richtigen Form: `get.voltpanel.dev` ist
-statisches JSON plus Tarballs mit Prüfsummen — dieselbe Bauart, die ein
-Plugin-Repository braucht. Was dort fehlt, fällt hier aber ins Gewicht: die
-cosign-Signatur wird erzeugt und von niemandem geprüft. Für das eigene Update
-ist das ein Mangel, für fremden Code wäre es fahrlässig.
+Bewusst *nicht* gebaut ist das, was die Roadmap eigentlich beschreibt: ein
+offenes Repository, in das jemand ein signiertes Paket mit eigenem
+Install-Skript hochlädt, das der Agent dann als root ausführt. Eine Signatur
+beweist, wer ein Paket geschrieben hat — nicht, dass es harmlos ist. Das ist
+genau die Art Entscheidung, die sich nicht zurücknehmen lässt, wenn sie
+einmal zu großzügig war, und sie widerspricht Prinzip 3 der Roadmap im Kern:
+"Kein User-Input geht ungeprüft in eine Shell." Ein hochgeladenes
+Installationsskript ist kein Input aus einem Feld, aber es ist ebenso wenig
+geprüft — nur eben mit mehr Aufwand verschleiert.
 
-Die Reihenfolge ist Absicht. Eine stabile Plugin-API lohnt sich erst, wenn der
-Kern sich nicht mehr täglich bewegt — sonst bricht jede Änderung die eigenen
-Plugins. Zwei offene Punkte anderer Phasen hängen daran: phpMyAdmin aus
-Phase 3 und Webmail aus Phase 6 sind in der Roadmap Plugins, keine
-Kernfunktionen.
+Was stattdessen steht: ein fester Katalog im Quelltext
+(`internal/core/plugins.go`), jeder Eintrag gelesen und geprüft wie jede
+andere Zeile in diesem Programm. Installiert wird über dieselben Bausteine,
+die der Agent für alles andere auch benutzt — eine feste Paketliste
+(`internal/agent/ops_feature.go`, dieselbe, die schon Docker, Fail2ban und
+den Mail-Stack nachinstalliert) und die Dienst-Whitelist. Ein Plugin, das
+mehr braucht als "ein apt-Paket, ein Dienst", gehört nicht in diesen
+Katalog, sondern in den Kern selbst. Ein Test hält den Katalog gegen die
+Whitelist des Agents, damit ein neuer Eintrag nicht erst beim ersten Klick
+in der Oberfläche auffällt, dass sein Dienst dort fehlt.
+
+Der erste und bisher einzige Katalogeintrag ist Redis — bewusst klein
+gewählt, um den ganzen Weg einmal vollständig zu bauen: Installieren,
+Ein-/Ausschalten, Entfernen, mit Zustand in einer eigenen Tabelle
+(`plugins`, ohne `tenant_id` — ein Plugin gehört dem Server, nicht einem
+Mandanten, wie Docker oder die Firewall).
+
+Offen:
+
+- Der App-Store-Teil: WordPress mit einem Klick ist der naheliegende erste
+  Eintrag — er bräuchte keine neuen Bausteine, nur die vorhandenen
+  zusammengesetzt (Site anlegen, Datenbank anlegen, den WordPress-Kern mit
+  derselben sicheren Archiv-Entpackung holen, die auch Node-Fassungen
+  benutzt, `wp-config.php` schreiben). Nicht gebaut, weil die sichere
+  Prüfsumme dafür noch nicht verifiziert stand.
+- phpMyAdmin und Webmail (Roundcube) als weitere Katalogeinträge. Beide sind
+  in der Roadmap ausdrücklich als Plugins vorgesehen, nicht als
+  Kernfunktion — und beide brauchen mehr als "Paket plus Dienst": eine
+  eigene Vhost, einen eigenen PHP-Pool, einen unerratbaren Zugriffspfad.
+  Das ist kein technisches Hindernis, aber ein eigener, sorgfältig zu
+  bauender Schritt, gerade weil beide root-nahen Zugriff auf Datenbank
+  respektive Post geben.
+- Eine stabile, dokumentierte interne Plugin-API für mehr als den
+  Server-Katalog. Die Roadmap sagt selbst, warum das noch früh wäre: sie
+  lohnt sich erst, wenn der Kern sich nicht mehr täglich bewegt — sonst
+  bricht jede Änderung die eigenen Plugins.
+- Ein signiertes Repository für Fremd-Plugins bleibt eine offene Frage, keine
+  Aufgabe. `get.voltpanel.dev` liefert schon statisches JSON plus Tarballs
+  mit Prüfsummen — dieselbe Bauart, die ein Plugin-Repository bräuchte —,
+  aber ob und wie fremder, root-ausführender Code je vertrauenswürdig genug
+  wäre, ist damit nicht beantwortet.
+- Spätere Game-Server-Verwaltung als Plugin.
 
 **Phase 8 — Härtung und Release**
 
@@ -320,15 +357,21 @@ Steht bereits:
   geprüft; ausgeliefert wird bisher nur stable
 - Vom Security-Review sind Command-Injection, Path-Traversal, IDOR und CSRF
   umgesetzt und mit Tests belegt — siehe [sicherheit.md](sicherheit.md)
+- SSRF-Filterung für ausgehende Aufrufe, inklusive Namensauflösung. Für
+  Backup-Ziele prüft `internal/transfer` die Adresse, mit der wirklich
+  gesprochen wird — über `net.Dialer.Control`, das nach der Auflösung und vor
+  dem Verbindungsaufbau läuft, deshalb ist ein Hostname genauso erfasst wie ein
+  Literal. Für Git-Quellen löst der Agent vor dem Klon selbst auf und hält
+  jede zurückgegebene Adresse gegen dieselbe Regel (`checkRepoTarget` in
+  `internal/agent/git_target.go`); für https wird die geprüfte Adresse mit
+  `http.curloptResolve` festgenagelt, damit git nicht ein zweites Mal und
+  womöglich anders auflöst. Für die Cloudflare-API ist der Host ein
+  Programmkonstante, kein Feld. Diese Zeile stand hier vorher als offen — die
+  Auflösung fehlte tatsächlich, bis sie mit dem Git-Deploy-Fix geschlossen
+  wurde; nur der Eintrag hier war seither nicht nachgezogen.
 
 Offen:
 
-- SSRF-Filterung für ausgehende Aufrufe. Für Backup-Ziele steht sie
-  (`internal/transfer`, eigener Dialer mit Adressprüfung), für Git-Quellen
-  ebenfalls (Loopback und Link-Local abgewiesen, private Netze erlaubt), und
-  für die Cloudflare-API ist der Host fest. Was fehlt, ist die Auflösung von
-  Namen: ein Hostname, der auf 169.254.169.254 zeigt, geht durch. Dagegen hilft
-  nur ein Proxy, der die aufgelöste Adresse prüft.
 - Doku-Site. Der Changelog steht (CHANGELOG.md, und der Abschnitt einer
   Fassung wird zu den Release-Notes im Panel); eine eigene Seite mit Anleitungen
   gibt es noch nicht.

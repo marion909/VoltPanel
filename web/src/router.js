@@ -18,6 +18,7 @@ import Cronjobs from './views/Cronjobs.vue'
 import FTP from './views/FTP.vue'
 import Tenants from './views/Tenants.vue'
 import Services from './views/Services.vue'
+import Plugins from './views/Plugins.vue'
 import Audit from './views/Audit.vue'
 import Settings from './views/Settings.vue'
 
@@ -58,6 +59,7 @@ const routes = [
   { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/backups', name: 'backups', component: Backups },
   { path: '/services', name: 'services', component: Services },
+  { path: '/plugins', name: 'plugins', component: Plugins, meta: { minRole: 'admin' } },
   { path: '/tenants', name: 'tenants', component: Tenants, meta: { minRole: 'admin' } },
   { path: '/audit', name: 'audit', component: Audit },
   { path: '/settings', name: 'settings', component: Settings },

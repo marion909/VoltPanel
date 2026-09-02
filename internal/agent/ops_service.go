@@ -69,6 +69,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpMailApply:         s.opMailApply,
 		OpMailFacts:         s.opMailFacts,
 		OpFeatureInstall:    s.opFeatureInstall,
+		OpFeatureUninstall:  s.opFeatureUninstall,
 		OpNodeList:          s.opNodeList,
 		OpNodeInstall:       s.opNodeInstall,
 		OpNodeRemove:        s.opNodeRemove,

@@ -31,6 +31,10 @@ var featurePakete = map[string][]string{
 	"dovecot":  {"dovecot-core", "dovecot-imapd"},
 	"opendkim": {"opendkim", "opendkim-tools"},
 	"rspamd":   {"rspamd"},
+	// Redis: Phase 7, der erste Eintrag im Plugin-Katalog (internal/core/plugins.go).
+	// Bindet standardmäßig nur an 127.0.0.1 — das bringt das Debian-Paket schon
+	// so mit, das Panel ändert daran nichts.
+	"redis": {"redis-server"},
 	// Node kommt nicht aus apt: das Panel führt eigene Fassungen unter
 	// /opt/volt/node. Ein Paket daneben wäre eine zweite Wahrheit.
 }
@@ -41,6 +45,7 @@ var featurePakete = map[string][]string{
 // macht der Agent danach gezielt.
 var featureDienste = map[string][]string{
 	"docker": {"docker"},
+	"redis":  {"redis-server"},
 }
 
 // FeatureNames sind die Fähigkeiten, die sich nachinstallieren lassen.
@@ -86,6 +91,37 @@ func (s *Server) opFeatureInstall(ctx context.Context, raw json.RawMessage) (any
 		return nil, err
 	}
 	return TextResult{Text: strings.Join(pakete, ", ") + " installiert"}, nil
+}
+
+// opFeatureUninstall entfernt die Pakete einer Fähigkeit wieder.
+//
+// Dieselbe Liste wie beim Installieren, nie ein Paketname aus der Anfrage —
+// wer einen Dienst über diesen Weg loswerden darf, darf damit noch lange
+// nicht apt-get purge mit beliebigem Namen aufrufen. Systemd-Units und
+// Konfigurationsdateien des Pakets gehen mit; eigene Daten des Dienstes
+// (bei Redis etwa der Inhalt von /var/lib/redis) bleiben stehen — das ist
+// die Vorsicht, die auch beim Löschen eines Mandanten gilt: ein Schritt
+// weniger ist besser als ein Datenverlust, den niemand angefordert hat.
+func (s *Server) opFeatureUninstall(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[struct {
+		Feature string `json:"feature"`
+	}](raw, OpFeatureUninstall)
+	if err != nil {
+		return nil, err
+	}
+	pakete, ok := featurePakete[p.Feature]
+	if !ok {
+		return nil, opInputErr(OpFeatureUninstall,
+			"%q ist keine bekannte fähigkeit — bekannt sind: %s",
+			p.Feature, strings.Join(FeatureNames(), ", "))
+	}
+
+	out, err := s.aptPurge(ctx, pakete...)
+	if err != nil {
+		return nil, opErr(OpFeatureUninstall, "%s entfernen: %s",
+			strings.Join(pakete, ", "), truncate(out, 500))
+	}
+	return TextResult{Text: strings.Join(pakete, ", ") + " entfernt"}, nil
 }
 
 func (s *Server) featurePaketeInstallieren(ctx context.Context, feature string, pakete []string) (string, error) {

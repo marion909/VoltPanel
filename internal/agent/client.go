@@ -753,6 +753,17 @@ func (c *Client) InstallFeature(ctx context.Context, feature string) (string, er
 	return res.Text, err
 }
 
+// UninstallFeature entfernt die Pakete einer Fähigkeit wieder — über dieselbe
+// feste Liste wie beim Installieren.
+func (c *Client) UninstallFeature(ctx context.Context, feature string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	var res TextResult
+	err := c.Call(ctx, OpFeatureUninstall, map[string]string{"feature": feature}, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

@@ -135,8 +135,10 @@ const (
 	OpMailFacts  Op = "mail.facts"
 
 	// OpFeatureInstall holt nach, was das Panel verwaltet — aus einer festen
-	// Liste, nie mit einem Paketnamen aus der Anfrage.
-	OpFeatureInstall Op = "feature.install"
+	// Liste, nie mit einem Paketnamen aus der Anfrage. OpFeatureUninstall
+	// nimmt es wieder herunter, über dieselbe Liste.
+	OpFeatureInstall   Op = "feature.install"
+	OpFeatureUninstall Op = "feature.uninstall"
 
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"

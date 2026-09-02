@@ -36,6 +36,7 @@ type Server struct {
 	cron      *core.CronService
 	apps      *core.AppService
 	mail      *core.MailService
+	plugins   *core.PluginService
 	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
@@ -90,6 +91,7 @@ func New(opts Options) (*Server, error) {
 		// sperrt zusätzlich das Konto; dieser hier bremst schon davor.
 		apps:      core.NewAppService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		mail:      core.NewMailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
+		plugins:   core.NewPluginService(opts.Store, opts.Agent),
 		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
@@ -183,6 +185,14 @@ func (s *Server) setupRoutes() {
 	auth.POST("/system/features/:name", s.handleInstallFeature, s.requireRole(store.RoleAdmin))
 	auth.GET("/system/portscan", s.handlePortScanStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/portscan", s.handlePortScanSet, s.requireRole(store.RoleAdmin))
+
+	// Plugins: server-weite Fähigkeiten aus einem festen Katalog — kein
+	// offenes Repository, keine Fremdcode-Ausführung. Siehe
+	// internal/core/plugins.go.
+	auth.GET("/plugins", s.handleListPlugins, s.requireRole(store.RoleAdmin))
+	auth.POST("/plugins/:id/install", s.handleInstallPlugin, s.requireRole(store.RoleAdmin))
+	auth.POST("/plugins/:id/uninstall", s.handleUninstallPlugin, s.requireRole(store.RoleAdmin))
+	auth.POST("/plugins/:id/set", s.handleSetPlugin, s.requireRole(store.RoleAdmin))
 
 	// Mail. Eine Maildomäne gehört einem Mandanten, deshalb entscheidet der
 	// Scope — wie bei Sites. Nur das Einrichten des Mailspeichers und der

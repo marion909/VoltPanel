@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,6 +93,54 @@ func TestFeatureNimmtKeinenPaketnamen(t *testing.T) {
 	} {
 		if ValidFeature(name) {
 			t.Errorf("%q wurde als fähigkeit angenommen", name)
+		}
+	}
+}
+
+// Redis ist Phase 7: der erste Eintrag im Plugin-Katalog. Er muss über
+// genau denselben Weg laufen wie jede andere Fähigkeit — keine zweite,
+// nachgebaute Installationslogik nur für Plugins.
+func TestRedisIstEineBekannteFaehigkeit(t *testing.T) {
+	if !ValidFeature("redis") {
+		t.Fatal(`"redis" gilt nicht als fähigkeit`)
+	}
+	found := false
+	for _, n := range FeatureNames() {
+		if n == "redis" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error(`"redis" fehlt in FeatureNames()`)
+	}
+}
+
+// opFeatureUninstall muss dieselbe Schranke haben wie opFeatureInstall: ein
+// Name aus der Anfrage darf nie zu einem Paketnamen werden, den apt zu sehen
+// bekommt. Geprüft wird das, bevor überhaupt ein Prozess startet — ein
+// unbekannter Name kommt gar nicht bis zu apt-get.
+//
+// Die Meldung wird ausdrücklich mitgeprüft, nicht nur "irgendein Fehler": in
+// einer Testumgebung ohne apt-get schlägt der Aufruf ohnehin fehl, egal ob die
+// Sperre greift oder nicht — ein Test, der das nicht unterscheidet, wäre grün,
+// selbst wenn die Prüfung fehlte. Genau darauf bin ich beim ersten Versuch
+// hereingefallen.
+func TestFeatureUninstallNimmtKeinenPaketnamen(t *testing.T) {
+	srv, _ := testServer(t)
+	for _, name := range []string{
+		"", "nginx", "docker.io", "docker;bash", "../../etc", "DOCKER",
+	} {
+		raw, err := json.Marshal(map[string]string{"feature": name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = srv.opFeatureUninstall(t.Context(), raw)
+		if err == nil {
+			t.Errorf("%q wurde als fähigkeit zum entfernen angenommen", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "bekannte fähigkeit") {
+			t.Errorf("%q wurde abgelehnt, aber aus dem falschen grund: %v", name, err)
 		}
 	}
 }

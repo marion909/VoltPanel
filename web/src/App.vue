@@ -21,6 +21,7 @@ const nav = computed(() =>
     { to: "/cronjobs", key: "nav.cron", icon: "clock" },
     { to: "/backups", key: "nav.backups", icon: "archive" },
     { to: "/services", key: "nav.services", icon: "server", minRole: "admin" },
+    { to: "/plugins", key: "nav.plugins", icon: "plug", minRole: "admin" },
     { to: "/tenants", key: "nav.tenants", icon: "users", minRole: "admin" },
     { to: "/audit", key: "nav.audit", icon: "list" },
     { to: "/settings", key: "nav.settings", icon: "gear" },
@@ -65,6 +66,9 @@ const paths = {
   users:
     "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8",
   gear: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V21a2 2 0 11-4 0v-.1A1.6 1.6 0 009 19.4a1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z",
+  // plug: ein Stecker — Plugins sind Zusatzdienste, die sich an den Server
+  // "anschließen", nicht Bausteine der Website (dafür steht schon "box").
+  plug: "M9 3v5M15 3v5M7 8h10v3a5 5 0 01-5 5 5 5 0 01-5-5V8zM12 16v5M9 21h6",
 };
 </script>
 

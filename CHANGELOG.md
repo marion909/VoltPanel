@@ -15,6 +15,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.19 — 2026-09-03
+
+- Phase 7 angefangen: fester Plugin-Katalog, Redis als erster Eintrag —
+  installieren, ein-/ausschalten, entfernen, ohne offenes Repository für
+  Fremdcode
+
 ## v0.4.18 — 2026-09-02
 
 - Apps und Deploys optisch an Websites angleichen
