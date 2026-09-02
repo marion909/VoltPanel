@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -32,9 +34,74 @@ type AppParams struct {
 	// sondern nachgeschlagen.
 	SystemUser string `json:"system_user"`
 	WorkingDir string `json:"working_dir"`
-	// Command ist das Programm mit seinen Argumenten, jedes für sich.
-	Command []string          `json:"command"`
-	Env     map[string]string `json:"env"`
+	// Runtime benennt den Interpreter, nicht seinen Pfad. Den sucht der Agent.
+	//
+	// Der Unterschied ist nicht kosmetisch: stünde hier ein Pfad, könnte der
+	// Web-Prozess jedes Programm des Servers als ExecStart eintragen. Ein
+	// übernommenes Panel dürfte damit zwar nur als Benutzer der Site laufen —
+	// aber "nie sh -c" ist eine Regel dieses Projekts, und eine Regel, die für
+	// jeden Aufruf gilt außer diesem einen, gilt nicht.
+	Runtime string `json:"runtime"`
+	// Args sind die Argumente danach, jedes für sich.
+	Args []string          `json:"args"`
+	Env  map[string]string `json:"env"`
+}
+
+// appRuntimes ordnet einer Laufzeitumgebung die Schlüssel aus allowedBinaries
+// zu, unter denen ihr Programm liegen kann.
+//
+// Schlüssel, keine Pfade: jeder Pfad, den der Agent je ausführt, soll in der
+// einen Liste in safe.go stehen. Eine zweite Liste mit Pfaden daneben wäre die
+// Stelle, an der die erste ihre Bedeutung verliert.
+//
+// Reihenfolge: was unter /usr/local liegt, hat der Betreiber selbst hingelegt
+// und ist meist die neuere Fassung — dann ist sie auch gemeint.
+var appRuntimes = map[string][]string{
+	"node": {"node-local", "node", "nodejs"},
+	"npm":  {"npm-local", "npm"},
+}
+
+// RuntimeInfo sagt, welche Interpreter dieser Server hat.
+type RuntimeInfo struct {
+	Name      string `json:"name"`
+	Path      string `json:"path,omitempty"`
+	Available bool   `json:"available"`
+	Version   string `json:"version,omitempty"`
+}
+
+// runtimeBinary sucht den Interpreter zu einem Namen und liefert seinen
+// Whitelist-Schlüssel.
+func runtimeBinary(name string) (string, error) {
+	keys, ok := appRuntimes[name]
+	if !ok {
+		return "", fmt.Errorf("%w: %q ist keine bekannte laufzeitumgebung", errNotAllow, name)
+	}
+	for _, key := range keys {
+		if fileExists(allowedBinaries[key]) {
+			return key, nil
+		}
+	}
+	return "", fmt.Errorf("%w: %s ist auf diesem server nicht installiert", errBadInput, name)
+}
+
+// opAppRuntimes sagt, was installiert ist. Damit kann die Oberfläche "Node ist
+// nicht installiert" schreiben, statt eine App anzulegen, die nicht startet.
+func (s *Server) opAppRuntimes(ctx context.Context, _ json.RawMessage) (any, error) {
+	out := make([]RuntimeInfo, 0, len(appRuntimes))
+	for name := range appRuntimes {
+		info := RuntimeInfo{Name: name}
+		if key, err := runtimeBinary(name); err == nil {
+			info.Path, info.Available = allowedBinaries[key], true
+			// --version ist ein festes Argument an ein Programm der Whitelist;
+			// nichts daran kommt aus einer Anfrage.
+			if v, err := run(ctx, shortTimeout, key, "--version"); err == nil {
+				info.Version = strings.TrimSpace(truncate(v, 40))
+			}
+		}
+		out = append(out, info)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
 }
 
 type AppResult struct {
@@ -83,6 +150,14 @@ func (s *Server) opAppWrite(ctx context.Context, raw json.RawMessage) (any, erro
 	if _, _, err := siteUserIDs(OpAppWrite, p.SystemUser); err != nil {
 		return nil, err
 	}
+	// Zuletzt die Laufzeitumgebung: das ist die einzige Prüfung hier, die nicht
+	// die Anfrage beurteilt, sondern den Server. Erst wenn alles an der Anfrage
+	// stimmt, ist "node ist nicht installiert" die richtige Auskunft — sonst
+	// verdeckt sie den eigentlichen Fehler.
+	key, err := runtimeBinary(p.Runtime)
+	if err != nil {
+		return nil, opInputErr(OpAppWrite, "%v", err)
+	}
 
 	data := templates.AppData{
 		Name:        p.Name,
@@ -91,7 +166,7 @@ func (s *Server) opAppWrite(ctx context.Context, raw json.RawMessage) (any, erro
 		Group:       p.SystemUser,
 		WorkingDir:  workdir,
 		EnvPath:     s.appEnvPath(p.Name),
-		Command:     p.Command,
+		Command:     append([]string{allowedBinaries[key]}, p.Args...),
 		Env:         envList(p.Env),
 	}
 

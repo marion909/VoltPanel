@@ -4,6 +4,7 @@ import { session, hasRole } from './stores/session'
 import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
 import Sites from './views/Sites.vue'
+import Apps from './views/Apps.vue'
 import SiteDetail from './views/SiteDetail.vue'
 import Databases from './views/Databases.vue'
 import SQL from './views/SQL.vue'
@@ -21,6 +22,7 @@ const routes = [
   { path: '/', name: 'dashboard', component: Dashboard },
   { path: '/sites', name: 'sites', component: Sites },
   { path: '/sites/:id', name: 'site-detail', component: SiteDetail },
+  { path: '/apps', name: 'apps', component: Apps },
   { path: '/databases', name: 'databases', component: Databases },
   { path: '/sql', name: 'sql', component: SQL },
   { path: '/files', name: 'files', component: Files },

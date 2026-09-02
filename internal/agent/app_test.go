@@ -98,7 +98,7 @@ func TestAppLaeuftNieAlsSystemkonto(t *testing.T) {
 		err := appCall(t, srv, OpAppWrite, AppParams{
 			Name: "shop", SystemUser: user,
 			WorkingDir: srv.roots[0] + "/shop.example.at",
-			Command:    []string{"/usr/bin/node", "server.js"},
+			Runtime:    "node", Args: []string{"server.js"},
 		})
 		if err == nil {
 			t.Errorf("eine App unter %q wurde angenommen", user)
@@ -122,7 +122,7 @@ func TestAppVerzeichnisBleibtInDenWurzeln(t *testing.T) {
 	for _, dir := range []string{"/etc", "/", "/etc/systemd/system", srv.roots[0] + "/../../etc"} {
 		err := appCall(t, srv, OpAppWrite, AppParams{
 			Name: "shop", SystemUser: "site_shop", WorkingDir: dir,
-			Command: []string{"/usr/bin/node", "server.js"},
+			Runtime: "node", Args: []string{"server.js"},
 		})
 		if err == nil {
 			t.Errorf("das Arbeitsverzeichnis %q wurde angenommen", dir)
@@ -134,6 +134,31 @@ func TestAppVerzeichnisBleibtInDenWurzeln(t *testing.T) {
 		// wenn jail() gar nicht mehr gerufen würde.
 		if !strings.Contains(err.Error(), "außerhalb der erlaubten verzeichnisse") {
 			t.Errorf("%q abgelehnt, aber aus dem falschen Grund: %v", dir, err)
+		}
+	}
+}
+
+// TestNurBekannteLaufzeitumgebungen: der Web-Prozess nennt die Umgebung, nicht
+// ihren Pfad. Stünde dort ein Pfad, könnte ein übernommenes Panel jedes
+// Programm des Servers als ExecStart eintragen — als Benutzer der Site zwar,
+// aber "nie sh -c" ist eine Regel dieses Projekts, und eine Regel, die für
+// jeden Aufruf gilt außer diesem einen, gilt nicht.
+func TestNurBekannteLaufzeitumgebungen(t *testing.T) {
+	for _, name := range []string{"", "sh", "bash", "/bin/sh", "python3", "NODE", "node "} {
+		if key, err := runtimeBinary(name); err == nil {
+			t.Errorf("die Laufzeitumgebung %q wurde angenommen: %s", name, key)
+		}
+	}
+
+	// Und jeder Schlüssel, den appRuntimes nennt, muss in der Binary-Whitelist
+	// stehen — sonst wäre die Umgebung geschriebener, aber unerreichbarer Code:
+	// run() lehnte den Aufruf ab, und auffallen könnte das erst auf einem
+	// Server, auf dem node wirklich liegt.
+	for runtime, keys := range appRuntimes {
+		for _, key := range keys {
+			if allowedBinaries[key] == "" {
+				t.Errorf("%s verweist auf %q, das nicht in allowedBinaries steht", runtime, key)
+			}
 		}
 	}
 }

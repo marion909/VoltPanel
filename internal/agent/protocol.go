@@ -114,9 +114,10 @@ const (
 	OpNginxTraffic Op = "nginx.traffic"
 
 	// Apps: eine Anwendung als systemd-Unit hinter dem Reverse-Proxy.
-	OpAppWrite  Op = "app.write"
-	OpAppRemove Op = "app.remove"
-	OpAppStatus Op = "app.status"
+	OpAppWrite    Op = "app.write"
+	OpAppRemove   Op = "app.remove"
+	OpAppStatus   Op = "app.status"
+	OpAppRuntimes Op = "app.runtimes"
 
 	// Echte Dateisystem-Quotas ueber Project Quota (ext4/XFS).
 	OpQuotaStatus  Op = "quota.status"

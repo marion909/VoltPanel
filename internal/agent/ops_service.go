@@ -57,6 +57,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpAppWrite:          s.opAppWrite,
 		OpAppRemove:         s.opAppRemove,
 		OpAppStatus:         s.opAppStatus,
+		OpAppRuntimes:       s.opAppRuntimes,
 		OpQuotaStatus:       s.opQuotaStatus,
 		OpQuotaProject:      s.opQuotaProject,
 		OpMySQLQuery:        s.opMySQLQuery,

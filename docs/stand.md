@@ -145,6 +145,14 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   sich weiter an. Den eigenen Mandanten zu sperren lehnt das Panel ab — das
   wäre der kürzeste Weg, sich selbst auszusperren.
 
+**Phase 5 — Docker, Node.js, Git-Deploy** (angefangen)
+
+- Eine App ist eine systemd-Unit plus Reverse-Proxy: Laufzeitumgebung,
+  Argumente und Umgebungsvariablen über die Oberfläche, Auto-Restart, Port und
+  Unit-Name vom Panel vergeben. Die App läuft als Systembenutzer ihrer Site in
+  einer eng gefassten Unit; die Umgebung liegt verschlüsselt in der Datenbank
+  und auf dem Server in einer Datei mit 0640, nicht in der Unit.
+
 Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
 ## Offen
@@ -154,8 +162,8 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 - Docker: Container, Images, Volumes, Netzwerke, Logs, Stats, Exec
 - Compose-Projekte anlegen und starten, Ports automatisch auf den Nginx-Proxy
   legen
-- Node.js: Versionen über fnm; eine App ist eine systemd-Unit plus
-  Reverse-Proxy, mit Auto-Restart, Log-Stream und ENV-Verwaltung
+- Node.js: Versionen über fnm. Die App selbst steht (oben unter „Fertig"), die
+  Versionsverwaltung nicht — genommen wird, was auf dem Server liegt.
 - Git-Deploy: Deploy-Keys, Webhook-Endpunkt je Site, Branch-Auswahl
 - Build-Schritte definierbar (`npm ci`, `npm run build`, `composer install`)
 - Releases-Verzeichnis mit Symlink-Wechsel, damit ein Rollback ein Klick ist

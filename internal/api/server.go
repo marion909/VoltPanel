@@ -34,6 +34,7 @@ type Server struct {
 	files     *core.FileService
 	ftp       *core.FTPService
 	cron      *core.CronService
+	apps      *core.AppService
 	quota     *core.QuotaService
 	certs     *core.CertService
 	backups   *core.BackupService
@@ -85,6 +86,7 @@ func New(opts Options) (*Server, error) {
 		devOrigin: opts.DevOrigin,
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
 		// sperrt zusätzlich das Konto; dieser hier bremst schon davor.
+		apps:      core.NewAppService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
 	}
@@ -268,6 +270,13 @@ func (s *Server) setupRoutes() {
 	auth.PATCH("/cronjobs/:id", s.handleUpdateCronjob)
 	auth.DELETE("/cronjobs/:id", s.handleDeleteCronjob)
 	auth.GET("/cronjobs/:id/log", s.handleCronjobLog)
+
+	// Apps: eine Anwendung ist eine systemd-Unit plus Reverse-Proxy.
+	auth.GET("/apps", s.handleListApps)
+	auth.GET("/apps/runtimes", s.handleAppRuntimes)
+	auth.POST("/apps", s.handleCreateApp)
+	auth.PATCH("/apps/:id", s.handleUpdateApp)
+	auth.DELETE("/apps/:id", s.handleDeleteApp)
 
 	auth.GET("/tenants", s.handleListTenants)
 	auth.POST("/tenants", s.handleCreateTenant, s.requireRole(store.RoleAdmin))

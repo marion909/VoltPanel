@@ -65,6 +65,15 @@ var allowedBinaries = map[string]string{
 	// frei. Beide bekommen ausschliesslich feste Argumente.
 	"pure-pw": "/usr/bin/pure-pw",
 	"ufw":     "/usr/sbin/ufw",
+	// Laufzeitumgebungen fuer Apps. Zwei Eintraege je Programm, weil node und
+	// npm je nach Herkunft unter /usr/bin oder unter /usr/local/bin liegen —
+	// und weil jeder Pfad, den der Agent je ausfuehrt, in dieser einen Liste
+	// stehen soll. appRuntimes in ops_app.go verweist auf die Schluessel hier.
+	"node":       "/usr/bin/node",
+	"node-local": "/usr/local/bin/node",
+	"nodejs":     "/usr/bin/nodejs",
+	"npm":        "/usr/bin/npm",
+	"npm-local":  "/usr/local/bin/npm",
 	// Fuer echte Dateisystem-Quotas: chattr setzt die Projektnummer an einem
 	// ext4-Baum, setquota die Grenze darauf, xfs_quota beides auf XFS. Alle
 	// Argumente sind agentseitig gebildet, die Pfade gehen vorher durch jail().

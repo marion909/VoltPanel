@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/marion909/voltpanel/internal/agent"
+	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/config"
 	"github.com/marion909/voltpanel/internal/store"
 )
@@ -24,6 +25,7 @@ type testEnv struct {
 	store      *store.Store
 	agent      *agent.Client
 	cfg        *config.Config
+	secrets    *authn.SecretBox
 	files      *FileService
 	sitesDir   string
 	backupDir  string
@@ -96,8 +98,14 @@ func newTestEnv(t *testing.T) *testEnv {
 	cfg.DataDir = dir
 	cfg.BackupDir = backupDir
 
+	secrets, err := authn.LoadSecretBox(filepath.Join(dir, "secret.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return &testEnv{
-		store: st, agent: client, cfg: cfg, sitesDir: sitesDir, backupDir: backupDir,
+		store: st, agent: client, cfg: cfg, secrets: secrets,
+		sitesDir: sitesDir, backupDir: backupDir,
 		systemUser: testSystemUser(t),
 		files:      NewFileService(st, client, cfg),
 	}

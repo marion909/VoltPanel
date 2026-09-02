@@ -555,6 +555,15 @@ func (c *Client) AppStatus(ctx context.Context, name string) (*AppResult, error)
 	return &res, err
 }
 
+// AppRuntimes sagt, welche Laufzeitumgebungen der Server hat. Damit kann die
+// Oberfläche "Node ist nicht installiert" schreiben, statt eine App anzulegen,
+// die nicht startet.
+func (c *Client) AppRuntimes(ctx context.Context) ([]RuntimeInfo, error) {
+	var res []RuntimeInfo
+	err := c.Call(ctx, OpAppRuntimes, nil, &res)
+	return res, err
+}
+
 // --- Echte Dateisystem-Quotas ----------------------------------------------
 
 // QuotaStatus sagt, ob unter einem Pfad Project Quota möglich ist.
