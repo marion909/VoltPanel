@@ -54,6 +54,28 @@ Das ergibt `cosign.key` (verschlüsselt mit der eingegebenen Passphrase) und
 3. `cosign.key` **nicht** einchecken. Wer sie hat, kann Updates für jede
    Installation ausliefern.
 
+### Vor dem Tag: den Changelog-Abschnitt setzen
+
+In [CHANGELOG.md](../CHANGELOG.md) sammelt sich unter „Unveröffentlicht", was
+seit dem letzten Tag dazugekommen ist. Vor dem Taggen wird daraus die
+Überschrift der neuen Fassung:
+
+```markdown
+## v0.4.0 — 2026-09-10
+```
+
+Das ist kein Formalismus. `scripts/release-assets.sh` schneidet genau diesen
+Abschnitt heraus und schreibt ihn als Release-Notes in `latest.json` — also in
+das, was ein Betreiber in der Update-Karte des Panels liest, bevor er auf
+„Aktualisieren" drückt. Fehlt der Abschnitt, fällt das Skript auf die von
+GoReleaser erzeugte Liste zurück: Commit-Überschriften mit Hashes davor.
+Brauchbar als Notnagel, aber keine Auskunft darüber, ob dieses Update etwas
+verlangt.
+
+Was etwas verlangt, gehört unter „Achtung" in den Abschnitt. Eine geänderte
+Voreinstellung, ein Handgriff, der vorher nicht nötig war — das ist der Satz,
+für den die Karte da ist.
+
 ### Was beim Release passiert
 
 `scripts/release-assets.sh` erzeugt `latest.json` und daneben

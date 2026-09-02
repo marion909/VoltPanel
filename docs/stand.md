@@ -300,7 +300,9 @@ Offen:
   für die Cloudflare-API ist der Host fest. Was fehlt, ist die Auflösung von
   Namen: ein Hostname, der auf 169.254.169.254 zeigt, geht durch. Dagegen hilft
   nur ein Proxy, der die aufgelöste Adresse prüft.
-- Doku-Site und Changelog
+- Doku-Site. Der Changelog steht (CHANGELOG.md, und der Abschnitt einer
+  Fassung wird zu den Release-Notes im Panel); eine eigene Seite mit Anleitungen
+  gibt es noch nicht.
 - Closed Beta mit zwei bis drei fremden Nutzern, erst danach öffentlich
 
 ## Bekannte Einschränkungen

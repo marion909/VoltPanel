@@ -65,11 +65,18 @@ for arch in amd64 arm64; do
 done
 
 # Die Release-Notes wandern in den Fahrplan, damit das Panel sie anzeigen kann,
-# ohne nach aussen zu telefonieren. GoReleaser hat das Release in diesem Lauf
-# schon angelegt, der Text steht also bereit.
+# ohne nach aussen zu telefonieren.
+#
+# Zuerst CHANGELOG.md: was dort steht, hat jemand geschrieben, damit ein
+# Betreiber es vor dem Update liest. Was GoReleaser erzeugt, ist eine Liste von
+# Commit-Ueberschriften mit Hashes davor — brauchbar als Notnagel, aber nicht
+# als Auskunft darueber, ob dieses Update etwas verlangt.
 NOTES=""
-if command -v gh >/dev/null 2>&1; then
+if NOTES="$(scripts/changelog-section.sh "$TAG" 2>/dev/null)"; then
+    echo "Release-Notes aus CHANGELOG.md ($TAG)"
+elif command -v gh >/dev/null 2>&1; then
     NOTES="$(gh release view "$TAG" --repo "$REPO" --json body --jq '.body' 2>/dev/null || true)"
+    echo "Kein CHANGELOG-Abschnitt fuer $TAG — Release-Notes von GitHub uebernommen" >&2
 fi
 # Gedeckelt: der Fahrplan wird bei jedem Dashboard-Aufruf geladen, und ein
 # ausuferndes Changelog gehoert auf die Release-Seite, nicht ins Panel.
