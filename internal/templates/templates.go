@@ -22,12 +22,12 @@ import (
 	"github.com/marion909/voltpanel/internal/store"
 )
 
-//go:embed nginx/*.tmpl php-fpm/*.tmpl systemd/*.tmpl
+//go:embed nginx/*.tmpl php-fpm/*.tmpl systemd/*.tmpl fail2ban/*.tmpl
 var files embed.FS
 
 var tmpl = template.Must(template.New("volt").
 	Funcs(template.FuncMap{"join": strings.Join}).
-	ParseFS(files, "nginx/*.tmpl", "php-fpm/*.tmpl", "systemd/*.tmpl"))
+	ParseFS(files, "nginx/*.tmpl", "php-fpm/*.tmpl", "systemd/*.tmpl", "fail2ban/*.tmpl"))
 
 // Redirect ist eine einzelne Weiterleitungsregel einer Site.
 type Redirect struct {

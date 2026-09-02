@@ -1,0 +1,25 @@
+# Von VoltPanel erzeugt — nicht von Hand bearbeiten.
+# Jede Änderung geht beim nächsten Schreiben verloren.
+# Erzeugt: {{ .GeneratedAt }}
+#
+# Empfindlichkeit: {{ .Level }}
+
+[volt-portscan]
+enabled  = true
+filter   = volt-portscan
+logpath  = {{ .LogPath }}
+backend  = auto
+
+# Geblockt wird die Adresse für alle Ports, nicht nur für den angetasteten.
+# Wer der Reihe nach anklopft, sucht nicht einen bestimmten Dienst.
+action   = %(banaction_allports)s[name=%(__name__)s, port="all", protocol="all", chain="%(chain)s"]
+
+maxretry = {{ .MaxRetry }}
+findtime = {{ .FindTime }}
+bantime  = {{ .BanTime }}
+
+# Die eigene Maschine und die Adressen, von denen aus der Betreiber sein Panel
+# erreicht. Sich selbst auszusperren ist bei einem Port-Scan-Schutz die
+# naheliegendste Art, ihn kennenzulernen: ein Portscanner im eigenen
+# Monitoring, ein Backup-Job, der eine geschlossene Adresse anfasst.
+ignoreip = 127.0.0.1/8 ::1{{ range .IgnoreIPs }} {{ . }}{{ end }}

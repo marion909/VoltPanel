@@ -62,6 +62,8 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFirewallRule:      s.opFirewallRule,
 		OpFail2banStatus:    s.opFail2banStatus,
 		OpFail2banUnban:     s.opFail2banUnban,
+		OpPortScanStatus:    s.opPortScanStatus,
+		OpPortScanSet:       s.opPortScanSet,
 		OpNodeList:          s.opNodeList,
 		OpNodeInstall:       s.opNodeInstall,
 		OpNodeRemove:        s.opNodeRemove,

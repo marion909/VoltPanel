@@ -698,6 +698,20 @@ func (c *Client) RemoveImage(ctx context.Context, ref string) (string, error) {
 	return res.Text, err
 }
 
+// PortScanStatusOf sagt, ob die Port-Scan-Erkennung steht.
+func (c *Client) PortScanStatusOf(ctx context.Context) (*PortScanStatus, error) {
+	var res PortScanStatus
+	err := c.Call(ctx, OpPortScanStatus, nil, &res)
+	return &res, err
+}
+
+// SetPortScan schaltet die Erkennung ein oder aus.
+func (c *Client) SetPortScan(ctx context.Context, p PortScanParams) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpPortScanSet, p, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

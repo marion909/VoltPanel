@@ -213,7 +213,15 @@ verify_manifest() {
 
     if [ -z "$VOLT_RELEASE_KEY_PEM" ]; then
         if [ "$VOLT_ALLOW_UNSIGNED" != "1" ]; then
-            die "Dieses Installationsskript traegt keinen Release-Schluessel; die Angaben unter $sig_url liessen sich damit nicht pruefen. Die veroeffentlichte Fassung unter https://get.voltpanel.dev/install.sh traegt ihn. Wer bewusst einen unsignierten Kanal betreibt, setzt VOLT_ALLOW_UNSIGNED=1."
+            printf '%sFehler:%s Dieses Installationsskript traegt keinen Release-Schluessel.\n' "$C_RED" "$C_RESET" >&2
+            printf '        Die Angaben unter %s liessen sich damit nicht pruefen,\n' "$sig_url" >&2
+            printf '        und ohne Pruefung wird hier nichts installiert.\n\n' >&2
+            printf '        Der Kanal ist noch nicht signiert. Zwei Wege:\n\n' >&2
+            printf '          1. Signieren (siehe docs/release.md). Danach traegt das\n' >&2
+            printf '             veroeffentlichte Skript den Schluessel und diese Meldung bleibt aus.\n' >&2
+            printf '          2. Bewusst ohne Pruefung installieren:\n\n' >&2
+            printf '             VOLT_ALLOW_UNSIGNED=1 bash <(curl -fsSL %s/install.sh)\n\n' "$VOLT_BASE_URL" >&2
+            exit 1
         fi
         warn "Ohne Signaturpruefung installiert (VOLT_ALLOW_UNSIGNED=1)."
         return 0
@@ -226,7 +234,7 @@ verify_manifest() {
 
     if ! curl -fsSL --retry 3 --retry-delay 2 "$sig_url" -o "$sigfile.b64"; then
         rm -f "$keyfile" "$sigfile" "$sigfile.b64"
-        die "Zu den Release-Angaben gibt es keine Signatur ($sig_url). Wer bewusst einen unsignierten Kanal betreibt, setzt VOLT_ALLOW_UNSIGNED=1."
+        die "Zu den Release-Angaben gibt es keine Signatur ($sig_url) — das Skript traegt einen Schluessel, der Kanal aber keine Unterschrift. Wer bewusst einen unsignierten Kanal betreibt, setzt VOLT_ALLOW_UNSIGNED=1."
     fi
     if ! base64 -d < "$sigfile.b64" > "$sigfile" 2>/dev/null; then
         rm -f "$keyfile" "$sigfile" "$sigfile.b64"

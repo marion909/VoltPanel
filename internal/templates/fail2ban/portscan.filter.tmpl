@@ -1,0 +1,20 @@
+# Von VoltPanel erzeugt — nicht von Hand bearbeiten.
+# Jede Änderung geht beim nächsten Schreiben verloren.
+# Erzeugt: {{ .GeneratedAt }}
+#
+# Was hier erkannt wird, sind abgewiesene Pakete, wie ufw sie protokolliert:
+#
+#   [UFW BLOCK] IN=eth0 OUT= MAC=… SRC=203.0.113.7 DST=… PROTO=TCP SPT=51000 DPT=23 …
+#
+# Eine einzelne solche Zeile heißt nichts — ein Browser, der eine geschlossene
+# Verbindung wiederholt, erzeugt sie auch. Viele in kurzer Zeit von derselben
+# Adresse heißen etwas, und deshalb steht die eigentliche Entscheidung nicht
+# hier, sondern im Jail: maxretry und findtime.
+
+[Definition]
+failregex = ^.*\[UFW BLOCK\].*SRC=<HOST> DST=\S+.*$
+ignoreregex =
+
+# journalmatch bleibt leer: ufw schreibt über den Kernel, und je nach
+# Einrichtung landet das in /var/log/ufw.log, /var/log/kern.log oder im
+# Journal. Welche Datei gelesen wird, entscheidet das Jail.

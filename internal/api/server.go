@@ -174,6 +174,8 @@ func (s *Server) setupRoutes() {
 	auth.POST("/system/firewall", s.handleFirewallRule, s.requireRole(store.RoleAdmin))
 	auth.GET("/system/fail2ban", s.handleFail2banStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/fail2ban/unban", s.handleUnban, s.requireRole(store.RoleAdmin))
+	auth.GET("/system/portscan", s.handlePortScanStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/system/portscan", s.handlePortScanSet, s.requireRole(store.RoleAdmin))
 	auth.POST("/system/services/:name/:action", s.handleServiceAction, s.requireRole(store.RoleAdmin))
 
 	// Den Stand darf jeder Angemeldete sehen — er steht als Hinweis in der

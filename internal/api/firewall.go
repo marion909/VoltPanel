@@ -60,6 +60,43 @@ func (s *Server) handleFail2banStatus(c echo.Context) error {
 	return c.JSON(http.StatusOK, st)
 }
 
+// handlePortScanStatus sagt, ob die Port-Scan-Erkennung steht.
+func (s *Server) handlePortScanStatus(c echo.Context) error {
+	st, err := s.agent.PortScanStatusOf(c.Request().Context())
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, st)
+}
+
+// handlePortScanSet schaltet sie ein oder aus.
+//
+// Die Whitelist kommt aus der config.yaml und nicht aus der Anfrage. Wer sie
+// über die Leitung setzen dürfte, könnte sich selbst von der Sperre ausnehmen
+// — und das ist genau die Zeile, die ein Angreifer als erste schriebe.
+func (s *Server) handlePortScanSet(c echo.Context) error {
+	var req struct {
+		Enabled bool   `json:"enabled"`
+		Level   string `json:"level"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+
+	ctx := c.Request().Context()
+	out, err := s.agent.SetPortScan(ctx, agent.PortScanParams{
+		Enabled:   req.Enabled,
+		Level:     req.Level,
+		IgnoreIPs: s.cfg.IPWhitelist,
+	})
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "firewall.portscan", "stufe", req.Level,
+		map[bool]string{true: "an", false: "aus"}[req.Enabled], c.RealIP(), nil)
+	return c.JSON(http.StatusOK, map[string]string{"log": out})
+}
+
 // handleUnban hebt eine Sperre auf.
 //
 // Der häufigste Fall im Betrieb: jemand hat sein Passwort dreimal falsch

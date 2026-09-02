@@ -124,6 +124,8 @@ const (
 	OpFirewallRule   Op = "firewall.rule"
 	OpFail2banStatus Op = "fail2ban.status"
 	OpFail2banUnban  Op = "fail2ban.unban"
+	OpPortScanStatus Op = "firewall.portscan.status"
+	OpPortScanSet    Op = "firewall.portscan.set"
 
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"
