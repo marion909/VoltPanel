@@ -89,7 +89,7 @@ type DockerStatus struct {
 func (s *Server) opDockerStatus(ctx context.Context, _ json.RawMessage) (any, error) {
 	res := DockerStatus{}
 	if !fileExists(allowedBinaries["docker"]) {
-		res.Warnings = append(res.Warnings, "Docker ist auf diesem Server nicht installiert.")
+		res.Warnings = append(res.Warnings, dockerCLIFehlt(ctx))
 		return res, nil
 	}
 	res.Installed = true
@@ -148,9 +148,29 @@ func (s *Server) opDockerRun(ctx context.Context, raw json.RawMessage) (any, err
 
 	out, err := run(ctx, dockerTimeout, "docker", args...)
 	if err != nil {
-		return nil, opErr(OpDockerRun, "container starten: %s", truncate(out, 500))
+		return nil, opErr(OpDockerRun, "container starten: %s", commandMessage(out, err, 500))
 	}
 	return ContainerResult{Name: name, ID: strings.TrimSpace(truncate(out, 64))}, nil
+}
+
+func dockerCLIFehlt(ctx context.Context) string {
+	for _, pkg := range []string{"docker.io", "docker-ce-cli"} {
+		if packageInstalled(ctx, pkg) {
+			return pkg + " ist laut dpkg installiert, aber " +
+				allowedBinaries["docker"] + " fehlt. Die Docker-CLI ist unvollständig " +
+				"installiert oder liegt an einem Pfad, den der Agent nicht ausführt. " +
+				"Der Installieren-Knopf repariert das Paket mit apt-get install --reinstall."
+		}
+	}
+	return "Docker ist auf diesem Server nicht installiert."
+}
+
+func commandMessage(out string, err error, n int) string {
+	msg := strings.TrimSpace(out)
+	if msg == "" && err != nil {
+		msg = err.Error()
+	}
+	return truncate(msg, n)
 }
 
 // dockerRunArgs baut die Kommandozeile.
@@ -349,7 +369,7 @@ func (s *Server) opDockerAction(ctx context.Context, raw json.RawMessage) (any, 
 
 	out, err := run(ctx, dockerTimeout, "docker", args...)
 	if err != nil {
-		return nil, opErr(OpDockerAction, "%s: %s", p.Action, truncate(out, 400))
+		return nil, opErr(OpDockerAction, "%s: %s", p.Action, commandMessage(out, err, 400))
 	}
 	return TextResult{Text: strings.TrimSpace(truncate(out, 200))}, nil
 }
@@ -363,7 +383,7 @@ func (s *Server) opDockerList(ctx context.Context, _ json.RawMessage) (any, erro
 		"--filter", "label=volt.site",
 		"--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}\t{{.Ports}}\t{{.CreatedAt}}")
 	if err != nil {
-		return nil, opErr(OpDockerList, "%s", truncate(out, 300))
+		return nil, opErr(OpDockerList, "%s", commandMessage(out, err, 300))
 	}
 
 	res := []ContainerResult{}
@@ -402,7 +422,7 @@ func (s *Server) opDockerLogs(ctx context.Context, raw json.RawMessage) (any, er
 	out, err := run(ctx, shortTimeout, "docker", "logs", "--tail",
 		strconv.Itoa(lines), dockerspec.ContainerName(p.Name))
 	if err != nil {
-		return nil, opErr(OpDockerLogs, "%s", truncate(out, 300))
+		return nil, opErr(OpDockerLogs, "%s", commandMessage(out, err, 300))
 	}
 	return TextResult{Text: truncate(out, 256<<10)}, nil
 }
@@ -429,7 +449,7 @@ func (s *Server) opDockerPull(ctx context.Context, raw json.RawMessage) (any, er
 	// einmal etwas durchrutscht.
 	out, err := run(ctx, pullTimeout, "docker", "pull", "--", p.Image)
 	if err != nil {
-		return nil, opErr(OpDockerPull, "image holen: %s", truncate(out, 500))
+		return nil, opErr(OpDockerPull, "image holen: %s", commandMessage(out, err, 500))
 	}
 	return TextResult{Text: truncate(out, 4000)}, nil
 }

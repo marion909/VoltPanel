@@ -182,3 +182,44 @@ func TestDockerStatusUnterscheidetInstalliertVonVerfuegbar(t *testing.T) {
 		t.Fatalf("Daemon-Warnung fehlt: %+v", st)
 	}
 }
+
+func TestDockerStatusMeldetInstalliertesPaketOhneCLI(t *testing.T) {
+	srv, _ := testServer(t)
+	dir := t.TempDir()
+	dpkg := filepath.Join(dir, "dpkg-query")
+	skript := "#!/bin/sh\nif [ \"$4\" = docker.io ]; then printf 'install ok installed'; exit 0; fi\nexit 1\n"
+	if err := os.WriteFile(dpkg, []byte(skript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	altDocker := allowedBinaries["docker"]
+	altDpkg := allowedBinaries["dpkg-query"]
+	allowedBinaries["docker"] = filepath.Join(dir, "docker-fehlt")
+	allowedBinaries["dpkg-query"] = dpkg
+	t.Cleanup(func() {
+		allowedBinaries["docker"] = altDocker
+		allowedBinaries["dpkg-query"] = altDpkg
+	})
+
+	out, err := srv.opDockerStatus(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := out.(DockerStatus)
+	if st.Installed {
+		t.Fatal("fehlende Docker-CLI darf nicht als installiert gelten")
+	}
+	if len(st.Warnings) == 0 || !strings.Contains(st.Warnings[0], "laut dpkg installiert") {
+		t.Fatalf("kaputtes docker.io-Paket wird nicht erklärt: %+v", st)
+	}
+	if !strings.Contains(st.Warnings[0], "--reinstall") {
+		t.Fatalf("Reparaturhinweis fehlt: %+v", st)
+	}
+}
+
+func TestDockerFehlerNenntAuchLeerenProzessfehler(t *testing.T) {
+	got := commandMessage("", os.ErrNotExist, 500)
+	if !strings.Contains(got, "file does not exist") {
+		t.Fatalf("commandMessage = %q", got)
+	}
+}

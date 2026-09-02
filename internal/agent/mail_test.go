@@ -124,3 +124,13 @@ func TestDockerFeatureStartetDenDienst(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerFeatureMeldetNichtStartklarenDaemon(t *testing.T) {
+	err := dockerFeatureBereit(DockerStatus{
+		Installed: true,
+		Warnings:  []string{"Docker ist installiert, der Daemon antwortet aber nicht: boom"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "nicht startklar") {
+		t.Fatalf("dockerFeatureBereit = %v, erwartet klare Fehlermeldung", err)
+	}
+}

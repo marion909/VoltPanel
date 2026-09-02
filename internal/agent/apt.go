@@ -29,6 +29,14 @@ var aptEnv = []string{"DEBIAN_FRONTEND=noninteractive"}
 // leicht eine halbe Minute, und in den allermeisten Fällen ist der Index frisch
 // genug — der Installer hat ihn beim Einrichten des Servers geholt.
 func (s *Server) aptInstall(ctx context.Context, packages ...string) (string, error) {
+	return s.aptInstallOptions(ctx, nil, packages...)
+}
+
+func (s *Server) aptReinstall(ctx context.Context, packages ...string) (string, error) {
+	return s.aptInstallOptions(ctx, []string{"--reinstall"}, packages...)
+}
+
+func (s *Server) aptInstallOptions(ctx context.Context, options []string, packages ...string) (string, error) {
 	defer s.blockServiceStarts()()
 
 	args := append([]string{
@@ -37,7 +45,8 @@ func (s *Server) aptInstall(ctx context.Context, packages ...string) (string, er
 		// vorhandene liegen. Ohne diese Angabe hinge der Aufruf an der Frage,
 		// und die Antwort wäre ohnehin immer dieselbe.
 		"-o", "Dpkg::Options::=--force-confold",
-	}, packages...)
+	}, options...)
+	args = append(args, packages...)
 
 	out, err := s.aptRun(ctx, args...)
 	if err == nil || !aptIndexStale(out) {

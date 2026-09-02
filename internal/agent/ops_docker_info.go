@@ -73,7 +73,7 @@ func (s *Server) opDockerStats(ctx context.Context, _ json.RawMessage) (any, err
 
 	out, err := run(ctx, shortTimeout, "docker", args...)
 	if err != nil {
-		return nil, opErr(OpDockerStats, "%s", truncate(out, 300))
+		return nil, opErr(OpDockerStats, "%s", commandMessage(out, err, 300))
 	}
 
 	return parseStatsLines(out), nil
@@ -114,7 +114,7 @@ func (s *Server) laufendeContainer(ctx context.Context) ([]string, error) {
 		"--filter", "label=volt.site", "--filter", "status=running",
 		"--format", "{{.Names}}")
 	if err != nil {
-		return nil, opErr(OpDockerStats, "%s", truncate(out, 300))
+		return nil, opErr(OpDockerStats, "%s", commandMessage(out, err, 300))
 	}
 	var namen []string
 	for _, line := range strings.Split(out, "\n") {
@@ -137,7 +137,7 @@ func (s *Server) opDockerImages(ctx context.Context, _ json.RawMessage) (any, er
 	out, err := run(ctx, shortTimeout, "docker", "images", "--format",
 		"{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}")
 	if err != nil {
-		return nil, opErr(OpDockerImages, "%s", truncate(out, 300))
+		return nil, opErr(OpDockerImages, "%s", commandMessage(out, err, 300))
 	}
 
 	return parseImageLines(out), nil
@@ -193,7 +193,7 @@ func (s *Server) opDockerImageRemove(ctx context.Context, raw json.RawMessage) (
 
 	out, err := run(ctx, dockerTimeout, "docker", "rmi", "--", p.Ref)
 	if err != nil {
-		return nil, opErr(OpDockerImageRemove, "image entfernen: %s", truncate(out, 400))
+		return nil, opErr(OpDockerImageRemove, "image entfernen: %s", commandMessage(out, err, 400))
 	}
 	return TextResult{Text: strings.TrimSpace(truncate(out, 2000))}, nil
 }

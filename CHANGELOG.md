@@ -15,6 +15,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.17 — 2026-09-02
+
+- Docker-Installation meldet klar, ob der Daemon danach startklar ist
+- Docker-Fehler ohne Ausgabe zeigen nicht mehr nur einen leeren Doppelpunkt
+
 ## v0.4.16 — 2026-09-02
 
 - Datenbanken und SQL zusammenfassen

@@ -275,6 +275,41 @@ func TestPaketinstallationLaeuftAusserhalbDerSandbox(t *testing.T) {
 	}
 }
 
+func TestAptReinstallSetztReinstallVorDasPaket(t *testing.T) {
+	srv, _ := testServer(t)
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "apt.log")
+	apt := filepath.Join(dir, "apt-get")
+	skript := "#!/bin/sh\nprintf '%s\\n' \"$*\" > " + logPath + "\n"
+	if err := os.WriteFile(apt, []byte(skript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	altApt := allowedBinaries["apt-get"]
+	altSystemdRun := allowedBinaries["systemd-run"]
+	altPolicy := policyPath
+	allowedBinaries["apt-get"] = apt
+	allowedBinaries["systemd-run"] = filepath.Join(dir, "systemd-run-fehlt")
+	policyPath = filepath.Join(dir, "policy-rc.d")
+	t.Cleanup(func() {
+		allowedBinaries["apt-get"] = altApt
+		allowedBinaries["systemd-run"] = altSystemdRun
+		policyPath = altPolicy
+	})
+
+	if _, err := srv.aptReinstall(t.Context(), "docker.io"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := string(got)
+	if !strings.Contains(args, "--reinstall docker.io") {
+		t.Fatalf("aptReinstall-Aufruf = %q", args)
+	}
+}
+
 // TestSystemdRunAusfallWirdErkannt: nur ein nicht ansprechbares systemd darf
 // den Rückfall auf den direkten Aufruf auslösen. Ein fehlgeschlagenes apt
 // dagegen ist ein Ergebnis und kein Grund, es noch einmal anders zu versuchen.

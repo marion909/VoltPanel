@@ -74,7 +74,7 @@ func (s *Server) opFeatureInstall(ctx context.Context, raw json.RawMessage) (any
 			p.Feature, strings.Join(FeatureNames(), ", "))
 	}
 
-	out, err := s.aptInstall(ctx, pakete...)
+	out, err := s.featurePaketeInstallieren(ctx, p.Feature, pakete)
 	if err != nil {
 		return nil, opErr(OpFeatureInstall, "%s installieren: %s",
 			strings.Join(pakete, ", "), truncate(out, 500))
@@ -82,7 +82,18 @@ func (s *Server) opFeatureInstall(ctx context.Context, raw json.RawMessage) (any
 	if err := s.featureDiensteStarten(ctx, p.Feature); err != nil {
 		return nil, err
 	}
+	if err := s.featureNachpruefen(ctx, p.Feature); err != nil {
+		return nil, err
+	}
 	return TextResult{Text: strings.Join(pakete, ", ") + " installiert"}, nil
+}
+
+func (s *Server) featurePaketeInstallieren(ctx context.Context, feature string, pakete []string) (string, error) {
+	if feature == "docker" && dockerPaketOhneCLI(ctx) {
+		s.log.Warn("docker.io ist installiert, aber docker-cli fehlt — paket wird neu installiert")
+		return s.aptReinstall(ctx, pakete...)
+	}
+	return s.aptInstall(ctx, pakete...)
 }
 
 func (s *Server) featureDiensteStarten(ctx context.Context, feature string) error {
@@ -98,4 +109,38 @@ func (s *Server) featureDiensteStarten(ctx context.Context, feature string) erro
 		}
 	}
 	return nil
+}
+
+func dockerPaketOhneCLI(ctx context.Context) bool {
+	return packageInstalled(ctx, "docker.io") && !fileExists(allowedBinaries["docker"])
+}
+
+func (s *Server) featureNachpruefen(ctx context.Context, feature string) error {
+	if feature != "docker" {
+		return nil
+	}
+	out, err := s.opDockerStatus(ctx, nil)
+	if err != nil {
+		return err
+	}
+	status, ok := out.(DockerStatus)
+	if !ok {
+		return opErr(OpFeatureInstall, "docker-status nicht lesbar")
+	}
+	return dockerFeatureBereit(status)
+}
+
+func dockerFeatureBereit(status DockerStatus) error {
+	if !status.Installed {
+		return opErr(OpFeatureInstall,
+			"docker.io wurde installiert, aber /usr/bin/docker ist danach nicht vorhanden")
+	}
+	if status.Available {
+		return nil
+	}
+	grund := strings.Join(status.Warnings, " ")
+	if strings.TrimSpace(grund) == "" {
+		grund = "der Docker-Daemon antwortet nach der Installation nicht"
+	}
+	return opErr(OpFeatureInstall, "docker installiert, aber nicht startklar: %s", grund)
 }

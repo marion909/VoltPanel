@@ -20,12 +20,15 @@ const emit = defineEmits(['installed'])
 
 const busy = ref(false)
 const error = ref('')
+const result = ref('')
 
 async function installieren() {
   busy.value = true
   error.value = ''
+  result.value = ''
   try {
-    await api.post(`/system/features/${props.feature}`)
+    const res = await api.post(`/system/features/${props.feature}`)
+    result.value = res?.log || t('feature.installed')
     emit('installed')
   } catch (err) {
     error.value = err.message
@@ -47,6 +50,7 @@ async function installieren() {
       <span>{{ text }}</span>
       <button
         v-if="isAdmin()"
+        type="button"
         class="shrink-0 rounded-md border px-2 py-1 text-[12px] disabled:opacity-60"
         :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
         :disabled="busy"
@@ -57,6 +61,9 @@ async function installieren() {
     </div>
     <p v-if="busy" class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
       {{ t('feature.installHint') }}
+    </p>
+    <p v-if="result" class="mt-1 text-[11px]" :style="{ color: 'var(--status-good)' }">
+      {{ result }}
     </p>
     <p v-if="error" class="mt-1 text-[11px]" :style="{ color: 'var(--status-critical)' }">
       {{ error }}

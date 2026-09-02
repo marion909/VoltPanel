@@ -335,7 +335,7 @@ onMounted(load)
     <InstallHint
       v-if="docker && !docker.installed"
       feature="docker"
-      :text="t('apps.needDocker')"
+      :text="docker.warnings?.[0] || t('apps.needDocker')"
       @installed="load"
     />
     <p
