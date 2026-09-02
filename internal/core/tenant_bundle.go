@@ -46,6 +46,11 @@ type TenantBundle struct {
 	Deploys   []*store.Deploy                 `json:"deploys"`
 	Targets   []*store.BackupTarget           `json:"backup_targets"`
 	Certs     []*store.Cert                   `json:"certs"`
+	// Mail. Ohne diese drei Zeilen wäre ein Umzug ein Umzug ohne Post — und
+	// zwar einer, der wie ein vollständiger aussieht.
+	MailDomains []*store.MailDomain `json:"mail_domains"`
+	Mailboxes   []*store.Mailbox    `json:"mailboxes"`
+	MailAliases []*store.MailAlias  `json:"mail_aliases"`
 
 	// Secrets sind die verschlüsselten Werte, umgeschlüsselt auf die
 	// Passphrase des Exports. Sie stehen hier und nicht in den Zeilen oben,
@@ -106,6 +111,15 @@ func CollectTenant(ctx context.Context, st *store.Store, sc store.Scope,
 	}
 	if b.Certs, err = st.ListCerts(ctx, nur); err != nil {
 		return nil, fmt.Errorf("zertifikate: %w", err)
+	}
+	if b.MailDomains, err = st.ListMailDomains(ctx, nur); err != nil {
+		return nil, fmt.Errorf("maildomänen: %w", err)
+	}
+	if b.Mailboxes, err = st.ListMailboxes(ctx, nur, 0); err != nil {
+		return nil, fmt.Errorf("postfächer: %w", err)
+	}
+	if b.MailAliases, err = st.ListMailAliases(ctx, nur, 0); err != nil {
+		return nil, fmt.Errorf("weiterleitungen: %w", err)
 	}
 
 	// Was an einer Site oder einer Datenbank hängt, einzeln nachladen.

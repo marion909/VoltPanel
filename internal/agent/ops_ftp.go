@@ -437,11 +437,33 @@ func (s *Server) opFTPUserSet(ctx context.Context, raw json.RawMessage) (any, er
 // Prüfung ist nicht überflüssig — sie fängt den Fall ab, dass jemand ein Konto
 // namens site_x mit der UID 0 angelegt hat.
 func siteUserIDs(op Op, name string) (int, int, error) {
+	// Der Namenscheck zuerst, und zwar bewusst vor dem Präfix: für "root" und
+	// "www-data" ist "reservierter systembenutzer" die Auskunft, die etwas
+	// sagt. "kein systembenutzer einer site" stimmt zwar auch, führt aber in
+	// die falsche Richtung. Der Test hält genau diesen Unterschied fest.
 	if err := checkUsername(name); err != nil {
 		return 0, 0, err
 	}
 	if !strings.HasPrefix(name, sitePrefix) {
 		return 0, 0, opInputErr(op, "%q ist kein systembenutzer einer site", name)
+	}
+	return unprivilegierteIDs(op, name)
+}
+
+// unprivilegierteIDs schlägt die Kennung eines Kontos nach, das nicht zu einer
+// Site gehört.
+//
+// Es gibt genau zwei davon: vmail für die Postfächer und opendkim für den
+// Signaturschlüssel. Beide legt der Agent selbst an, und für beide gilt
+// dieselbe Untergrenze — root oder ein Systemkonto kommt nicht in Frage.
+//
+// Getrennt von siteUserIDs, weil dort die Präfixprüfung richtig ist: ein
+// FTP-Zugang oder ein Deploy darf ausschließlich unter dem Benutzer einer Site
+// laufen. Sie hier mitzunehmen war der Fehler — `mail.setup` legte vmail an
+// und scheiterte danach an "vmail ist kein Systembenutzer einer Site".
+func unprivilegierteIDs(op Op, name string) (int, int, error) {
+	if err := checkUsername(name); err != nil {
+		return 0, 0, err
 	}
 	u, err := user.Lookup(name)
 	if err != nil {
@@ -456,8 +478,7 @@ func siteUserIDs(op Op, name string) (int, int, error) {
 		return 0, 0, opErr(op, "gid von %q: %v", name, err)
 	}
 	if uid < 1000 || gid < 1000 {
-		return 0, 0, opInputErr(op, "%q hat die uid %d — ein ftp-zugang darf nicht auf einem "+
-			"systemkonto laufen", name, uid)
+		return 0, 0, opInputErr(op, "%q hat die uid %d — das ist ein systemkonto", name, uid)
 	}
 	return uid, gid, nil
 }

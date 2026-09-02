@@ -15,6 +15,13 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.11 — 2026-09-02
+
+- Proxy-Sites schreiben die gemeinsame Nginx-Config vor dem Vhost
+- Mail zieht beim Mandanten-Export und -Import mit um
+- Mail-Setup behandelt vmail nicht mehr wie einen Site-Benutzer
+- Doku-Startseite für GitHub Pages
+
 ## v0.4.10 — 2026-09-02
 
 - SPF, DKIM und DMARC über Cloudflare setzen — statt sie abzuschreiben

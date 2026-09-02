@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -163,7 +164,7 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, opErr(OpMailApply, "postfix ist auf diesem server nicht installiert")
 	}
 
-	uid, gid, err := siteUserIDs(OpMailApply, vmailUser)
+	uid, gid, err := unprivilegierteIDs(OpMailApply, vmailUser)
 	if err != nil {
 		return nil, opErr(OpMailApply,
 			"den benutzer %s gibt es noch nicht — `mail.setup` legt ihn an", vmailUser)
@@ -337,9 +338,22 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
 }
 
 // opendkimIDs sucht die Kennung, unter der OpenDKIM läuft.
+//
+// Ohne die Untergrenze von 1000: opendkim ist ein Dienstkonto und hat
+// deshalb eine niedrige Kennung — anders als vmail, das der Agent selbst
+// anlegt. Die Regel "kein Systemkonto" gilt für Konten, unter denen fremder
+// Code läuft; hier geht es um den Eigentümer einer Datei, die ein Dienst
+// lesen können muss.
+//
+// Der Name steht im Quelltext und kommt aus keiner Anfrage.
 func opendkimIDs() (int, int) {
-	uid, gid, err := siteUserIDs(OpMailApply, "opendkim")
+	u, err := user.Lookup("opendkim")
 	if err != nil {
+		return -1, -1
+	}
+	uid, err1 := strconv.Atoi(u.Uid)
+	gid, err2 := strconv.Atoi(u.Gid)
+	if err1 != nil || err2 != nil {
 		return -1, -1
 	}
 	return uid, gid
@@ -464,7 +478,7 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		schritte = append(schritte, "benutzer "+vmailUser+" angelegt")
 	}
 
-	uid, gid, err := siteUserIDs(OpMailSetup, vmailUser)
+	uid, gid, err := unprivilegierteIDs(OpMailSetup, vmailUser)
 	if err != nil {
 		return nil, err
 	}

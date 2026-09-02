@@ -42,6 +42,9 @@ type ImportResult struct {
 	Cronjobs  int `json:"cronjobs"`
 	Apps      int `json:"apps"`
 
+	MailDomains int `json:"mail_domains"`
+	Mailboxes   int `json:"mailboxes"`
+
 	// Warnings sind Teile, die nicht mitkonnten. Ein Import, der still weniger
 	// einspielt als im Bündel steht, ist schlimmer als einer, der es sagt.
 	Warnings []string `json:"warnings,omitempty"`
@@ -78,7 +81,10 @@ func (s *ExportService) ImportTenant(ctx context.Context, path, passphrase strin
 	}
 
 	res := &ImportResult{Slug: bundle.Tenant.Slug}
-	m := &idMap{sites: map[int64]int64{}, dbs: map[int64]int64{}, dbUsers: map[int64]int64{}}
+	m := &idMap{
+		sites: map[int64]int64{}, dbs: map[int64]int64{},
+		dbUsers: map[int64]int64{}, mailDomains: map[int64]int64{},
+	}
 
 	if err := s.importTenantRow(ctx, sys, bundle, res); err != nil {
 		return nil, err
@@ -155,6 +161,17 @@ func (s *ExportService) applySystem(ctx context.Context, res *ImportResult) {
 	s.applyCronjobs(ctx, sc, res)
 	s.applyFTP(ctx, sc, nachSite, res)
 	s.applyApps(ctx, sc, nachSite, res)
+
+	// Und die Mail-Dateien. Sie gelten für den ganzen Server, deshalb schreibt
+	// der Dienst sie vollständig neu — mit dem eingespielten Mandanten darin.
+	if res.MailDomains > 0 {
+		mail := NewMailService(s.store, s.agent, s.cfg, s.secrets)
+		if _, err := mail.Apply(ctx); err != nil {
+			res.Warnings = append(res.Warnings,
+				"die mail-dateien konnten nicht geschrieben werden: "+err.Error()+
+					" — `volt mail apply` wiederholt es, sobald der mailspeicher steht")
+		}
+	}
 }
 
 // applyCronjobs schreibt die Dateien in /etc/cron.d.
@@ -234,9 +251,10 @@ func (s *ExportService) applyApps(ctx context.Context, sc store.Scope,
 // idMap hält fest, welche Nummer aus dem Bündel welcher auf diesem Server
 // entspricht.
 type idMap struct {
-	sites   map[int64]int64
-	dbs     map[int64]int64
-	dbUsers map[int64]int64
+	sites       map[int64]int64
+	dbs         map[int64]int64
+	dbUsers     map[int64]int64
+	mailDomains map[int64]int64
 }
 
 func (s *ExportService) importTenantRow(ctx context.Context, sys store.Scope,
@@ -403,6 +421,7 @@ func (s *ExportService) importDatabases(ctx context.Context, sys store.Scope,
 // Site.
 func (s *ExportService) importRest(ctx context.Context, sys store.Scope,
 	b *TenantBundle, box *authn.SecretBox, m *idMap, res *ImportResult) {
+	s.importMail(ctx, sys, b, box, m, res)
 
 	for _, c := range b.Cronjobs {
 		job := *c
@@ -512,6 +531,74 @@ func (s *ExportService) rekey(b *TenantBundle, box *authn.SecretBox, key string,
 }
 
 // unpackFiles legt die Dateien der Sites an ihren neuen Platz.
+// importMail spielt Domänen, Postfächer und Weiterleitungen ein.
+//
+// Die Reihenfolge ist zwingend: erst die Domäne, dann was an ihr hängt. Die
+// Nummern aus dem Bündel gelten hier nicht — was aufeinander zeigt, wird
+// umgehängt, sonst hinge es an einer fremden Zeile.
+func (s *ExportService) importMail(ctx context.Context, sys store.Scope,
+	b *TenantBundle, box *authn.SecretBox, m *idMap, res *ImportResult) {
+
+	for _, d := range b.MailDomains {
+		dom := *d
+		dom.ID, dom.TenantID = 0, res.TenantID
+		if enc, ok := bundleSecret(b, box, fmt.Sprintf("maildomain.%d.dkim", d.ID)); ok {
+			// Umgeschlüsselt auf diesen Server. Bliebe der Schlüssel zurück,
+			// unterschriebe der neue Server mit einem anderen — und der
+			// DNS-Eintrag zeigte weiter auf den alten.
+			neu, err := s.secrets.Encrypt(enc)
+			if err != nil {
+				res.Warnings = append(res.Warnings,
+					"dkim-schlüssel von "+d.Domain+": "+err.Error())
+			} else {
+				dom.DKIMPrivate = neu
+			}
+		}
+		if err := s.store.CreateMailDomain(ctx, sys, &dom); err != nil {
+			res.Warnings = append(res.Warnings, "maildomäne "+d.Domain+": "+err.Error())
+			continue
+		}
+		m.mailDomains[d.ID] = dom.ID
+		res.MailDomains++
+	}
+
+	for _, mb := range b.Mailboxes {
+		id, ok := m.mailDomains[mb.DomainID]
+		if !ok {
+			res.Warnings = append(res.Warnings, "postfach "+mb.Address+": die domäne fehlt")
+			continue
+		}
+		box2 := *mb
+		box2.ID, box2.TenantID, box2.DomainID = 0, res.TenantID, id
+		if enc, ok := bundleSecret(b, box, fmt.Sprintf("mailbox.%d.password", mb.ID)); ok {
+			neu, err := s.secrets.Encrypt(enc)
+			if err != nil {
+				res.Warnings = append(res.Warnings, "passwort von "+mb.Address+": "+err.Error())
+			} else {
+				box2.PasswordEnc = neu
+			}
+		}
+		if err := s.store.CreateMailbox(ctx, sys, &box2); err != nil {
+			res.Warnings = append(res.Warnings, "postfach "+mb.Address+": "+err.Error())
+			continue
+		}
+		res.Mailboxes++
+	}
+
+	for _, a := range b.MailAliases {
+		id, ok := m.mailDomains[a.DomainID]
+		if !ok {
+			res.Warnings = append(res.Warnings, "weiterleitung "+a.Source+": die domäne fehlt")
+			continue
+		}
+		alias := *a
+		alias.ID, alias.TenantID, alias.DomainID = 0, res.TenantID, id
+		if err := s.store.CreateMailAlias(ctx, sys, &alias); err != nil {
+			res.Warnings = append(res.Warnings, "weiterleitung "+a.Source+": "+err.Error())
+		}
+	}
+}
+
 func (s *ExportService) unpackFiles(ctx context.Context, archive string,
 	b *TenantBundle, m *idMap, res *ImportResult) {
 
@@ -523,12 +610,32 @@ func (s *ExportService) unpackFiles(ctx context.Context, archive string,
 			erlaubt[site.Domain] = filepath.Join(s.cfg.SitesDir, site.Domain)
 		}
 	}
-	if len(erlaubt) == 0 {
-		return
+
+	// Und die Post: dieselbe Regel, nur ein anderes Verzeichnis. Nur Domänen,
+	// die wirklich angelegt wurden — ein Maildir ohne Domäne bekäme nie Post
+	// und läge nur da.
+	erlaubteMail := map[string]string{}
+	for _, d := range b.MailDomains {
+		if _, ok := m.mailDomains[d.ID]; ok {
+			erlaubteMail[d.Domain] = filepath.Join(mailRoot, d.Domain)
+		}
 	}
 
 	if err := s.eachEntry(archive, func(h *tar.Header, r io.Reader) error {
 		name := strings.TrimPrefix(filepath.ToSlash(h.Name), "./")
+
+		if rest, ok := strings.CutPrefix(name, exportMailDir+"/"); ok {
+			domain, sub, ok := strings.Cut(rest, "/")
+			if !ok || sub == "" {
+				return nil
+			}
+			root, ok := erlaubteMail[domain]
+			if !ok {
+				return nil
+			}
+			return writeUnder(root, sub, h, r)
+		}
+
 		rest, ok := strings.CutPrefix(name, exportSitesDir+"/")
 		if !ok {
 			return nil

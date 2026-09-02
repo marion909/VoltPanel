@@ -45,6 +45,13 @@ const (
 	// exportSitesDir und exportDBDir sind die Verzeichnisse im Archiv.
 	exportSitesDir = "sites"
 	exportDBDir    = "databases"
+	exportMailDir  = "mail"
+
+	// mailRoot ist das Verzeichnis, unter dem die Postfächer liegen. Es steht
+	// hier als Konstante und nicht in der Konfiguration: der Agent legt es
+	// beim Einrichten an, und zwei Stellen mit derselben Angabe wären zwei,
+	// die auseinanderlaufen können.
+	mailRoot = "/var/vmail"
 
 	// minPassphrase ist die Untergrenze. Kürzer wäre der Schlüssel des
 	// Bündels schwächer als jedes Passwort darin.
@@ -84,7 +91,9 @@ type ExportResult struct {
 	SizeBytes int64  `json:"size_bytes"`
 	Checksum  string `json:"checksum"`
 	Sites     int    `json:"sites"`
-	Databases int    `json:"databases"`
+	// Mail ist die Zahl der Domänen, deren Post mit im Bündel liegt.
+	Mail      int `json:"mail"`
+	Databases int `json:"databases"`
 	// Warnings sind Teile, die nicht mitkonnten. Ein Export, der still
 	// weniger mitnimmt als erwartet, ist schlimmer als einer, der es sagt.
 	Warnings []string `json:"warnings,omitempty"`
@@ -166,6 +175,19 @@ func (s *ExportService) ExportTenant(ctx context.Context, sc store.Scope,
 			continue
 		}
 		res.Sites++
+	}
+
+	for _, d := range bundle.MailDomains {
+		quelle := filepath.Join(mailRoot, d.Domain)
+		if err := addTree(ctx, tw, quelle, filepath.Join(exportMailDir, d.Domain)); err != nil {
+			// Eine Domäne ohne Postfach hat kein Verzeichnis. Das ist kein
+			// Fehler — aber es gehört benannt, damit niemand hinterher eine
+			// Mail sucht, die nie im Bündel war.
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("%s: post nicht gesichert (%v)", d.Domain, err))
+			continue
+		}
+		res.Mail++
 	}
 
 	s.addDatabases(ctx, tw, bundle, res)
@@ -290,6 +312,15 @@ func (s *ExportService) rekeySecrets(b *TenantBundle, box *authn.SecretBox,
 	}
 	for _, d := range b.Deploys {
 		umschluesseln(fmt.Sprintf("deploy.%d.hook", d.ID), &d.HookSecretEnc)
+	}
+	for _, m := range b.Mailboxes {
+		umschluesseln(fmt.Sprintf("mailbox.%d.password", m.ID), &m.PasswordEnc)
+	}
+	for _, d := range b.MailDomains {
+		// Der DKIM-Schlüssel zieht mit um. Bliebe er zurück, unterschriebe der
+		// neue Server mit einem anderen — und der DNS-Eintrag zeigte weiter
+		// auf den alten. Eine kaputte Unterschrift ist schlechter als keine.
+		umschluesseln(fmt.Sprintf("maildomain.%d.dkim", d.ID), &d.DKIMPrivate)
 	}
 	return nil
 }

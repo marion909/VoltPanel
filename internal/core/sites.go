@@ -18,9 +18,25 @@ import (
 
 type SiteService struct {
 	store *store.Store
-	agent *agent.Client
+	agent siteAgent
 	cfg   *config.Config
 	quota *QuotaService
+}
+
+type siteAgent interface {
+	WriteShared(ctx context.Context, content string) error
+	CreateSystemUser(ctx context.Context, username, homeDir string) error
+	DeleteSystemUser(ctx context.Context, username string, removeHome bool) error
+	Mkdir(ctx context.Context, path string, mode uint32, owner string) error
+	MkdirGroup(ctx context.Context, path string, mode uint32, owner, group string) error
+	WriteFileGroup(ctx context.Context, path, content string, mode uint32, owner, group string) error
+	RemovePath(ctx context.Context, path string, recursive bool) error
+	WritePHPPool(ctx context.Context, phpVersion, poolName, content string) error
+	RemovePHPPool(ctx context.Context, phpVersion, poolName string) error
+	WriteVhost(ctx context.Context, domain, content string) error
+	RemoveVhost(ctx context.Context, domain string) error
+	WriteHtpasswd(ctx context.Context, domain string, entries []string) (string, error)
+	RemoveHtpasswd(ctx context.Context, domain string) error
 }
 
 func NewSiteService(st *store.Store, ag *agent.Client, cfg *config.Config) *SiteService {
@@ -132,6 +148,14 @@ func (s *SiteService) CreateSite(ctx context.Context, sc store.Scope, in CreateS
 }
 
 func (s *SiteService) provision(ctx context.Context, sc store.Scope, site *store.Site) error {
+	// Jede Site-Config setzt voraus, dass die gemeinsame Nginx-Config aktiv ist:
+	// dort stehen log_format "volt" und die WebSocket-Upgrade-Map. Auf einem
+	// frischen Server ist `site add` oft der erste Nginx-Schreibvorgang, also
+	// darf diese Voraussetzung nicht nur in `site rebuild` hergestellt werden.
+	if err := s.SyncShared(ctx); err != nil {
+		return fmt.Errorf("gemeinsame nginx-config: %w", err)
+	}
+
 	if err := s.agent.CreateSystemUser(ctx, site.SystemUser, site.RootPath); err != nil {
 		return fmt.Errorf("systembenutzer %s: %w", site.SystemUser, err)
 	}
