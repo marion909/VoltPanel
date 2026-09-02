@@ -152,6 +152,11 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Unit-Name vom Panel vergeben. Die App läuft als Systembenutzer ihrer Site in
   einer eng gefassten Unit; die Umgebung liegt verschlüsselt in der Datenbank
   und auf dem Server in einer Datei mit 0640, nicht in der Unit.
+- Git-Deploy je Site: Deploy-Key, Branch-Auswahl, Buildschritte aus einer
+  festen Liste, Releases-Verzeichnis mit Symlink-Wechsel und Rollback per
+  Klick. Der Webhook-Endpunkt liegt außerhalb des Zugriffspfads und weist sich
+  über eine HMAC-Signatur aus; das Protokoll des letzten Laufs steht im Panel,
+  auch wenn er fehlgeschlagen ist.
 
 Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
@@ -164,22 +169,17 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
   legen
 - Node.js: Versionen über fnm. Die App selbst steht (oben unter „Fertig"), die
   Versionsverwaltung nicht — genommen wird, was auf dem Server liegt.
-- Git-Deploy: Deploy-Keys, Webhook-Endpunkt je Site, Branch-Auswahl
-- Build-Schritte definierbar (`npm ci`, `npm run build`, `composer install`)
-- Releases-Verzeichnis mit Symlink-Wechsel, damit ein Rollback ein Klick ist
 
-Die Hälfte, die den Verkehr betrifft, steht schon: der Site-Typ `proxy`
-schreibt einen fertigen `proxy_pass`-Vhost, und `docker` steht auf der
-Dienst-Whitelist des Agents. Auch die Unit-Vorlage für eine App liegt unter
-`internal/templates/systemd/app.service.tmpl` — sie wird eingebettet und
-geparst, aber von niemandem gerendert. Es fehlt alles dazwischen.
+App und Git-Deploy stehen (oben unter „Fertig"). Was fehlt, ist Docker —
+und das ist keine Fleißarbeit: ein Container mit `--privileged` oder einem
+Bind-Mount auf `/` hebt jede Isolation auf, die dieses Panel aufbaut. Die
+Operationen müssen also nicht nur „Container starten" können, sondern
+vorgeben, was ein Container darf. `docker` steht immerhin schon auf der
+Dienst-Whitelist des Agents.
 
-Zwei Dinge sind hier keine Fleißarbeit. Erstens Docker: ein Container mit
-`--privileged` oder einem Bind-Mount auf `/` hebt jede Isolation auf, die
-dieses Panel aufbaut. Die Operationen müssen also nicht nur "Container
-starten" können, sondern vorgeben, was ein Container darf. Zweitens holt
-Git-Deploy Daten von einer Adresse, die der Kunde bestimmt — genau der Fall,
-für den die SSRF-Filterung fehlt.
+Die Versionsverwaltung für Node über fnm fehlt ebenfalls. Genommen wird, was
+unter `/usr/bin` oder `/usr/local/bin` liegt; das Panel sagt, welche Fassung
+das ist, und weist darauf hin, wenn gar keine da ist.
 
 **Phase 6 — Mailserver**
 

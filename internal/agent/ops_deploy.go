@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/marion909/voltpanel/internal/gitspec"
 	"github.com/marion909/voltpanel/internal/templates"
 )
 
@@ -44,20 +45,6 @@ const (
 	deployTimeout = 20 * time.Minute
 	cloneTimeout  = 5 * time.Minute
 )
-
-// deploySteps ist die Liste der Buildschritte. Namen, keine Kommandozeilen.
-//
-// Der Unterschied ist die ganze Sicherheit dieser Funktion: eine Kommandozeile
-// vom Kunden müsste jemand zerlegen, und wer zerlegt, landet früher oder später
-// bei einer Shell. Ein Name schlägt hier eine feste Argumentliste nach, oder er
-// wird abgelehnt.
-var deploySteps = map[string][]string{
-	"npm-ci":           {"npm", "ci"},
-	"npm-install":      {"npm", "install"},
-	"npm-build":        {"npm", "run", "build"},
-	"npm-prod":         {"npm", "ci", "--omit=dev"},
-	"composer-install": {"composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"},
-}
 
 // DeployParams beschreibt einen Deploy vollständig.
 type DeployParams struct {
@@ -151,7 +138,7 @@ func (s *Server) deployPlan(p DeployParams) (*deployPlan, error) {
 	if err != nil {
 		return nil, err
 	}
-	repoURL, err := NormalizeGitURL(p.RepoURL)
+	repoURL, err := gitspec.NormalizeURL(p.RepoURL)
 	if err != nil {
 		return nil, opInputErr(OpDeployRun, "%v", err)
 	}
@@ -159,7 +146,7 @@ func (s *Server) deployPlan(p DeployParams) (*deployPlan, error) {
 	if ref == "" {
 		ref = "main"
 	}
-	if !ValidGitRef(ref) {
+	if !gitspec.ValidRef(ref) {
 		return nil, opInputErr(OpDeployRun, "%q ist kein gültiger branch- oder tagname", ref)
 	}
 	if len(p.Steps) > 10 {
@@ -168,7 +155,7 @@ func (s *Server) deployPlan(p DeployParams) (*deployPlan, error) {
 
 	steps := make([][]string, 0, len(p.Steps))
 	for _, name := range p.Steps {
-		cmd, ok := deploySteps[name]
+		cmd, ok := gitspec.Steps[name]
 		if !ok {
 			return nil, opInputErr(OpDeployRun, "%q ist kein bekannter buildschritt", name)
 		}

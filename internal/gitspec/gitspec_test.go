@@ -1,4 +1,4 @@
-package agent
+package gitspec
 
 import "testing"
 
@@ -34,7 +34,7 @@ func TestGitAdresseIstKeinKommando(t *testing.T) {
 	}
 
 	for name, url := range angriffe {
-		if got, err := NormalizeGitURL(url); err == nil {
+		if got, err := NormalizeURL(url); err == nil {
 			t.Errorf("%s: %q wurde angenommen als %q", name, url, got)
 		}
 	}
@@ -56,7 +56,7 @@ func TestGitAdresseWirdNeuGebaut(t *testing.T) {
 		"  https://github.com/a/b.git  ":     "https://github.com/a/b.git",
 	}
 	for in, want := range gut {
-		got, err := NormalizeGitURL(in)
+		got, err := NormalizeURL(in)
 		if err != nil {
 			t.Errorf("%q wurde abgelehnt: %v", in, err)
 			continue
@@ -71,7 +71,7 @@ func TestGitAdresseWirdNeuGebaut(t *testing.T) {
 // Ein führender Bindestrich wäre dort eine Option.
 func TestBranchNameIstKeineOption(t *testing.T) {
 	for _, gut := range []string{"main", "master", "release/2026-09", "v1.2.3", "feature/a_b"} {
-		if !ValidGitRef(gut) {
+		if !ValidRef(gut) {
 			t.Errorf("%q wurde abgelehnt", gut)
 		}
 	}
@@ -79,7 +79,7 @@ func TestBranchNameIstKeineOption(t *testing.T) {
 		"", "-b", "--force", "main..dev", "main@{1}", "main.lock", "main/",
 		"a//b", "main branch", "main\nrm", "haupt;id", "..",
 	} {
-		if ValidGitRef(schlecht) {
+		if ValidRef(schlecht) {
 			t.Errorf("%q ging durch", schlecht)
 		}
 	}

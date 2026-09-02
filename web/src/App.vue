@@ -15,6 +15,7 @@ const nav = computed(() =>
     { to: "/", key: "nav.dashboard", icon: "grid" },
     { to: "/sites", key: "nav.sites", icon: "globe" },
     { to: "/apps", key: "nav.apps", icon: "box" },
+    { to: "/deploys", key: "nav.deploys", icon: "branch" },
     { to: "/files", key: "nav.files", icon: "folder" },
     { to: "/databases", key: "nav.databases", icon: "database" },
     { to: "/sql", key: "nav.sql", icon: "database" },
@@ -53,6 +54,7 @@ const paths = {
   server: "M4 5h16v5H4zM4 14h16v5H4zM7.5 7.5h.01M7.5 16.5h.01",
   list: "M4 6h16M4 12h16M4 18h10",
   box: "M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v10",
+  branch: "M6 3v12M6 21a3 3 0 100-6 3 3 0 000 6zM6 6a3 3 0 100-6 3 3 0 000 6zM18 9a3 3 0 100-6 3 3 0 000 6zM18 6v1a4 4 0 01-4 4h-2a6 6 0 00-6 6",
   folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
   database:
     "M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",

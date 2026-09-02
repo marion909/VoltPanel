@@ -1,11 +1,27 @@
-package agent
+// Package gitspec prüft, was von einem Kunden kommt und später ein Argument
+// von git oder ein Buildschritt wird.
+//
+// Eigenes Paket, weil zwei Seiten dieselbe Prüfung brauchen: der Store beim
+// Speichern und der Agent unmittelbar vor dem Aufruf. Dieselbe, nicht eine
+// ähnliche — eine zweite, nachgebaute Prüfung ist die Stelle, an der beide
+// auseinanderlaufen, und dann lässt die eine durch, was die andere verbietet.
+//
+// Unter beiden, weil store und agent einander nicht importieren können, ohne
+// einen Zyklus zu bilden.
+package gitspec
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 )
+
+// ErrInvalid trägt jede Ablehnung aus diesem Paket. Der Aufrufer entscheidet
+// daran, ob daraus ein 400 wird oder ein 500.
+var ErrInvalid = errors.New("ungültige eingabe")
 
 // Git-Adressen und Referenzen vom Kunden.
 //
@@ -43,7 +59,7 @@ var (
 	reGitRef = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$`)
 )
 
-// NormalizeGitURL prüft eine Repository-Adresse und gibt sie in kanonischer
+// NormalizeURL prüft eine Repository-Adresse und gibt sie in kanonischer
 // Form zurück.
 //
 // Erlaubt sind genau drei Formen:
@@ -55,16 +71,16 @@ var (
 // Alles andere wird abgelehnt — auch Formen, die harmlos aussehen. Eine
 // Whitelist, die nur die drei Fälle kennt, die wirklich vorkommen, ist hier
 // mehr wert als eine Liste dessen, was jemandem an Angriffen eingefallen ist.
-func NormalizeGitURL(raw string) (string, error) {
+func NormalizeURL(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	switch {
 	case s == "":
-		return "", fmt.Errorf("%w: keine repository-adresse", errBadInput)
+		return "", fmt.Errorf("%w: keine repository-adresse", ErrInvalid)
 	case len(s) > 300:
-		return "", fmt.Errorf("%w: die adresse ist zu lang", errBadInput)
+		return "", fmt.Errorf("%w: die adresse ist zu lang", ErrInvalid)
 	case strings.ContainsAny(s, " \t\n\r\x00'\";|&$`<>()"):
 		return "", fmt.Errorf("%w: die adresse enthält zeichen, die dort nicht vorkommen",
-			errBadInput)
+			ErrInvalid)
 	case strings.HasPrefix(s, "-"):
 		// git läse das als Option, nicht als Adresse.
 		//
@@ -73,20 +89,20 @@ func NormalizeGitURL(raw string) (string, error) {
 		// erlaubten Formen passt. Sie steht hier, weil die Meldung dann sagt,
 		// woran es wirklich liegt — und weil eine spätere Lockerung der Formen
 		// sie nicht mitnehmen soll.
-		return "", fmt.Errorf("%w: eine adresse beginnt nicht mit einem bindestrich", errBadInput)
+		return "", fmt.Errorf("%w: eine adresse beginnt nicht mit einem bindestrich", ErrInvalid)
 	}
 
 	if strings.Contains(s, "://") {
-		return normalizeGitScheme(s)
+		return normalizeScheme(s)
 	}
-	return normalizeGitSCP(s)
+	return normalizeSCP(s)
 }
 
-// normalizeGitScheme behandelt https:// und ssh://.
-func normalizeGitScheme(s string) (string, error) {
+// normalizeScheme behandelt https:// und ssh://.
+func normalizeScheme(s string) (string, error) {
 	u, err := url.Parse(s)
 	if err != nil {
-		return "", fmt.Errorf("%w: die adresse ist nicht lesbar", errBadInput)
+		return "", fmt.Errorf("%w: die adresse ist nicht lesbar", ErrInvalid)
 	}
 	switch u.Scheme {
 	case "https", "ssh":
@@ -95,7 +111,7 @@ func normalizeGitScheme(s string) (string, error) {
 		// git:// wäre unverschlüsselt und nicht authentifiziert, http:// ebenso;
 		// file:// wäre ein Weg an jedes Verzeichnis des Servers.
 		return "", fmt.Errorf("%w: %q wird nicht unterstützt — https:// oder ssh://",
-			errBadInput, u.Scheme)
+			ErrInvalid, u.Scheme)
 	}
 	if u.User != nil {
 		if _, hatPasswort := u.User.Password(); hatPasswort {
@@ -103,21 +119,21 @@ func normalizeGitScheme(s string) (string, error) {
 			// Audit-Log und in jeder Fehlermeldung. Für https gibt es den
 			// Token, für ssh den Deploy-Key.
 			return "", fmt.Errorf("%w: kein passwort in der adresse — dafür gibt es "+
-				"den deploy-key", errBadInput)
+				"den deploy-key", ErrInvalid)
 		}
 		if !reGitUser.MatchString(u.User.Username()) {
-			return "", fmt.Errorf("%w: benutzername %q", errBadInput, u.User.Username())
+			return "", fmt.Errorf("%w: benutzername %q", ErrInvalid, u.User.Username())
 		}
 	}
 
 	host, port := u.Hostname(), u.Port()
 	if !reGitHost.MatchString(host) {
-		return "", fmt.Errorf("%w: hostname %q", errBadInput, host)
+		return "", fmt.Errorf("%w: hostname %q", ErrInvalid, host)
 	}
 	if port != "" && !regexp.MustCompile(`^[0-9]{1,5}$`).MatchString(port) {
-		return "", fmt.Errorf("%w: port %q", errBadInput, port)
+		return "", fmt.Errorf("%w: port %q", ErrInvalid, port)
 	}
-	pfad, err := cleanGitPath(u.Path)
+	pfad, err := cleanPath(u.Path)
 	if err != nil {
 		return "", err
 	}
@@ -135,51 +151,51 @@ func normalizeGitScheme(s string) (string, error) {
 	return out + "/" + pfad, nil
 }
 
-// normalizeGitSCP behandelt die Kurzform git@host:pfad.
-func normalizeGitSCP(s string) (string, error) {
+// normalizeSCP behandelt die Kurzform git@host:pfad.
+func normalizeSCP(s string) (string, error) {
 	user, rest, ok := strings.Cut(s, "@")
 	if !ok {
 		return "", fmt.Errorf("%w: die adresse braucht ein schema (https:// oder ssh://) "+
-			"oder die form benutzer@host:pfad", errBadInput)
+			"oder die form benutzer@host:pfad", ErrInvalid)
 	}
 	host, pfad, ok := strings.Cut(rest, ":")
 	if !ok {
-		return "", fmt.Errorf("%w: nach dem host fehlt der doppelpunkt mit dem pfad", errBadInput)
+		return "", fmt.Errorf("%w: nach dem host fehlt der doppelpunkt mit dem pfad", ErrInvalid)
 	}
 	if !reGitUser.MatchString(user) {
-		return "", fmt.Errorf("%w: benutzername %q", errBadInput, user)
+		return "", fmt.Errorf("%w: benutzername %q", ErrInvalid, user)
 	}
 	if !reGitHost.MatchString(host) {
-		return "", fmt.Errorf("%w: hostname %q", errBadInput, host)
+		return "", fmt.Errorf("%w: hostname %q", ErrInvalid, host)
 	}
-	clean, err := cleanGitPath(pfad)
+	clean, err := cleanPath(pfad)
 	if err != nil {
 		return "", err
 	}
 	return user + "@" + host + ":" + clean, nil
 }
 
-// cleanGitPath prüft den Pfadteil und nimmt führende Schrägstriche weg.
-func cleanGitPath(p string) (string, error) {
+// cleanPath prüft den Pfadteil und nimmt führende Schrägstriche weg.
+func cleanPath(p string) (string, error) {
 	p = strings.TrimPrefix(p, "/")
 	if p == "" {
-		return "", fmt.Errorf("%w: in der adresse fehlt der pfad zum repository", errBadInput)
+		return "", fmt.Errorf("%w: in der adresse fehlt der pfad zum repository", ErrInvalid)
 	}
 	if strings.Contains(p, "..") {
-		return "", fmt.Errorf("%w: der pfad darf kein .. enthalten", errBadInput)
+		return "", fmt.Errorf("%w: der pfad darf kein .. enthalten", ErrInvalid)
 	}
 	if !reGitPath.MatchString(p) {
-		return "", fmt.Errorf("%w: pfad %q", errBadInput, p)
+		return "", fmt.Errorf("%w: pfad %q", ErrInvalid, p)
 	}
 	return p, nil
 }
 
-// ValidGitRef prüft einen Branch- oder Tagnamen.
+// ValidRef prüft einen Branch- oder Tagnamen.
 //
 // Der Name wird ein Argument von `git checkout`. Ein führender Bindestrich wäre
 // dort eine Option; die übrigen Regeln sind die von git selbst
 // (git-check-ref-format), soweit sie hier zählen.
-func ValidGitRef(ref string) bool {
+func ValidRef(ref string) bool {
 	switch {
 	case !reGitRef.MatchString(ref):
 		return false
@@ -191,4 +207,38 @@ func ValidGitRef(ref string) bool {
 		return false
 	}
 	return true
+}
+
+// Steps ist die Liste der Buildschritte: Namen, keine Kommandozeilen.
+//
+// Der Unterschied ist die ganze Sicherheit daran. Eine Kommandozeile vom Kunden
+// müsste jemand zerlegen, und wer zerlegt, landet früher oder später bei einer
+// Shell. Ein Name schlägt hier eine feste Argumentliste nach, oder er wird
+// abgelehnt.
+//
+// Das erste Element jeder Liste ist ein Schlüssel aus der Binary-Whitelist des
+// Agents; dass es ihn dort wirklich gibt, hält ein Test im Agent fest.
+var Steps = map[string][]string{
+	"npm-ci":           {"npm", "ci"},
+	"npm-install":      {"npm", "install"},
+	"npm-build":        {"npm", "run", "build"},
+	"npm-prod":         {"npm", "ci", "--omit=dev"},
+	"composer-install": {"composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"},
+}
+
+// ValidStep sagt, ob ein Name für einen Buildschritt steht.
+func ValidStep(name string) bool {
+	_, ok := Steps[name]
+	return ok
+}
+
+// StepNames sind die möglichen Buildschritte, sortiert. Für die Oberfläche:
+// sie soll die Namen anbieten, nicht ein Textfeld.
+func StepNames() []string {
+	out := make([]string, 0, len(Steps))
+	for name := range Steps {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }

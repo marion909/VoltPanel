@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/gitspec"
 )
 
 func deployCall(t *testing.T, srv *Server, op Op, params any) error {
@@ -98,7 +100,7 @@ func TestDeployPruefungenGreifenVorDemKlon(t *testing.T) {
 // zerlegen, und wer zerlegt, landet früher oder später bei einer Shell. Ein
 // Name schlägt eine feste Argumentliste nach — oder er wird abgelehnt.
 func TestBuildschritteSindNamen(t *testing.T) {
-	for name, cmd := range deploySteps {
+	for name, cmd := range gitspec.Steps {
 		if len(cmd) == 0 {
 			t.Errorf("%s hat kein kommando", name)
 			continue
@@ -114,7 +116,7 @@ func TestBuildschritteSindNamen(t *testing.T) {
 	}
 	// Und was nicht in der Liste steht, gibt es nicht.
 	for _, fremd := range []string{"", "sh", "npm", "npm ci", "NPM-CI", "npm-ci; id"} {
-		if _, ok := deploySteps[fremd]; ok {
+		if gitspec.ValidStep(fremd) {
 			t.Errorf("%q steht in der Liste der Buildschritte", fremd)
 		}
 	}

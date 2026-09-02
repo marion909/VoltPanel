@@ -145,6 +145,12 @@ func (s *Server) tenantDomainRoot(next echo.HandlerFunc) echo.HandlerFunc {
 		if r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefix+"/") {
 			return next(c)
 		}
+		// Der Webhook liegt bewusst außerhalb des Zugriffspfads — auch auf
+		// einer Kundendomain. Ihm den Pfad voranzustellen hieße, ihn dort
+		// unerreichbar zu machen.
+		if strings.HasPrefix(r.URL.Path, "/hooks/") {
+			return next(c)
+		}
 		t := s.loginTenant(c)
 		if t == nil {
 			return next(c)

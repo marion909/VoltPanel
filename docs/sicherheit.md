@@ -579,6 +579,72 @@ schreibbarer Pfad das Verzeichnis der Site.
 V8 braucht schreibbaren und ausführbaren Speicher, und mit der Sperre startet
 keine Node-Anwendung. Eine Härtung, die das Ziel nicht laufen lässt, ist keine.
 
+## 4q. Git-Deploy
+
+**Risiko 1 — die Repository-Adresse.** Sie kommt vom Kunden und wird ein
+Argument von `git`. git legt sie selbst noch einmal aus, und mehrere Formen tun
+dabei etwas anderes als „irgendwo etwas herunterladen":
+
+| Eingabe | Was git daraus macht |
+|---|---|
+| `ext::sh -c whoami` | führt das Kommando aus — der ext-Transport ist so gemeint |
+| `--upload-pack=/bin/sh` | wird als Option gelesen und ruft das Programm auf |
+| `ssh://-oProxyCommand=…/x` | der Hostname beginnt mit `-` und wird von ssh als Option gelesen (CVE-2017-1000117) |
+| `file:///etc` | kein Angriff, aber ein Weg, jedes Verzeichnis des Servers in ein Kundenverzeichnis zu kopieren |
+
+**Maßnahme:** Die Adresse wird nicht gefiltert, sondern zerlegt und neu
+zusammengesetzt. Was herauskommt, besteht nur aus geprüften Teilen. Erlaubt sind
+drei Formen — `https://`, `ssh://` und `git@host:pfad` —, mehr kommt bei keinem
+Hoster vor. Der Hostname muss mit einem Buchstaben oder einer Ziffer beginnen;
+diese eine Zeile schließt CVE-2017-1000117.
+
+Dieselbe Prüfung im Store und im Agent, aus einem Paket (`internal/gitspec`).
+Eine zweite, nachgebaute Prüfung wäre die Stelle, an der beide auseinanderlaufen.
+
+**Risiko 2 — die Buildschritte.** Ein Build ist fremder Code. Eine
+Kommandozeile vom Kunden müsste jemand zerlegen, und wer zerlegt, landet früher
+oder später bei einer Shell.
+
+**Maßnahme:** Buildschritte sind Namen, keine Kommandozeilen. `npm-ci` schlägt
+eine feste Argumentliste nach, oder es wird abgelehnt. Klon und Build laufen
+unter der Kennung des Site-Benutzers; als root wäre der fremde Code ein
+Rootzugang, den sich der Kunde selbst mitbringt.
+
+`GIT_SSH_COMMAND` ist die eine Stelle im ganzen Projekt, an der ein Wert später
+doch von einer Shell gelesen wird — git übergibt ihn an `sh -c`. Dort steht
+ausschließlich Text aus dem Quelltext und ein Pfad, den der Agent selbst aus dem
+geprüften Namen gebildet hat.
+
+**Risiko 3 — der Webhook.** Er ist von außen erreichbar, ohne Sitzung und ohne
+CSRF-Token, und er löst einen Build aus.
+
+**Maßnahmen:** Zwei Ausweise. Die Adresse ist zufällig (16 Byte aus
+`crypto/rand`) — ratbar wäre sie eine Liste aller Sites des Servers. Und über
+den Rumpf muss eine gültige Signatur kommen: HMAC-SHA256, verglichen in
+konstanter Zeit. Ohne Signatur wird nichts angenommen; die Adresse allein steht
+in den Einstellungen eines fremden Dienstes und in jedem Proxy-Log dazwischen.
+
+Die Antwort auf jeden Fehlerfall ist dieselbe — 404, ohne Unterschied zwischen
+„diese Adresse gibt es nicht" und „die Signatur passt nicht". Sonst wäre der
+Endpunkt ein Weg, gültige Hook-Adressen durch Ausprobieren zu finden.
+
+Der Branch aus dem Rumpf muss der eingestellte sein. Ohne das überschriebe jeder
+Push auf einen Feature-Branch die Produktion.
+
+Der Endpunkt liegt **außerhalb** des Zugriffspfads. Nicht aus Bequemlichkeit:
+seine Adresse landet in den Einstellungen eines fremden Dienstes, und der
+Zugriffspfad des Betreibers hat dort nichts verloren. Eine IP-Whitelist am Panel
+sperrt ihn dagegen mit aus, und das bleibt so — ein Loch in die Whitelist für
+einen Endpunkt ohne Sitzung wäre genau die Ausnahme, wegen der die Whitelist
+danach nichts mehr wert ist.
+
+**Und ein Symlink als Umschalter.** Ein Deploy, der in das laufende Verzeichnis
+schreibt, hat zwischen „halb kopiert" und „fertig" einen Zustand, in dem die
+Site kaputt ist. Aufgeräumt wird nur, was diesem Code selbst gehört: ein
+Verzeichnis unter `releases/`, das nicht auf das Zeitmuster passt, bleibt
+stehen, und der gerade gültige Stand in jedem Fall — nach einem Rollback ist der
+neueste nicht der benutzte.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

@@ -5,6 +5,7 @@ import Login from './views/Login.vue'
 import Dashboard from './views/Dashboard.vue'
 import Sites from './views/Sites.vue'
 import Apps from './views/Apps.vue'
+import Deploys from './views/Deploys.vue'
 import SiteDetail from './views/SiteDetail.vue'
 import Databases from './views/Databases.vue'
 import SQL from './views/SQL.vue'
@@ -23,6 +24,7 @@ const routes = [
   { path: '/sites', name: 'sites', component: Sites },
   { path: '/sites/:id', name: 'site-detail', component: SiteDetail },
   { path: '/apps', name: 'apps', component: Apps },
+  { path: '/deploys', name: 'deploys', component: Deploys },
   { path: '/databases', name: 'databases', component: Databases },
   { path: '/sql', name: 'sql', component: SQL },
   { path: '/files', name: 'files', component: Files },

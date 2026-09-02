@@ -35,6 +35,7 @@ type Server struct {
 	ftp       *core.FTPService
 	cron      *core.CronService
 	apps      *core.AppService
+	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
 	backups   *core.BackupService
@@ -87,6 +88,7 @@ func New(opts Options) (*Server, error) {
 		// Fünf Fehlversuche je Minute und IP. Der Zähler in der users-Tabelle
 		// sperrt zusätzlich das Konto; dieser hier bremst schon davor.
 		apps:      core.NewAppService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
+		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
 	}
@@ -271,6 +273,16 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/cronjobs/:id", s.handleDeleteCronjob)
 	auth.GET("/cronjobs/:id/log", s.handleCronjobLog)
 
+	// Git-Deploy. Der Webhook steht weiter unten, außerhalb dieser Gruppe.
+	auth.GET("/deploys", s.handleListDeploys)
+	auth.GET("/deploys/steps", s.handleDeploySteps)
+	auth.POST("/deploys", s.handleConfigureDeploy)
+	auth.POST("/deploys/:id/run", s.handleRunDeploy)
+	auth.GET("/deploys/:id/releases", s.handleDeployReleases)
+	auth.POST("/deploys/:id/rollback", s.handleDeployRollback)
+	auth.GET("/deploys/:id/key", s.handleDeployKey)
+	auth.DELETE("/deploys/:id", s.handleDeleteDeploy)
+
 	// Apps: eine Anwendung ist eine systemd-Unit plus Reverse-Proxy.
 	auth.GET("/apps", s.handleListApps)
 	auth.GET("/apps/runtimes", s.handleAppRuntimes)
@@ -300,6 +312,14 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/users/:id", s.handleDeleteUser, s.requireRole(store.RoleReseller))
 
 	auth.GET("/audit", s.handleAudit)
+
+	// Der Webhook liegt außerhalb des Zugriffspfads und außerhalb der
+	// Sitzungsprüfung. Sein Ausweis ist die Signatur über den Rumpf.
+	//
+	// Außerhalb des Pfads, weil seine Adresse in den Einstellungen eines
+	// fremden Dienstes landet — GitHub kennt den Zugriffspfad des Betreibers
+	// nicht und soll ihn auch nicht erfahren.
+	s.echo.POST("/hooks/deploy/:hook", s.handleDeployHook)
 
 	s.mountFrontend(root)
 }

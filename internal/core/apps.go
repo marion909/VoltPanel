@@ -152,6 +152,14 @@ func (s *AppService) DeleteApp(ctx context.Context, sc store.Scope, id int64) er
 	return s.store.DeleteApp(ctx, sc, app.ID)
 }
 
+// applyForSite ist apply unter einem Namen, den auch der Deploy-Dienst ruft:
+// nach einem neuen Stand muss die Unit neu geschrieben und gestartet werden,
+// sonst liefe weiter der alte Code aus dem alten Verzeichnis.
+func (s *AppService) applyForSite(ctx context.Context, sc store.Scope, site *store.Site,
+	app *store.App) error {
+	return s.apply(ctx, sc, site, app)
+}
+
 // apply schreibt Unit und Vhost. Beides oder nichts.
 func (s *AppService) apply(ctx context.Context, sc store.Scope, site *store.Site,
 	app *store.App) error {
@@ -191,12 +199,29 @@ func (s *AppService) apply(ctx context.Context, sc store.Scope, site *store.Site
 	_, err = s.agent.WriteApp(ctx, agent.AppParams{
 		Name:       app.Name,
 		SystemUser: site.SystemUser,
-		WorkingDir: site.RootPath,
+		WorkingDir: s.workingDir(ctx, site),
 		Runtime:    app.Runtime,
 		Args:       app.Args,
 		Env:        env,
 	})
 	return err
+}
+
+// workingDir ist das Verzeichnis, in dem die App läuft.
+//
+// Gibt es einen Deploy, ist es der gültige Stand — <root>/current. Sonst die
+// Wurzel der Site selbst, wie bei einer App, deren Code über FTP hochgeladen
+// wird.
+//
+// Der Unterschied ist nicht kosmetisch: zeigte die Unit auf die Wurzel, liefe
+// nach einem Deploy weiter der alte Code, denn dort liegt er noch. Und der
+// Symlink wird beim Start aufgelöst, deshalb schreibt der Deploy die Unit
+// danach neu.
+func (s *AppService) workingDir(ctx context.Context, site *store.Site) string {
+	if _, err := s.store.DeployForSite(ctx, store.SystemScope(), site.ID); err == nil {
+		return site.RootPath + "/current"
+	}
+	return site.RootPath
 }
 
 // ListApps liefert die Apps eines Mandanten samt Zustand vom Agent.
