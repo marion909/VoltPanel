@@ -264,6 +264,13 @@ Steht bereits:
   umgeschlüsselt — der Schlüssel des Quellservers wäre auf dem Zielserver
   unlesbar, und im Klartext wäre das Bündel eine Datei mit allen Passwörtern
   des Mandanten.
+- `volt tenant import` stellt den Mandanten auch auf dem Server her, nicht
+  nur in der Datenbank: Linux-Benutzer, Vhost, FPM-Pool, Cron-Dateien,
+  FTP-Zugänge und Units entstehen im selben Lauf. Vorher stand dort ein
+  Hinweis, man möge `volt site rebuild --all` nachschieben — und ein Hinweis
+  ist kein Zustand. Was dabei nicht gelingt, steht als Warnung am Ende und
+  bricht den Import nicht ab: die Daten liegen dann schon, und ein Abbruch
+  ließe einen halben Mandanten zurück.
 - Firewall und Fail2ban in der Oberfläche: ufw-Regeln setzen und entfernen,
   Jails und gesperrte Adressen ansehen, eine Sperre aufheben. Die Regel kommt
   in Teilen über die Leitung, nicht als Text — es gibt kein Feld für eine
@@ -287,10 +294,6 @@ Offen:
   nur ein Proxy, der die aufgelöste Adresse prüft.
 - Port-Scan-Schutz. Die Firewall-Oberfläche steht (siehe oben), aber ein
   Scan von außen fällt nirgends auf.
-- Ein Restore, der die Systemressourcen gleich mit anlegt. `volt tenant import`
-  spielt Zeilen, Dateien und Datenbanken ein; Linux-Benutzer, Vhost und
-  FPM-Pool entstehen erst mit `volt site rebuild` je Site. Das steht auch am
-  Ende des Imports, aber ein Schritt weniger wäre besser.
 - Doku-Site und Changelog
 - Closed Beta mit zwei bis drei fremden Nutzern, erst danach öffentlich
 

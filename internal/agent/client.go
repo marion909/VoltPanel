@@ -57,6 +57,15 @@ func (c *Client) closeLocked() error {
 // Anfrage im Panel scheitern lassen. Wiederholt wird nur der Transportfehler;
 // eine vom Agent abgelehnte Operation kommt unverändert zurück.
 func (c *Client) Call(ctx context.Context, op Op, params any, out any) error {
+	// Ein nicht vorhandener Agent ist ein Zustand, keine Katastrophe: im Test
+	// steht dort bewusst nil, und im laufenden Panel liefe ein Aufruf ohne
+	// Verbindung sonst in einen Nil-Zugriff — der nähme in einer Goroutine den
+	// ganzen Prozess mit. Eine Fehlermeldung sagt dasselbe und lässt das Panel
+	// stehen.
+	if c == nil {
+		return fmt.Errorf("%s: kein agent verbunden", op)
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

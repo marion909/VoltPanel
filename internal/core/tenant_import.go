@@ -32,8 +32,12 @@ type ImportResult struct {
 	TenantID int64  `json:"tenant_id"`
 	Slug     string `json:"slug"`
 
-	Sites     int `json:"sites"`
-	Users     int `json:"users"`
+	Sites int `json:"sites"`
+	Users int `json:"users"`
+	// Rebuilt sind die Sites, die auf diesem Server auch wirklich stehen —
+	// mit Benutzer, Vhost und Pool. Sie kann kleiner sein als Sites; dann
+	// steht daneben, was schiefging.
+	Rebuilt   int `json:"rebuilt"`
 	Databases int `json:"databases"`
 	Cronjobs  int `json:"cronjobs"`
 	Apps      int `json:"apps"`
@@ -95,7 +99,136 @@ func (s *ExportService) ImportTenant(ctx context.Context, path, passphrase strin
 	s.unpackFiles(ctx, path, bundle, m, res)
 	s.restoreDatabases(ctx, path, bundle, res)
 
+	// Und zuletzt der Server selbst.
+	s.applySystem(ctx, res)
+
 	return res, nil
+}
+
+// applySystem legt an, was auf diesem Server noch fehlt.
+//
+// Bis hierher stand der Mandant nur in der Datenbank und auf der Platte: die
+// Zeilen sind da, die Dateien sind da, die Datenbanken laufen. Was fehlte,
+// war alles, was der Server selbst führt — Linux-Benutzer, Vhost, FPM-Pool,
+// Cron-Dateien, FTP-Zugänge, Units. Dafür stand am Ende des Imports ein
+// Hinweis, man möge `volt site rebuild --all` laufen lassen.
+//
+// Ein Hinweis ist kein Zustand. Wer ihn übersieht, hat einen Mandanten, der
+// in der Oberfläche vollständig aussieht und dessen Websites 502 liefern —
+// und der Zusammenhang zum Import ist dann längst nicht mehr sichtbar. Also
+// macht der Import es selbst.
+//
+// Fehler brechen nichts ab. Zeilen, Dateien und Datenbanken liegen schon; ein
+// Abbruch hier ließe einen halb eingespielten Mandanten zurück, und das wäre
+// schlechter als einer, bei dem eine Site nachgebaut werden muss. Was nicht
+// ging, steht in den Warnungen — ein Import, der still weniger herstellt als
+// er soll, ist schlimmer als einer, der es sagt.
+func (s *ExportService) applySystem(ctx context.Context, res *ImportResult) {
+	// Im Scope des eingespielten Mandanten, nicht im Systemscope: dieselbe
+	// Regel wie überall sonst, und sie beantwortet hier auch die Frage, was
+	// überhaupt dazugehört.
+	sc := store.Scope{TenantID: res.TenantID, Role: store.RoleOwner}
+
+	sites, err := s.store.ListSites(ctx, sc)
+	if err != nil {
+		res.Warnings = append(res.Warnings, "sites nachbauen: "+err.Error())
+		return
+	}
+
+	siteSvc := NewSiteService(s.store, s.agent, s.cfg)
+	nachSite := make(map[int64]*store.Site, len(sites))
+	for _, site := range sites {
+		nachSite[site.ID] = site
+		// Der Benutzer, die Rechte, der Vhost und der FPM-Pool — alles, was
+		// `volt site rebuild` herstellt, und zwar über denselben Weg. Ein
+		// zweiter, hier nachgebauter Ablauf wäre die Stelle, an der Import
+		// und Rebuild verschiedene Ergebnisse liefern.
+		if err := siteSvc.Rebuild(ctx, sc, site.ID); err != nil {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("%s nachbauen: %v — `volt site rebuild %s` wiederholt es",
+					site.Domain, err, site.Domain))
+			continue
+		}
+		res.Rebuilt++
+	}
+
+	s.applyCronjobs(ctx, sc, res)
+	s.applyFTP(ctx, sc, nachSite, res)
+	s.applyApps(ctx, sc, nachSite, res)
+}
+
+// applyCronjobs schreibt die Dateien in /etc/cron.d.
+func (s *ExportService) applyCronjobs(ctx context.Context, sc store.Scope, res *ImportResult) {
+	jobs, err := s.store.ListCronjobs(ctx, sc)
+	if err != nil {
+		res.Warnings = append(res.Warnings, "cronjobs: "+err.Error())
+		return
+	}
+	cron := NewCronService(s.store, s.agent, s.cfg)
+	for _, job := range jobs {
+		if err := cron.apply(ctx, job); err != nil {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("cronjob %s: %v — er steht in der Datenbank, läuft aber nicht",
+					job.Name, err))
+		}
+	}
+}
+
+// applyFTP legt die virtuellen Zugänge wieder an.
+//
+// Das Passwort steht verschlüsselt in der Zeile, mit dem Schlüssel *dieses*
+// Servers — der Import hat es beim Einspielen umgeschlüsselt. Pure-FTPd
+// braucht es im Klartext, also einmal aufschließen. Wer diese Zeile liest und
+// stutzt: das ist genau der Grund, warum das Bündel eine Passphrase hat.
+func (s *ExportService) applyFTP(ctx context.Context, sc store.Scope,
+	sites map[int64]*store.Site, res *ImportResult) {
+
+	ftp := NewFTPService(s.store, s.agent, s.cfg, s.secrets)
+	for siteID, site := range sites {
+		accounts, err := s.store.ListFTPAccounts(ctx, sc, siteID)
+		if err != nil {
+			res.Warnings = append(res.Warnings, "ftp-zugänge: "+err.Error())
+			continue
+		}
+		for _, a := range accounts {
+			passwort, err := s.secrets.Decrypt(a.PasswordEnc)
+			if err != nil {
+				res.Warnings = append(res.Warnings,
+					fmt.Sprintf("ftp-zugang %s: das passwort lässt sich nicht lesen (%v) — "+
+						"im Panel ein neues setzen", a.Username, err))
+				continue
+			}
+			if err := ftp.apply(ctx, sc, a, site.SystemUser, passwort); err != nil {
+				res.Warnings = append(res.Warnings,
+					fmt.Sprintf("ftp-zugang %s: %v", a.Username, err))
+			}
+		}
+	}
+}
+
+// applyApps schreibt die Units und richtet den Vhost auf sie.
+func (s *ExportService) applyApps(ctx context.Context, sc store.Scope,
+	sites map[int64]*store.Site, res *ImportResult) {
+
+	apps, err := s.store.ListApps(ctx, sc)
+	if err != nil {
+		res.Warnings = append(res.Warnings, "apps: "+err.Error())
+		return
+	}
+	svc := NewAppService(s.store, s.agent, s.cfg, s.secrets)
+	for _, app := range apps {
+		site, ok := sites[app.SiteID]
+		if !ok {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("app %s: die zugehörige site fehlt", app.Name))
+			continue
+		}
+		if err := svc.apply(ctx, sc, site, app); err != nil {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("app %s: %v — sie steht in der Datenbank, läuft aber nicht",
+					app.Name, err))
+		}
+	}
 }
 
 // idMap hält fest, welche Nummer aus dem Bündel welcher auf diesem Server

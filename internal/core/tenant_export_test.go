@@ -356,3 +356,63 @@ func schluessel(m map[string]string) []string {
 	}
 	return out
 }
+
+// Nach dem Import steht der Mandant auch auf dem Server, nicht nur in der
+// Datenbank.
+//
+// Vorher endete der Import mit einem Hinweis, man möge `volt site rebuild
+// --all` laufen lassen. Ein Hinweis ist kein Zustand: wer ihn übersieht, hat
+// einen Mandanten, der in der Oberfläche vollständig aussieht und dessen
+// Websites 502 liefern — und der Zusammenhang zum Import ist dann längst
+// nicht mehr sichtbar.
+//
+// Geprüft wird deshalb, dass der Import es überhaupt versucht, und zwar für
+// jede Site. Ob es gelingt, hängt am Server: `useradd` und `nginx -t` gibt es
+// auf einem Entwicklungsrechner nicht. Der Test verlangt daher entweder den
+// Erfolg oder eine Warnung, die die Domain nennt — was er nicht durchgehen
+// lässt, ist stillschweigend gar nichts zu tun.
+func TestImportStelltDieSiteAufDemServerHer(t *testing.T) {
+	quelle := newTestEnv(t)
+	alice := seedExportTenant(t, quelle, "alice")
+	res, err := exportService(quelle).ExportTenant(t.Context(), store.SystemScope(),
+		alice.ID, "eine-lange-passphrase")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mit echtem Agent, nicht mit dem nil aus exportService(): geprüft wird
+	// hier gerade der Weg zum Server.
+	ziel := newTestEnv(t)
+	svc := NewExportService(ziel.cfg, ziel.store, ziel.agent, ziel.secrets, nil)
+	imported, err := svc.ImportTenant(t.Context(), res.Path, "eine-lange-passphrase")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sites, err := ziel.store.ListSites(t.Context(),
+		store.Scope{TenantID: imported.TenantID, Role: store.RoleOwner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) == 0 {
+		t.Fatal("keine Site eingespielt")
+	}
+
+	for _, site := range sites {
+		if imported.Rebuilt == len(sites) {
+			continue // hergestellt, nichts weiter zu prüfen
+		}
+		genannt := false
+		for _, w := range imported.Warnings {
+			if strings.Contains(w, site.Domain) {
+				genannt = true
+				break
+			}
+		}
+		if !genannt {
+			t.Errorf("%s wurde weder hergestellt noch als Warnung genannt — "+
+				"der Import hat es gar nicht erst versucht. Warnungen: %v",
+				site.Domain, imported.Warnings)
+		}
+	}
+}
