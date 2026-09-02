@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/marion909/voltpanel/internal/dockerspec"
 )
 
 // Apps: eine Anwendung ist eine systemd-Unit plus Reverse-Proxy.
@@ -26,18 +28,50 @@ var (
 	reAppArg = regexp.MustCompile(`^[A-Za-z0-9_./:@=,+-]+$`)
 )
 
-const appCols = `id, tenant_id, site_id, name, runtime, args, port, env, enabled,
-	created_at, updated_at`
+const appCols = `id, tenant_id, site_id, name, kind, runtime, args, image, volumes,
+	memory_mb, cpus, container_port, port, env, enabled, created_at, updated_at`
+
+// AppKind sagt, was die App startet.
+type AppKind = string
+
+const (
+	// AppNative ist eine systemd-Unit auf dem Server.
+	AppNative AppKind = "native"
+	// AppDocker ist ein Container.
+	AppDocker AppKind = "docker"
+)
+
+// AppVolume ist ein Verzeichnis der Site, das im Container erscheint.
+type AppVolume struct {
+	// Source ist relativ zur Wurzel der Site.
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	ReadOnly bool   `json:"read_only"`
+}
 
 // App ist eine Anwendung hinter dem Reverse-Proxy einer Site.
 type App struct {
-	ID       int64    `json:"id"`
-	TenantID int64    `json:"tenant_id"`
-	SiteID   int64    `json:"site_id"`
-	Name     string   `json:"name"`
-	Runtime  string   `json:"runtime"`
-	Args     []string `json:"args"`
-	Port     int      `json:"port"`
+	ID       int64   `json:"id"`
+	TenantID int64   `json:"tenant_id"`
+	SiteID   int64   `json:"site_id"`
+	Name     string  `json:"name"`
+	Kind     AppKind `json:"kind"`
+
+	// Nur für kind="native".
+	Runtime string   `json:"runtime"`
+	Args    []string `json:"args"`
+
+	// Nur für kind="docker".
+	Image         string      `json:"image"`
+	Volumes       []AppVolume `json:"volumes"`
+	MemoryMB      int64       `json:"memory_mb"`
+	CPUs          string      `json:"cpus"`
+	ContainerPort int         `json:"container_port"`
+
+	// Port ist der Port auf 127.0.0.1, auf den der Vhost zeigt. Bei einer
+	// nativen App horcht der Prozess selbst darauf; bei einem Container
+	// veröffentlicht Docker ihn auf ContainerPort.
+	Port int `json:"port"`
 
 	// EnvEnc liegt verschlüsselt und wird nie serialisiert. Was hinterlegt ist,
 	// sagt EnvKeys — die Namen ohne die Werte.
@@ -127,11 +161,16 @@ func (s *Store) CreateApp(ctx context.Context, sc Scope, a *App) error {
 	if err != nil {
 		return err
 	}
+	vols, err := json.Marshal(a.Volumes)
+	if err != nil {
+		return err
+	}
 	res, err := tx.ExecContext(ctx, `
-		INSERT INTO apps (tenant_id, site_id, name, runtime, args, port, env, enabled,
-			created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.TenantID, a.SiteID, a.Name, a.Runtime, string(args), a.Port, a.EnvEnc,
+		INSERT INTO apps (tenant_id, site_id, name, kind, runtime, args, image, volumes,
+			memory_mb, cpus, container_port, port, env, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.TenantID, a.SiteID, a.Name, a.Kind, a.Runtime, string(args), a.Image, string(vols),
+		a.MemoryMB, a.CPUs, a.ContainerPort, a.Port, a.EnvEnc,
 		boolToInt(a.Enabled), a.CreatedAt, a.UpdatedAt)
 	if err != nil {
 		if isUnique(err) {
@@ -251,14 +290,20 @@ func (s *Store) UpdateApp(ctx context.Context, sc Scope, a *App) error {
 	if err != nil {
 		return err
 	}
+	vols, err := json.Marshal(a.Volumes)
+	if err != nil {
+		return err
+	}
 	a.UpdatedAt = now()
 
 	// tenant_id und site_id stehen bewusst nicht im SET: eine App wandert nicht
 	// zu einem anderen Mandanten, und der Port bliebe sonst beim alten.
 	res, err := s.db.ExecContext(ctx, `
-		UPDATE apps SET runtime = ?, args = ?, env = ?, enabled = ?, updated_at = ?
+		UPDATE apps SET kind = ?, runtime = ?, args = ?, image = ?, volumes = ?,
+			memory_mb = ?, cpus = ?, container_port = ?, env = ?, enabled = ?, updated_at = ?
 		WHERE id = ? AND tenant_id = ?`,
-		a.Runtime, string(args), a.EnvEnc, boolToInt(a.Enabled), a.UpdatedAt, a.ID, a.TenantID)
+		a.Kind, a.Runtime, string(args), a.Image, string(vols), a.MemoryMB, a.CPUs,
+		a.ContainerPort, a.EnvEnc, boolToInt(a.Enabled), a.UpdatedAt, a.ID, a.TenantID)
 	return affected(res, err)
 }
 
@@ -274,10 +319,11 @@ func (s *Store) DeleteApp(ctx context.Context, sc Scope, id int64) error {
 
 func scanApp(sc scanner) (*App, error) {
 	var a App
-	var args string
+	var args, vols string
 	var enabled int
-	err := sc.Scan(&a.ID, &a.TenantID, &a.SiteID, &a.Name, &a.Runtime, &args,
-		&a.Port, &a.EnvEnc, &enabled, &a.CreatedAt, &a.UpdatedAt)
+	err := sc.Scan(&a.ID, &a.TenantID, &a.SiteID, &a.Name, &a.Kind, &a.Runtime, &args,
+		&a.Image, &vols, &a.MemoryMB, &a.CPUs, &a.ContainerPort, &a.Port, &a.EnvEnc,
+		&enabled, &a.CreatedAt, &a.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -285,9 +331,12 @@ func scanApp(sc scanner) (*App, error) {
 		return nil, err
 	}
 	a.Enabled = enabled != 0
+	// Eine kaputte Zeile darf nicht die ganze Liste unlesbar machen.
 	if err := json.Unmarshal([]byte(args), &a.Args); err != nil {
-		// Eine kaputte Zeile darf nicht die ganze Liste unlesbar machen.
 		a.Args = nil
+	}
+	if err := json.Unmarshal([]byte(vols), &a.Volumes); err != nil {
+		a.Volumes = nil
 	}
 	return &a, nil
 }
@@ -304,6 +353,23 @@ func validateApp(a *App) error {
 	if !reAppName.MatchString(a.Name) {
 		return fmt.Errorf("app-name %q ist ungültig", a.Name)
 	}
+	if a.Kind == "" {
+		a.Kind = AppNative
+	}
+	if a.Port != 0 && (a.Port < appPortFrom || a.Port > appPortTo) {
+		return fmt.Errorf("der port muss zwischen %d und %d liegen", appPortFrom, appPortTo)
+	}
+
+	switch a.Kind {
+	case AppNative:
+		return validateNativeApp(a)
+	case AppDocker:
+		return validateDockerApp(a)
+	}
+	return fmt.Errorf("%q ist keine bekannte art einer app", a.Kind)
+}
+
+func validateNativeApp(a *App) error {
 	if !validAppRuntime(a.Runtime) {
 		return fmt.Errorf("laufzeitumgebung %q ist unbekannt", a.Runtime)
 	}
@@ -316,8 +382,33 @@ func validateApp(a *App) error {
 				"nicht sicher stehen können", arg)
 		}
 	}
-	if a.Port != 0 && (a.Port < appPortFrom || a.Port > appPortTo) {
-		return fmt.Errorf("der port muss zwischen %d und %d liegen", appPortFrom, appPortTo)
+	return nil
+}
+
+// validateDockerApp prüft mit denselben Funktionen, die der Agent anwendet.
+//
+// Dieselben, nicht ähnliche: eine nachgebaute Prüfung wäre die Stelle, an der
+// die beiden auseinanderlaufen.
+func validateDockerApp(a *App) error {
+	if err := dockerspec.ValidImage(a.Image); err != nil {
+		return err
+	}
+	if a.ContainerPort < 1 || a.ContainerPort > 65535 {
+		return errors.New("der port im container muss zwischen 1 und 65535 liegen")
+	}
+	if a.MemoryMB < 0 || a.MemoryMB > 262144 {
+		return errors.New("die speichergrenze ist unbrauchbar")
+	}
+	if a.CPUs != "" && !dockerspec.ValidCPUs(a.CPUs) {
+		return fmt.Errorf("%q ist keine cpu-angabe", a.CPUs)
+	}
+	if len(a.Volumes) > 20 {
+		return errors.New("höchstens 20 volumes")
+	}
+	for _, v := range a.Volumes {
+		if err := dockerspec.CheckVolume(v.Source, v.Target); err != nil {
+			return err
+		}
 	}
 	return nil
 }

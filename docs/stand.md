@@ -152,6 +152,12 @@ Ehrliche Liste dessen, was läuft und was nicht. Die Phasennummern folgen
   Unit-Name vom Panel vergeben. Die App läuft als Systembenutzer ihrer Site in
   einer eng gefassten Unit; die Umgebung liegt verschlüsselt in der Datenbank
   und auf dem Server in einer Datei mit 0640, nicht in der Unit.
+- Eine App läuft wahlweise als systemd-Unit oder als Container. Beide belegen
+  denselben Port, beide bekommen den Vhost auf sich gerichtet; der Unterschied
+  ist eine Spalte, nicht eine zweite Hälfte des Panels. Der Container läuft
+  unter der Kennung der Site, ohne jede Capability, mit Speicher- und
+  CPU-Grenze und nur auf 127.0.0.1 erreichbar. Es gibt kein Eingabefeld für
+  einen docker-Schalter — die Kommandozeile baut der Agent.
 - Git-Deploy je Site: Deploy-Key, Branch-Auswahl, Buildschritte aus einer
   festen Liste, Releases-Verzeichnis mit Symlink-Wechsel und Rollback per
   Klick. Der Webhook-Endpunkt liegt außerhalb des Zugriffspfads und weist sich
@@ -164,18 +170,19 @@ Phase 0 bis 2 und Phase 4 sind damit abgeschlossen.
 
 **Phase 5 — Docker, Node.js, Git-Deploy**
 
-- Docker: Container, Images, Volumes, Netzwerke, Logs, Stats, Exec
-- Compose-Projekte anlegen und starten, Ports automatisch auf den Nginx-Proxy
-  legen
+- Compose-Projekte. Bewusst offen: eine Compose-Datei kommt aus dem Repository
+  des Kunden, und in ihr stünden genau die Schalter wieder, die im Panel nicht
+  vorgesehen sind.
+- `docker exec`. Ebenfalls bewusst: für eine Shell gibt es das Terminal der
+  Site, das unter derselben Kennung läuft und über dieselbe Whitelist.
+- Eigene Netzwerke und benannte Volumes. Bisher nur Bind-Mounts aus dem
+  Verzeichnis der Site — mehr braucht keine der Anwendungen, um die es hier
+  geht.
 - Node.js: Versionen über fnm. Die App selbst steht (oben unter „Fertig"), die
   Versionsverwaltung nicht — genommen wird, was auf dem Server liegt.
 
-App und Git-Deploy stehen (oben unter „Fertig"). Was fehlt, ist Docker —
-und das ist keine Fleißarbeit: ein Container mit `--privileged` oder einem
-Bind-Mount auf `/` hebt jede Isolation auf, die dieses Panel aufbaut. Die
-Operationen müssen also nicht nur „Container starten" können, sondern
-vorgeben, was ein Container darf. `docker` steht immerhin schon auf der
-Dienst-Whitelist des Agents.
+App, Container und Git-Deploy stehen (oben unter „Fertig"). Offen bleibt, was
+aus gutem Grund offen bleibt — siehe die Begründungen oben.
 
 Die Versionsverwaltung für Node über fnm fehlt ebenfalls. Genommen wird, was
 unter `/usr/bin` oder `/usr/local/bin` liegt; das Panel sagt, welche Fassung

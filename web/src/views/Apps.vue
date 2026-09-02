@@ -11,7 +11,20 @@ const busy = ref(false)
 const error = ref('')
 
 const showForm = ref(false)
-const form = ref({ site_id: null, runtime: 'node', argsText: 'server.js' })
+const form = ref({
+  site_id: null,
+  kind: 'native',
+  runtime: 'node',
+  argsText: 'server.js',
+  image: '',
+  container_port: 8080,
+  memory_mb: 0,
+  cpus: '',
+})
+// Der Zustand von Docker. Nur Administratoren bekommen ihn — für alle anderen
+// bleibt er null, und die Warnung darüber steht dann eben nicht da.
+const docker = ref(null)
+const logs = ref({})
 
 // Die Umgebung wird je App bearbeitet. Die Werte kommen nie zurück — das Panel
 // gibt sie nach dem Speichern nicht mehr heraus —, deshalb ist das Feld immer
@@ -42,16 +55,20 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [appList, siteList, runtimeList] = await Promise.all([
+    const [appList, siteList, runtimeList, dockerState] = await Promise.all([
       api.get('/apps'),
       api.get('/sites'),
       // Ohne laufenden Agent gibt es keine Auskunft über Laufzeitumgebungen.
       // Die Liste der Apps soll deswegen nicht leer bleiben.
       api.get('/apps/runtimes').catch(() => []),
+      // Scheitert für alle außer Administratoren an der Rolle, und das ist in
+      // Ordnung.
+      api.get('/apps/docker').catch(() => null),
     ])
     apps.value = appList
     sites.value = siteList
     runtimes.value = runtimeList
+    docker.value = dockerState
   } catch (err) {
     error.value = err.message
   } finally {
@@ -82,13 +99,12 @@ async function createApp() {
   busy.value = true
   error.value = ''
   try {
-    await api.post('/apps', {
-      site_id: Number(form.value.site_id),
-      runtime: form.value.runtime,
-      args: argsFromText(form.value.argsText),
-    })
+    await api.post('/apps', appPayload())
     showForm.value = false
-    form.value = { site_id: null, runtime: 'node', argsText: 'server.js' }
+    form.value = {
+      site_id: null, kind: 'native', runtime: 'node', argsText: 'server.js',
+      image: '', container_port: 8080, memory_mb: 0, cpus: '',
+    }
     await load()
   } catch (err) {
     error.value = err.message
@@ -97,13 +113,36 @@ async function createApp() {
   }
 }
 
+// appPayload baut, was der Server erwartet — je nach Art andere Felder.
+// Die Felder der jeweils anderen Art gehen mit, aber leer: der Server
+// entscheidet an "kind", welche er ansieht.
+function appPayload() {
+  const f = form.value
+  return {
+    site_id: Number(f.site_id),
+    kind: f.kind,
+    runtime: f.runtime,
+    args: argsFromText(f.argsText),
+    image: f.image,
+    container_port: Number(f.container_port) || 0,
+    memory_mb: Number(f.memory_mb) || 0,
+    cpus: f.cpus,
+  }
+}
+
 async function saveApp(app, patch) {
   busy.value = true
   error.value = ''
   try {
     await api.patch(`/apps/${app.id}`, {
+      kind: app.kind,
       runtime: app.runtime,
       args: app.args || [],
+      image: app.image,
+      volumes: app.volumes || [],
+      memory_mb: app.memory_mb,
+      cpus: app.cpus,
+      container_port: app.container_port,
       enabled: app.enabled,
       ...patch,
     })
@@ -132,6 +171,19 @@ async function removeApp(app) {
     error.value = err.message
   } finally {
     busy.value = false
+  }
+}
+
+async function logsLaden(app) {
+  if (logs.value[app.id] !== undefined) {
+    logs.value = { ...logs.value, [app.id]: undefined }
+    return
+  }
+  try {
+    const res = await api.get(`/apps/${app.id}/logs?lines=200`)
+    logs.value = { ...logs.value, [app.id]: res.log || t('apps.logsEmpty') }
+  } catch (err) {
+    error.value = err.message
   }
 }
 
@@ -181,6 +233,23 @@ onMounted(load)
       {{ t('apps.noRuntime') }}
     </p>
 
+    <!--
+      Die Trennung, auf die es bei Containern ankommt, ist eine Einstellung des
+      Docker-Daemons. Sie lässt sich nicht je Container nachholen, deshalb steht
+      hier ein Hinweis und keine Schaltfläche.
+    -->
+    <p
+      v-for="w in (docker && docker.warnings) || []"
+      :key="w"
+      class="mb-4 rounded-md px-3 py-2 text-[12px]"
+      :style="{
+        background: 'color-mix(in srgb, var(--status-warning) 14%, var(--surface-card))',
+        color: 'var(--ink-secondary)',
+      }"
+    >
+      {{ w }}
+    </p>
+
     <form
       v-if="showForm"
       class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-3"
@@ -203,30 +272,82 @@ onMounted(load)
 
       <label class="block">
         <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
-          {{ t('apps.runtime') }}
+          {{ t('apps.kind') }}
         </span>
-        <select
-          v-model="form.runtime"
-          class="w-full rounded-md border px-3 py-2 text-[13px]"
-          :style="inputStyle"
-        >
-          <option v-for="r in runtimes" :key="r.name" :value="r.name">
-            {{ r.name }}{{ r.version ? ' ' + r.version : '' }}
-          </option>
+        <select v-model="form.kind" class="w-full rounded-md border px-3 py-2 text-[13px]"
+                :style="inputStyle">
+          <option value="native">{{ t('apps.kindNative') }}</option>
+          <option value="docker">{{ t('apps.kindDocker') }}</option>
         </select>
       </label>
 
-      <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
-          {{ t('apps.args') }}
-        </span>
-        <input
-          v-model="form.argsText"
-          placeholder="server.js"
-          class="w-full rounded-md border px-3 py-2 text-[13px]"
-          :style="inputStyle"
-        />
-      </label>
+      <template v-if="form.kind === 'native'">
+        <label class="block">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.runtime') }}
+          </span>
+          <select
+            v-model="form.runtime"
+            class="w-full rounded-md border px-3 py-2 text-[13px]"
+            :style="inputStyle"
+          >
+            <option v-for="r in runtimes" :key="r.name" :value="r.name">
+              {{ r.name }}{{ r.version ? ' ' + r.version : '' }}
+            </option>
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.args') }}
+          </span>
+          <input
+            v-model="form.argsText"
+            placeholder="server.js"
+            class="w-full rounded-md border px-3 py-2 text-[13px]"
+            :style="inputStyle"
+          />
+        </label>
+      </template>
+
+      <template v-else>
+        <label class="block sm:col-span-2">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.image') }}
+          </span>
+          <input v-model="form.image" required placeholder="nginx:1.27-alpine"
+                 class="w-full rounded-md border px-3 py-2 font-mono text-[12px]"
+                 :style="inputStyle" />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.containerPort') }}
+          </span>
+          <input v-model.number="form.container_port" type="number" min="1" max="65535"
+                 class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.memory') }}
+          </span>
+          <input v-model.number="form.memory_mb" type="number" min="0"
+                 class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            {{ t('apps.cpus') }}
+          </span>
+          <input v-model="form.cpus" placeholder="0.5"
+                 class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+        </label>
+
+        <p class="text-[11px] sm:col-span-3" :style="{ color: 'var(--ink-muted)' }">
+          {{ t('apps.containerNote') }}
+        </p>
+      </template>
 
       <div class="sm:col-span-3">
         <button
@@ -272,8 +393,9 @@ onMounted(load)
               {{ app.unit }} &middot; 127.0.0.1:{{ app.port }}
             </div>
           </div>
-          <span class="shrink-0 text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
-            {{ app.runtime }} {{ (app.args || []).join(' ') }}
+          <span class="shrink-0 font-mono text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <template v-if="app.kind === 'docker'">{{ app.image }}</template>
+            <template v-else>{{ app.runtime }} {{ (app.args || []).join(' ') }}</template>
           </span>
         </header>
 
@@ -314,7 +436,13 @@ onMounted(load)
           </button>
         </div>
 
-        <footer class="mt-3 flex gap-3 text-[11px]">
+        <pre
+          v-if="logs[app.id] !== undefined"
+          class="mt-2 max-h-64 overflow-auto rounded-md p-2 font-mono text-[11px]"
+          :style="{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }"
+        >{{ logs[app.id] }}</pre>
+
+        <footer class="mt-3 flex flex-wrap gap-3 text-[11px]">
           <button
             class="underline"
             :style="{ color: 'var(--ink-secondary)' }"
@@ -322,6 +450,14 @@ onMounted(load)
             @click="envOpen[app.id] = !envOpen[app.id]"
           >
             {{ t('apps.editEnv') }}
+          </button>
+          <button
+            v-if="app.kind === 'docker'"
+            class="underline"
+            :style="{ color: 'var(--ink-secondary)' }"
+            @click="logsLaden(app)"
+          >
+            {{ t('apps.logs') }}
           </button>
           <button
             class="underline"

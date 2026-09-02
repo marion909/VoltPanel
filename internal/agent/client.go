@@ -564,6 +564,58 @@ func (c *Client) AppRuntimes(ctx context.Context) ([]RuntimeInfo, error) {
 	return res, err
 }
 
+// --- Docker -----------------------------------------------------------------
+
+// DockerStatusOf sagt, ob Docker läuft und wie sicher es steht.
+func (c *Client) DockerStatusOf(ctx context.Context) (*DockerStatus, error) {
+	var res DockerStatus
+	err := c.Call(ctx, OpDockerStatus, nil, &res)
+	return &res, err
+}
+
+// WriteContainerEnv legt die Umgebungsdatei an, bevor der Container startet.
+func (c *Client) WriteContainerEnv(ctx context.Context, p ContainerParams) error {
+	var res TextResult
+	return c.Call(ctx, OpDockerEnv, p, &res)
+}
+
+// RunContainer legt den Container an und startet ihn. Ein gleichnamiger wird
+// vorher entfernt — die Operation ist damit wiederholbar.
+func (c *Client) RunContainer(ctx context.Context, p ContainerParams) (*ContainerResult, error) {
+	var res ContainerResult
+	err := c.Call(ctx, OpDockerRun, p, &res)
+	return &res, err
+}
+
+// ContainerAction hält an, startet, startet neu oder entfernt.
+func (c *Client) ContainerAction(ctx context.Context, name, action string) error {
+	var res TextResult
+	return c.Call(ctx, OpDockerAction, map[string]string{
+		"name": name, "action": action,
+	}, &res)
+}
+
+// Containers listet ausschließlich die Container dieses Panels.
+func (c *Client) Containers(ctx context.Context) ([]ContainerResult, error) {
+	var res []ContainerResult
+	err := c.Call(ctx, OpDockerList, nil, &res)
+	return res, err
+}
+
+// ContainerLogs liefert die letzten Zeilen.
+func (c *Client) ContainerLogs(ctx context.Context, name string, lines int) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpDockerLogs, ContainerNameParams{Name: name, Lines: lines}, &res)
+	return res.Text, err
+}
+
+// PullImage holt ein Image.
+func (c *Client) PullImage(ctx context.Context, image string) (string, error) {
+	var res TextResult
+	err := c.Call(ctx, OpDockerPull, map[string]string{"image": image}, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

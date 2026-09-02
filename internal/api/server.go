@@ -286,6 +286,9 @@ func (s *Server) setupRoutes() {
 	// Apps: eine Anwendung ist eine systemd-Unit plus Reverse-Proxy.
 	auth.GET("/apps", s.handleListApps)
 	auth.GET("/apps/runtimes", s.handleAppRuntimes)
+	auth.GET("/apps/docker", s.handleDockerStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/apps/pull", s.handlePullImage)
+	auth.GET("/apps/:id/logs", s.handleAppLogs)
 	auth.POST("/apps", s.handleCreateApp)
 	auth.PATCH("/apps/:id", s.handleUpdateApp)
 	auth.DELETE("/apps/:id", s.handleDeleteApp)

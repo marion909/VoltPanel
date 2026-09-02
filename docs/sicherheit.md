@@ -645,6 +645,67 @@ Verzeichnis unter `releases/`, das nicht auf das Zeitmuster passt, bleibt
 stehen, und der gerade gültige Stand in jedem Fall — nach einem Rollback ist der
 neueste nicht der benutzte.
 
+## 4r. Container
+
+**Risiko:** Ein Container ist kein Sandkasten, sondern ein Prozess mit anderen
+Namensräumen. Eine Handvoll Schalter hebt jede Trennung auf, die dieses Panel
+aufbaut:
+
+| Schalter | Was er bedeutet |
+|---|---|
+| `--privileged` | alle Capabilities, alle Geräte — Root auf dem Wirt |
+| `-v /:/host` | das Dateisystem des Servers im Container |
+| `-v /var/run/docker.sock` | der Weg, einen zweiten Container mit `--privileged` zu starten |
+| `--pid=host` | die Prozesse des Wirts, samt `/proc/1/root` |
+| `--net=host` | alles, was auf 127.0.0.1 horcht — die Datenbank des Servers etwa |
+| `--cap-add SYS_ADMIN` | reicht allein für einen Ausbruch |
+| `--user 0` | Root im Container, und bei einem Bind-Mount auch Root auf den Dateien des Wirts |
+
+**Maßnahme — und sie ist eine andere als sonst:** Es gibt hier keine
+Schalterliste, die geprüft würde. Der Aufrufer beschreibt, *was* er will; die
+Kommandozeile baut der Agent. In `ContainerParams` gibt es kein Feld für
+Capabilities, keines für den Netzmodus, keines für ein Gerät, keines für den
+Benutzer im Container und keines für ein Kommando hinter dem Image. Was nicht
+vorgesehen ist, lässt sich nicht anfordern — auch nicht mit einem findigen Wert.
+
+Jeder Aufruf trägt dieselben Schranken, fest im Quelltext:
+
+- `--user <uid>:<gid>` der Site. Ohne Benutzernamensraum-Abbildung im Daemon ist
+  Root im Container dieselbe Kennung wie Root auf dem Server; ein Bind-Mount
+  reicht dann, um dessen Dateien zu übernehmen. Das schließt Images aus, die als
+  Root starten müssen — der Preis ist herum richtig bezahlt.
+- `--cap-drop ALL` und `--security-opt no-new-privileges`.
+- `--pids-limit 512`: eine Fork-Bombe im Container nimmt den Server nicht mit.
+- `--network bridge` und `--publish 127.0.0.1:<port>:<port>`. Der Weg von außen
+  führt über den Vhost, wo TLS, Zugriffsregeln und Protokollierung schon stehen.
+- Volumes nur mit einer Quelle **relativ** zur Wurzel der Site. Der klassische
+  Ausbruch — den Docker-Socket des Wirts hineinreichen — ist damit nicht bloß
+  verboten, sondern unaussprechbar: die Quelle kann den Wirt gar nicht benennen.
+- Kein Kommando hinter dem Image. Das wäre die Stelle, an der ein Container doch
+  wieder Code ausführt, den nicht der Image-Autor bestimmt hat.
+
+Der Image-Name wird zerlegt wie Docker ihn liest — der Doppelpunkt trennt in
+`registry.example.at:5000/x/y` einen Port und in `nginx:1.27` einen Tag. Ein
+Ausdruck, der beides in einem Muster versucht, wird entweder zu großzügig oder
+lehnt gültige Namen ab.
+
+Der Container-Name trägt das feste Präfix `volt-`, das der Agent selbst setzt.
+Ohne das wäre „meinen Container anhalten" ein Weg, jeden Container des Servers
+anzuhalten — auch den, in dem jemand anderes seine Datenbank betreibt. Die Liste
+zeigt nur Container mit dem Label des Panels *und* diesem Präfix.
+
+**Was der Agent nicht tut:** an `/etc/docker/daemon.json` schreiben. Die
+Trennung, auf die es wirklich ankommt (`userns-remap`), ist eine Einstellung des
+Daemons und lässt sich nicht je Container nachholen; sie nachträglich zu setzen
+und den Daemon neu zu starten nähme jedem laufenden Container die Grundlage. Das
+Panel sagt stattdessen, ob sie gesetzt ist, und was fehlt.
+
+**Nicht umgesetzt, mit Absicht:** `docker exec` und Compose. Exec ist eine Shell
+in einen Prozess, den der Kunde mitgebracht hat — für eine Shell gibt es das
+Terminal der Site, das unter derselben Kennung läuft und über dieselbe
+Whitelist. Compose nähme eine Datei aus dem Repository des Kunden entgegen, und
+in ihr stünden genau die Schalter wieder, die hier nicht vorgesehen sind.
+
 ## 5. Multi-Tenant-Lecks (IDOR)
 
 **Risiko:** Ein Kunde liest über eine geratene ID die Daten eines anderen.

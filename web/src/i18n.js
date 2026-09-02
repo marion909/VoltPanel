@@ -5,6 +5,16 @@ import { reactive, computed } from 'vue'
 const messages = {
   de: {
     'nav.apps': 'Apps',
+    'apps.kind': 'Art',
+    'apps.kindNative': 'Dienst auf dem Server',
+    'apps.kindDocker': 'Container',
+    'apps.image': 'Image',
+    'apps.containerPort': 'Port im Container',
+    'apps.memory': 'Speicher (MB, 0 = unbegrenzt)',
+    'apps.cpus': 'CPUs (z. B. 0.5)',
+    'apps.containerNote': 'Der Container läuft unter der Kennung der Site, ohne jede Capability und nur auf 127.0.0.1 erreichbar. Images, die als root starten müssen, laufen damit nicht.',
+    'apps.logs': 'Logs',
+    'apps.logsEmpty': 'Noch keine Ausgabe.',
     'apps.title': 'Apps',
     'apps.subtitle': 'Eine App ist ein eigener Dienst hinter dem Reverse-Proxy ihrer Site.',
     'apps.new': 'Neue App',
@@ -448,6 +458,16 @@ const messages = {
 
   en: {
     'nav.apps': 'Apps',
+    'apps.kind': 'Kind',
+    'apps.kindNative': 'Service on the server',
+    'apps.kindDocker': 'Container',
+    'apps.image': 'Image',
+    'apps.containerPort': 'Port inside the container',
+    'apps.memory': 'Memory (MB, 0 = unlimited)',
+    'apps.cpus': 'CPUs (e.g. 0.5)',
+    'apps.containerNote': 'The container runs under the site\u2019s own account, with no capabilities, reachable only on 127.0.0.1. Images that must start as root will not run.',
+    'apps.logs': 'Logs',
+    'apps.logsEmpty': 'No output yet.',
     'apps.title': 'Apps',
     'apps.subtitle': 'An app is its own service behind its site\u2019s reverse proxy.',
     'apps.new': 'New app',

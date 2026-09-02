@@ -69,6 +69,7 @@ var allowedBinaries = map[string]string{
 	// Fuer Git-Deploy. git holt den Stand, ssh-keygen erzeugt den Deploy-Key,
 	// composer und npm bauen. Alle Argumente kommen aus festen Listen oder
 	// gehen vorher durch NormalizeGitURL bzw. ValidGitRef.
+	"docker":     "/usr/bin/docker",
 	"git":        "/usr/bin/git",
 	"ssh-keygen": "/usr/bin/ssh-keygen",
 	"composer":   "/usr/bin/composer",

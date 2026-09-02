@@ -40,9 +40,20 @@ func NewAppService(st *store.Store, ag *agent.Client, cfg *config.Config,
 // AppInput ist, was von außen kommt. Name und Port stehen nicht darin: der Name
 // entsteht aus der Domain, den Port vergibt der Store.
 type AppInput struct {
-	SiteID  int64             `json:"site_id"`
-	Runtime string            `json:"runtime"`
-	Args    []string          `json:"args"`
+	SiteID int64         `json:"site_id"`
+	Kind   store.AppKind `json:"kind"`
+
+	// Für kind="native".
+	Runtime string   `json:"runtime"`
+	Args    []string `json:"args"`
+
+	// Für kind="docker".
+	Image         string            `json:"image"`
+	Volumes       []store.AppVolume `json:"volumes"`
+	MemoryMB      int64             `json:"memory_mb"`
+	CPUs          string            `json:"cpus"`
+	ContainerPort int               `json:"container_port"`
+
 	Env     map[string]string `json:"env"`
 	Enabled bool              `json:"enabled"`
 }
@@ -85,11 +96,10 @@ func (s *AppService) CreateApp(ctx context.Context, sc store.Scope, in AppInput)
 		TenantID: site.TenantID,
 		SiteID:   site.ID,
 		Name:     store.AppNameForDomain(site.Domain),
-		Runtime:  in.Runtime,
-		Args:     in.Args,
 		EnvEnc:   envEnc,
 		Enabled:  true,
 	}
+	applyInput(app, in)
 	if err := s.store.CreateApp(ctx, sc, app); err != nil {
 		return nil, err
 	}
@@ -101,6 +111,21 @@ func (s *AppService) CreateApp(ctx context.Context, sc store.Scope, in AppInput)
 		return nil, err
 	}
 	return app, nil
+}
+
+// applyInput überträgt, was von außen kommt — und nur das.
+//
+// Name, Port und Mandant stehen nicht darin: die entstehen im Panel, und sie
+// über ein Eingabefeld änderbar zu machen hieße, dem Kunden die Vergabe von
+// Ports und Unit-Namen zu überlassen.
+func applyInput(app *store.App, in AppInput) {
+	app.Kind = in.Kind
+	if app.Kind == "" {
+		app.Kind = store.AppNative
+	}
+	app.Runtime, app.Args = in.Runtime, in.Args
+	app.Image, app.Volumes = in.Image, in.Volumes
+	app.MemoryMB, app.CPUs, app.ContainerPort = in.MemoryMB, in.CPUs, in.ContainerPort
 }
 
 // UpdateApp ändert Laufzeit, Argumente oder Umgebung und schreibt neu.
@@ -120,7 +145,8 @@ func (s *AppService) UpdateApp(ctx context.Context, sc store.Scope, id int64,
 		return nil, err
 	}
 
-	app.Runtime, app.Args, app.Enabled = in.Runtime, in.Args, in.Enabled
+	applyInput(app, in)
+	app.Enabled = in.Enabled
 	if in.Env != nil {
 		if app.EnvEnc, err = s.encodeEnv(in.Env); err != nil {
 			return nil, err
@@ -146,7 +172,7 @@ func (s *AppService) DeleteApp(ctx context.Context, sc store.Scope, id int64) er
 	if err != nil {
 		return err
 	}
-	if err := s.agent.RemoveApp(ctx, app.Name); err != nil {
+	if err := s.entferne(ctx, app); err != nil {
 		return err
 	}
 	return s.store.DeleteApp(ctx, sc, app.ID)
@@ -178,16 +204,21 @@ func (s *AppService) apply(ctx context.Context, sc store.Scope, site *store.Site
 	}
 
 	if !app.Enabled {
-		// Abgeschaltet heißt: die Unit soll weg, nicht bloß gestoppt. Eine
-		// Unit, die dasteht und nicht laufen soll, käme beim nächsten Neustart
-		// des Servers von selbst wieder.
-		return s.agent.RemoveApp(ctx, app.Name)
+		// Abgeschaltet heißt: weg, nicht bloß gestoppt. Eine Unit oder ein
+		// Container, die dastehen und nicht laufen sollen, kämen beim nächsten
+		// Neustart des Servers von selbst wieder.
+		return s.entferne(ctx, app)
 	}
 
 	env, err := s.decodeEnv(app.EnvEnc)
 	if err != nil {
 		return err
 	}
+
+	if app.Kind == store.AppDocker {
+		return s.applyContainer(ctx, site, app, env)
+	}
+
 	// PORT gehört dazu, ohne dass jemand ihn einträgt: fast jede Node-Anwendung
 	// liest ihn, und wer ihn selbst setzen müsste, könnte ihn falsch setzen —
 	// dann horchte die App woanders als der Vhost hinsieht.
@@ -205,6 +236,49 @@ func (s *AppService) apply(ctx context.Context, sc store.Scope, site *store.Site
 		Env:        env,
 	})
 	return err
+}
+
+// applyContainer startet die App als Container.
+//
+// Die Umgebung zuerst: `docker run` liest die Datei beim Start, und wenn sie
+// dann noch nicht dasteht, startet der Container ohne sie — mit einer
+// Anwendung, die ihre Datenbank nicht findet und nicht sagt, warum.
+func (s *AppService) applyContainer(ctx context.Context, site *store.Site,
+	app *store.App, env map[string]string) error {
+
+	vols := make([]agent.ContainerVolume, 0, len(app.Volumes))
+	for _, v := range app.Volumes {
+		vols = append(vols, agent.ContainerVolume{
+			Source: v.Source, Target: v.Target, ReadOnly: v.ReadOnly,
+		})
+	}
+	p := agent.ContainerParams{
+		Name:       app.Name,
+		SystemUser: site.SystemUser,
+		RootPath:   site.RootPath,
+		Image:      app.Image,
+		Env:        env,
+		HostPort:   app.Port,
+		Port:       app.ContainerPort,
+		Volumes:    vols,
+		MemoryMB:   app.MemoryMB,
+		CPUs:       app.CPUs,
+	}
+	if len(env) > 0 {
+		if err := s.agent.WriteContainerEnv(ctx, p); err != nil {
+			return err
+		}
+	}
+	_, err := s.agent.RunContainer(ctx, p)
+	return err
+}
+
+// entferne räumt weg, was zu dieser App gehört — je nach Art.
+func (s *AppService) entferne(ctx context.Context, app *store.App) error {
+	if app.Kind == store.AppDocker {
+		return s.agent.ContainerAction(ctx, app.Name, "remove")
+	}
+	return s.agent.RemoveApp(ctx, app.Name)
 }
 
 // workingDir ist das Verzeichnis, in dem die App läuft.
@@ -246,12 +320,57 @@ func (s *AppService) ListApps(ctx context.Context, sc store.Scope) ([]AppView, e
 		// Ein Agent, der gerade nicht antwortet, darf die Liste nicht leeren:
 		// dann steht eben "läuft nicht" da, und das ist ehrlicher als ein
 		// Fehler statt der ganzen Übersicht.
-		if st, err := s.agent.AppStatus(ctx, app.Name); err == nil {
-			view.Active = st.Active
-		}
+		view.Active = s.laeuft(ctx, app)
 		out = append(out, view)
 	}
 	return out, nil
+}
+
+// laeuft fragt den Agent, ob die App wirklich läuft.
+//
+// Ein Agent, der gerade nicht antwortet, ergibt "läuft nicht". Das ist
+// ehrlicher als ein Fehler statt der ganzen Übersicht — und in der Sache
+// meistens richtig.
+func (s *AppService) laeuft(ctx context.Context, app *store.App) bool {
+	if app.Kind == store.AppDocker {
+		liste, err := s.agent.Containers(ctx)
+		if err != nil {
+			return false
+		}
+		for _, c := range liste {
+			if c.Name == "volt-"+app.Name {
+				return c.State == "running"
+			}
+		}
+		return false
+	}
+	st, err := s.agent.AppStatus(ctx, app.Name)
+	return err == nil && st.Active
+}
+
+// DockerStatus sagt, ob Docker läuft und wie sicher es steht.
+func (s *AppService) DockerStatus(ctx context.Context) (*agent.DockerStatus, error) {
+	return s.agent.DockerStatusOf(ctx)
+}
+
+// PullImage holt ein Image vorab. Getrennt vom Start, damit ein Tippfehler im
+// Image-Namen als solcher auffällt und nicht als Container, der nicht startet.
+func (s *AppService) PullImage(ctx context.Context, image string) (string, error) {
+	return s.agent.PullImage(ctx, image)
+}
+
+// ContainerLogs liefert die letzten Zeilen eines Containers.
+func (s *AppService) ContainerLogs(ctx context.Context, sc store.Scope, id int64,
+	lines int) (string, error) {
+
+	app, err := s.store.GetApp(ctx, sc, id)
+	if err != nil {
+		return "", err
+	}
+	if app.Kind != store.AppDocker {
+		return "", fmt.Errorf("%s läuft nicht als container", app.Name)
+	}
+	return s.agent.ContainerLogs(ctx, app.Name, lines)
 }
 
 // Runtimes sagt, welche Laufzeitumgebungen der Server hat.

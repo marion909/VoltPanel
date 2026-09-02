@@ -224,3 +224,73 @@ func TestUnitTauglicheArgumente(t *testing.T) {
 		}
 	}
 }
+
+// TestContainerAppWirdGeprueft: der Store prüft mit denselben Funktionen, die
+// der Agent unmittelbar vor dem docker-Aufruf anwendet. Dieselben, nicht
+// ähnliche — eine nachgebaute Prüfung ist die Stelle, an der die beiden
+// auseinanderlaufen.
+func TestContainerAppWirdGeprueft(t *testing.T) {
+	st := newTestStore(t)
+	ctx, sys := context.Background(), SystemScope()
+	site := seedAppSite(t, st, "eins")
+
+	basis := App{
+		TenantID: site.TenantID, SiteID: site.ID, Name: "eins",
+		Kind: AppDocker, Image: "nginx:1.27-alpine", ContainerPort: 8080,
+	}
+
+	// So geht es durch.
+	gut := basis
+	if err := st.CreateApp(ctx, sys, &gut); err != nil {
+		t.Fatalf("eine gültige Container-App wurde abgelehnt: %v", err)
+	}
+	if err := st.DeleteApp(ctx, sys, gut.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]func(*App){
+		"Image als Schalter":     func(a *App) { a.Image = "--privileged" },
+		"Image mit Leerzeichen":  func(a *App) { a.Image = "nginx --net=host" },
+		"kein Image":             func(a *App) { a.Image = "" },
+		"Port fehlt":             func(a *App) { a.ContainerPort = 0 },
+		"Port zu groß":           func(a *App) { a.ContainerPort = 70000 },
+		"CPU-Angabe mit Anhang":  func(a *App) { a.CPUs = "1 --privileged" },
+		"absolute Volume-Quelle": func(a *App) { a.Volumes = []AppVolume{{Source: "/etc", Target: "/x"}} },
+		"Volume aus der Wurzel":  func(a *App) { a.Volumes = []AppVolume{{Source: "..", Target: "/x"}} },
+		"proc überdecken":        func(a *App) { a.Volumes = []AppVolume{{Source: "x", Target: "/proc"}} },
+		"Doppelpunkt im Ziel":    func(a *App) { a.Volumes = []AppVolume{{Source: "x", Target: "/a:/b"}} },
+		"unbekannte Art":         func(a *App) { a.Kind = "podman" },
+	}
+	for name, kaputt := range cases {
+		a := basis
+		kaputt(&a)
+		if err := st.CreateApp(ctx, sys, &a); err == nil {
+			t.Errorf("%s wurde angenommen", name)
+			_ = st.DeleteApp(ctx, sys, a.ID)
+		}
+	}
+}
+
+// TestNativeAppBleibtDieVoreinstellung: die Spalte kind kam später dazu. Eine
+// Zeile ohne sie ist eine native App — sonst wären alle bestehenden Apps nach
+// der Migration von unbekannter Art.
+func TestNativeAppBleibtDieVoreinstellung(t *testing.T) {
+	st := newTestStore(t)
+	ctx, sys := context.Background(), SystemScope()
+	site := seedAppSite(t, st, "eins")
+
+	a := &App{TenantID: site.TenantID, SiteID: site.ID, Name: "eins", Runtime: "node"}
+	if err := st.CreateApp(ctx, sys, a); err != nil {
+		t.Fatal(err)
+	}
+	if a.Kind != AppNative {
+		t.Errorf("Art ist %q, erwartet %q", a.Kind, AppNative)
+	}
+	gelesen, err := st.GetApp(ctx, sys, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gelesen.Kind != AppNative {
+		t.Errorf("gelesen als %q", gelesen.Kind)
+	}
+}

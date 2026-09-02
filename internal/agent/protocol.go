@@ -119,6 +119,16 @@ const (
 	OpAppStatus   Op = "app.status"
 	OpAppRuntimes Op = "app.runtimes"
 
+	// Docker. Der Aufrufer beschreibt, was er will; die Kommandozeile baut
+	// der Agent. Es gibt kein Feld fuer einen Schalter.
+	OpDockerStatus Op = "docker.status"
+	OpDockerRun    Op = "docker.run"
+	OpDockerEnv    Op = "docker.env"
+	OpDockerAction Op = "docker.action"
+	OpDockerList   Op = "docker.list"
+	OpDockerLogs   Op = "docker.logs"
+	OpDockerPull   Op = "docker.pull"
+
 	// Git-Deploy: holen, bauen, umschalten. Der Umschalter ist ein Symlink.
 	OpDeployRun      Op = "deploy.run"
 	OpDeployKey      Op = "deploy.key"
