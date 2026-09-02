@@ -256,10 +256,11 @@ Steht bereits:
 Offen:
 
 - SSRF-Filterung für ausgehende Aufrufe. Für Backup-Ziele steht sie
-  (`internal/transfer`, eigener Dialer mit Adressprüfung); für die
-  Cloudflare-API ist der Host fest, und für Git-Quellen begrenzt die
-  Adressprüfung in `internal/gitspec` die Form, nicht das Ziel — eine Adresse
-  auf 169.254.169.254 ginge dort noch durch.
+  (`internal/transfer`, eigener Dialer mit Adressprüfung), für Git-Quellen
+  ebenfalls (Loopback und Link-Local abgewiesen, private Netze erlaubt), und
+  für die Cloudflare-API ist der Host fest. Was fehlt, ist die Auflösung von
+  Namen: ein Hostname, der auf 169.254.169.254 zeigt, geht durch. Dagegen hilft
+  nur ein Proxy, der die aufgelöste Adresse prüft.
 - Fail2ban-Anbindung und eine Oberfläche für die Firewall. Derzeit öffnet
   `install.sh` Ports in ufw, sofern ufw überhaupt läuft; bei nftables gibt es
   eine Warnung und sonst nichts. Port-Scan-Schutz fehlt ganz.
