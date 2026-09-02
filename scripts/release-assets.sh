@@ -135,20 +135,45 @@ NOTES_JSON="$(printf '%s' "$NOTES" | jq -Rs .)"
 # in `volt update` eine Pruefung gegen dieselbe Quelle: wer den Server
 # beherrscht, liefert ein anderes Binary *und* die passende Summe.
 #
-# Der private Schluessel steht in COSIGN_PRIVATE_KEY (als Secret im Workflow),
-# das Passwort in COSIGN_PASSWORD. Der oeffentliche gehoert nach
-# internal/release/release.pub — eingebettet, nicht heruntergeladen: ein
-# Schluessel von derselben Adresse wie die Datei, die er beglaubigen soll,
-# beglaubigt nichts.
-if [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
+# Zwei Wege, dasselbe Ergebnis: eine base64-kodierte ECDSA-Signatur im
+# DER-Format ueber den SHA-256 des Rumpfs.
+#
+#   COSIGN_PRIVATE_KEY  ein von cosign erzeugter Schluessel, dazu COSIGN_PASSWORD
+#   RELEASE_SIGNING_KEY ein blanker EC-Schluessel im PEM-Format, den openssl
+#                       erzeugt hat — ohne cosign, ohne Passphrase
+#
+# Der zweite Weg steht hier, weil der erste ein Werkzeug verlangt, das auf
+# keinem Rechner vorinstalliert ist und im Workflow erst geholt werden muss.
+# Fuer eine Signatur ueber eine Datei ist das viel Umstand: `openssl dgst`
+# erzeugt genau dasselbe, und geprueft wird ohnehin mit der Standardbibliothek
+# von Go, nicht mit cosign.
+#
+# Der oeffentliche Teil gehoert nach internal/release/release.pub — eingebettet,
+# nicht heruntergeladen: ein Schluessel von derselben Adresse wie die Datei, die
+# er beglaubigen soll, beglaubigt nichts.
+if [ -n "${RELEASE_SIGNING_KEY:-}" ]; then
+    command -v openssl >/dev/null 2>&1 || { echo "openssl fehlt." >&2; exit 1; }
+    KEYFILE="$(mktemp)"
+    trap 'rm -f "$KEYFILE"' EXIT
+    printf '%s\n' "$RELEASE_SIGNING_KEY" > "$KEYFILE"
+
+    # Ueber eine Zwischendatei und nicht ueber eine Pipe: der Rueckgabewert
+    # einer Pipe ist der des letzten Glieds, und ein gescheitertes Signieren
+    # ergaebe sonst eine leere, aber gueltig aussehende Signatur.
+    openssl dgst -sha256 -sign "$KEYFILE" -out "$OUT/latest.json.der" "$OUT/latest.json"
+    base64 < "$OUT/latest.json.der" | tr -d '\n' > "$OUT/latest.json.sig"
+    rm -f "$OUT/latest.json.der"
+    echo "latest.json signiert (openssl)."
+elif [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
     command -v cosign >/dev/null 2>&1 || { echo "cosign fehlt." >&2; exit 1; }
     cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
         --output-signature "$OUT/latest.json.sig" "$OUT/latest.json"
-    echo "latest.json signiert."
+    echo "latest.json signiert (cosign)."
 else
-    echo "WARNUNG: COSIGN_PRIVATE_KEY ist nicht gesetzt — latest.json bleibt" >&2
-    echo "         unsigniert. \`volt update\` lehnt diesen Kanal ab, solange" >&2
-    echo "         update_allow_unsigned nicht gesetzt ist. Siehe docs/release.md." >&2
+    echo "WARNUNG: weder RELEASE_SIGNING_KEY noch COSIGN_PRIVATE_KEY ist gesetzt —" >&2
+    echo "         latest.json bleibt unsigniert. \`volt update\` lehnt diesen Kanal" >&2
+    echo "         ab, solange update_allow_unsigned nicht gesetzt ist, und" >&2
+    echo "         install.sh bricht ab. Siehe docs/release.md." >&2
 fi
 
 echo

@@ -23,6 +23,31 @@ gar nichts.
 
 ### Einmalig einrichten
 
+Der kurze Weg, ohne zusätzliches Werkzeug — openssl liegt auf jedem Rechner,
+auf dem VoltPanel gebaut oder betrieben wird:
+
+```sh
+openssl ecparam -genkey -name prime256v1 -noout -out release.key
+openssl ec -in release.key -pubout -out internal/release/release.pub
+```
+
+Danach `release.key` als Repository-Secret `RELEASE_SIGNING_KEY` hinterlegen
+(der ganze Dateiinhalt, mit den BEGIN/END-Zeilen) — und die Datei selbst
+**nicht** einchecken. Wer sie hat, kann Updates für jede Installation
+ausliefern.
+
+Das war es. `internal/release/release.pub` wird beim nächsten Build eingebettet
+und beim Veröffentlichen in `install.sh` eingesetzt; `scripts/release-assets.sh`
+signiert `latest.json` mit dem privaten Teil.
+
+> Der Schlüssel liegt unverschlüsselt im Secret-Speicher. Das ist derselbe
+> Schutz, den auch `COSIGN_PASSWORD` hätte: wer den Secret-Speicher lesen kann,
+> liest beides. Eine Passphrase, die im Secret daneben steht, ist keine.
+
+#### Der cosign-Weg
+
+Wer cosign ohnehin benutzt, kann dabei bleiben:
+
 ```sh
 cosign generate-key-pair
 ```
@@ -51,6 +76,10 @@ Das ergibt `cosign.key` (verschlüsselt mit der eingegebenen Passphrase) und
    - `COSIGN_PRIVATE_KEY` — der Inhalt von `cosign.key`
    - `COSIGN_PASSWORD` — die Passphrase
 
+   Ist `RELEASE_SIGNING_KEY` gesetzt, hat es Vorrang; beide zugleich zu setzen
+   ergibt keinen Sinn, weil dann zwei verschiedene Schlüssel signieren würden
+   und nur einer eingebettet ist.
+
 3. `cosign.key` **nicht** einchecken. Wer sie hat, kann Updates für jede
    Installation ausliefern.
 
@@ -78,12 +107,27 @@ für den die Karte da ist.
 
 ### Was beim Release passiert
 
-`scripts/release-assets.sh` erzeugt `latest.json` und daneben
+`scripts/release-assets.sh` erzeugt `latest.json` und daneben die Signatur —
+mit `RELEASE_SIGNING_KEY`:
+
+```sh
+openssl dgst -sha256 -sign release.key -out latest.json.der latest.json
+base64 < latest.json.der | tr -d '\n' > latest.json.sig
+```
+
+oder mit cosign:
 
 ```sh
 cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
     --output-signature latest.json.sig latest.json
 ```
+
+Beides ergibt dasselbe: eine base64-kodierte ECDSA-Signatur im DER-Format über
+den SHA-256 des Rumpfs. Dass die beiden Seiten wirklich zusammenpassen, prüft
+`TestOpenSSLSignaturWirdAngenommen` in `internal/release` — mit denselben
+openssl-Aufrufen, die hier stehen. Eine falsche Behauptung an dieser Stelle
+hieße: der Kanal ist signiert, jedes Panel lehnt ihn ab, und niemand kann mehr
+aktualisieren.
 
 Beide Dateien hängen am Release. `volt update` holt sie, prüft die Signatur über
 den **Rumpf** der Datei — nicht über das Ergebnis des Parsens, denn wer erst

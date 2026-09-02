@@ -14,6 +14,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 ## Unveröffentlicht
 
 - Port-Scan-Erkennung: die abgewiesenen Pakete zählen
+- Changelog — und er wird zu dem, was vor dem Update dasteht
+- Signieren ohne cosign: `RELEASE_SIGNING_KEY` und zwei openssl-Zeilen
 
 ## v0.3.9 — 2026-09-02
 
