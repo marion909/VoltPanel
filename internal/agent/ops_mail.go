@@ -52,6 +52,8 @@ const (
 	vmailHome = "/var/vmail"
 	// opendkimDir ist das Verzeichnis, in dem OpenDKIM seine Tabellen sucht.
 	opendkimDir = "/etc/opendkim"
+	// dovecotConfD ist das Verzeichnis, aus dem Dovecot Ergaenzungen liest.
+	dovecotConfD = "/etc/dovecot/conf.d"
 )
 
 // MailboxParams ist ein Postfach, wie das Panel es beschreibt.
@@ -342,6 +344,21 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// mailCert sucht das Zertifikat, das Postfix und Dovecot benutzen sollen.
+//
+// Dasselbe wie beim Panel und bei FTP: die Pfade entstehen aus der
+// Konfiguration des Agents, nicht aus einer Anfrage. Gefunden wird das erste
+// lesbare Paar; gibt es keines, läuft Mail unverschlüsselt, und das steht
+// dann im Ergebnis.
+func (s *Server) mailCert() (cert, key string) {
+	for _, paar := range s.panelCertChain() {
+		if fileExists(paar.Cert) && fileExists(paar.Key) {
+			return paar.Cert, paar.Key
+		}
+	}
+	return "", ""
+}
+
 // maildirFuer bildet den Pfad eines Postfachs aus seiner Adresse.
 //
 // Zerlegt und neu gebaut, nicht durchgereicht: "domain/local" aus zwei
@@ -440,6 +457,98 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		}
 	}
 	schritte = append(schritte, "postfix zeigt auf "+postfixMailDir)
+
+	// TLS und SASL. Ohne beides nimmt der Server zwar Post an, aber niemand
+	// kann über ihn welche verschicken — und wer es doch tut, schickt sein
+	// Passwort im Klartext über das Netz.
+	cert, key := s.mailCert()
+	if cert != "" {
+		for _, e := range [][2]string{
+			{"smtpd_tls_cert_file", cert},
+			{"smtpd_tls_key_file", key},
+			{"smtpd_tls_security_level", "may"},
+			// Ausgehend ebenso: wenn die Gegenstelle TLS kann, wird es
+			// benutzt. "may" und nicht "encrypt", weil ein Server, der kein
+			// TLS kann, sonst gar keine Post mehr bekäme.
+			{"smtp_tls_security_level", "may"},
+			{"smtpd_tls_protocols", "!SSLv2,!SSLv3,!TLSv1,!TLSv1.1"},
+		} {
+			if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
+				return nil, opErr(OpMailSetup, "postconf %s: %s", e[0], truncate(out, 200))
+			}
+		}
+		schritte = append(schritte, "tls aus "+cert)
+	} else {
+		schritte = append(schritte, "kein zertifikat gefunden — smtp läuft unverschlüsselt")
+	}
+
+	// SASL über Dovecot: Postfix fragt dort, ob ein Absender sich ausweisen
+	// kann. Der Socket dafür steht in der Dovecot-Konfiguration weiter unten.
+	for _, e := range [][2]string{
+		{"smtpd_sasl_type", "dovecot"},
+		{"smtpd_sasl_path", "private/auth"},
+		{"smtpd_sasl_auth_enable", "yes"},
+		// Die Reihenfolge ist die Zeile, auf die es ankommt: erst die eigenen
+		// Netze, dann die ausgewiesenen Absender, dann ablehnen. Ohne das
+		// abschließende reject_unauth_destination ist der Server ein offenes
+		// Relay, und das merkt man daran, dass die IP auf jeder Sperrliste
+		// steht.
+		{"smtpd_relay_restrictions",
+			"permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination"},
+	} {
+		if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
+			return nil, opErr(OpMailSetup, "postconf %s: %s", e[0], truncate(out, 200))
+		}
+	}
+	schritte = append(schritte, "sasl über dovecot, relay nur für ausgewiesene absender")
+
+	// Der Einlieferungsport 587. Ohne ihn müsste ein Kunde über Port 25
+	// senden, den viele Anbieter für ausgehende Verbindungen sperren.
+	if out, err := run(ctx, shortTimeout, "postconf", "-M",
+		"submission/inet=submission inet n - y - - smtpd"); err != nil {
+		schritte = append(schritte, "port 587 nicht eingerichtet: "+truncate(out, 120))
+	} else {
+		for _, e := range []string{
+			"submission/inet/syslog_name=postfix/submission",
+			"submission/inet/smtpd_tls_security_level=encrypt",
+			"submission/inet/smtpd_sasl_auth_enable=yes",
+			"submission/inet/smtpd_relay_restrictions=permit_sasl_authenticated,reject",
+		} {
+			if out, err := run(ctx, shortTimeout, "postconf", "-P", e); err != nil {
+				return nil, opErr(OpMailSetup, "postconf -P %s: %s", e, truncate(out, 200))
+			}
+		}
+		schritte = append(schritte, "einlieferung auf 587, nur mit tls und ausweis")
+	}
+
+	// Und die Dovecot-Ergänzung: ohne sie kennt Dovecot die Passwortdatei
+	// nicht, die der Agent schreibt — die Postfächer stünden da und niemand
+	// käme herein.
+	if dirExists(dovecotConfD) {
+		conf, err := templates.RenderDovecotConf(templates.DovecotData{
+			GeneratedAt: templates.NowStamp(),
+			MailRoot:    vmailHome,
+			UsersFile:   filepath.Join(dovecotMailDir, "users"),
+			VMailUID:    uid,
+			VMailGID:    gid,
+			CertPath:    cert,
+			KeyPath:     key,
+		})
+		if err != nil {
+			return nil, opErr(OpMailSetup, "dovecot-konfiguration: %v", err)
+		}
+		pfad := filepath.Join(dovecotConfD, "99-volt.conf")
+		if err := writeFileAtomic(pfad, []byte(conf), 0o644); err != nil {
+			return nil, opErr(OpMailSetup, "%s schreiben: %v", pfad, err)
+		}
+		if out, err := run(ctx, shortTimeout, "systemctl", "reload", "dovecot"); err != nil {
+			schritte = append(schritte, "dovecot nicht neu geladen: "+truncate(out, 150))
+		} else {
+			schritte = append(schritte, "dovecot kennt die postfächer")
+		}
+	} else {
+		schritte = append(schritte, "dovecot fehlt — die postfächer sind nicht abrufbar")
+	}
 
 	// Der Milter nur, wenn OpenDKIM wirklich da ist. Sonst spräche Postfix mit
 	// einem Dienst, den es nicht gibt — milter_default_action=accept fängt das

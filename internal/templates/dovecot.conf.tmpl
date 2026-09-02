@@ -1,0 +1,57 @@
+# Von VoltPanel erzeugt — nicht von Hand bearbeiten.
+# Jede Änderung geht beim nächsten Schreiben verloren.
+# Erzeugt: {{ .GeneratedAt }}
+#
+# Diese Datei liegt in conf.d und ergänzt die Voreinstellungen von Dovecot.
+# Sie ersetzt sie nicht: was hier nicht steht, bleibt, wie das Paket es
+# ausliefert. Dieselbe Bauart wie bei den eigenen Nginx-Direktiven einer Site.
+
+protocols = imap
+
+# Die Postfächer liegen dort, wo die Passwortdatei es sagt: home ist
+# {{ .MailRoot }}/<domain>/<name>, und darin liegt das Maildir direkt.
+mail_location = maildir:~
+mail_uid = {{ .VMailUID }}
+mail_gid = {{ .VMailGID }}
+
+# Ohne diese beiden Zeilen lehnt Dovecot jeden Benutzer ab, dessen Kennung
+# unter first_valid_uid liegt — und der Standardwert liegt über der Kennung,
+# die für Maildirs üblich ist.
+first_valid_uid = {{ .VMailUID }}
+last_valid_uid = {{ .VMailUID }}
+
+# Benutzer und Passwörter kommen aus der Datei, die das Panel schreibt.
+# scheme=SSHA512 sagt Dovecot, wie das Feld zu lesen ist; ohne die Angabe
+# nimmt es das Feld für Klartext, und dann käme niemand mehr herein.
+passdb {
+  driver = passwd-file
+  args = scheme=SSHA512 username_format=%u {{ .UsersFile }}
+}
+
+userdb {
+  driver = passwd-file
+  args = username_format=%u {{ .UsersFile }}
+}
+
+{{ if .CertPath }}
+ssl = required
+ssl_cert = <{{ .CertPath }}
+ssl_key = <{{ .KeyPath }}
+# TLS 1.0 und 1.1 gelten als gebrochen. Wer einen Client hat, der nichts
+# Neueres kann, hat ein größeres Problem als seine Mail.
+ssl_min_protocol = TLSv1.2
+{{ else }}
+# Kein Zertifikat gefunden — Dovecot läuft dann mit dem selbstsignierten des
+# Pakets. Ein Mailprogramm meldet das, und das soll es auch.
+{{ end }}
+
+# Der Socket, über den Postfix fragt, ob ein Absender sich ausweisen kann.
+# Ohne ihn nimmt der Server Post an, aber niemand kann über ihn welche
+# verschicken.
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}

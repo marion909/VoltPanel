@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"sort"
@@ -235,6 +236,54 @@ func mapKopf(b *strings.Builder, erzeugt, was string) {
 
 // NowStamp ist der Zeitstempel im Kopf jeder erzeugten Datei.
 func NowStamp() string { return time.Now().Format(time.RFC3339) }
+
+// DovecotData ist das Eingabemodell der Dovecot-Konfiguration.
+type DovecotData struct {
+	GeneratedAt string
+	MailRoot    string
+	UsersFile   string
+	VMailUID    int
+	VMailGID    int
+	// CertPath und KeyPath dürfen leer sein. Dann läuft Dovecot mit dem
+	// selbstsignierten Zertifikat des Pakets — sichtbar für jeden, der ein
+	// Mailprogramm einrichtet, und das ist die richtige Auskunft.
+	CertPath string
+	KeyPath  string
+}
+
+// RenderDovecotConf erzeugt die Ergänzung in conf.d.
+//
+// Eine Ergänzung und keine ersetzte Hauptdatei: was hier nicht steht, bleibt,
+// wie das Paket es ausliefert. Eine vollständig erzeugte dovecot.conf wäre bei
+// jedem Distributionsupdate eine Entscheidung, die das Panel für den Betreiber
+// trifft.
+func RenderDovecotConf(d DovecotData) (string, error) {
+	switch {
+	case !strings.HasPrefix(d.MailRoot, "/") || strings.ContainsAny(d.MailRoot, " \n\t\r"):
+		return "", fmt.Errorf("%q ist kein zulässiges mailverzeichnis", d.MailRoot)
+	case !strings.HasPrefix(d.UsersFile, "/") || strings.ContainsAny(d.UsersFile, " \n\t\r"):
+		return "", fmt.Errorf("%q ist kein zulässiger pfad für die passwortdatei", d.UsersFile)
+	case d.VMailUID < 1000 || d.VMailGID < 1000:
+		return "", fmt.Errorf("die kennung für die maildirs ist zu niedrig (%d:%d)",
+			d.VMailUID, d.VMailGID)
+	}
+	for _, p := range []string{d.CertPath, d.KeyPath} {
+		if p != "" && (!strings.HasPrefix(p, "/") || strings.ContainsAny(p, " \n\t\r")) {
+			return "", fmt.Errorf("%q ist kein zulässiger pfad für ein zertifikat", p)
+		}
+	}
+	if (d.CertPath == "") != (d.KeyPath == "") {
+		// Eines von beiden allein ergibt eine Konfiguration, die Dovecot nicht
+		// startet — und dann kommt niemand mehr an seine Post.
+		return "", fmt.Errorf("zertifikat und schlüssel gehören zusammen")
+	}
+
+	var b bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&b, "dovecot.conf.tmpl", d); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
 
 // DKIMEntry ist ein Schlüssel, mit dem für eine Domäne unterschrieben wird.
 type DKIMEntry struct {

@@ -213,7 +213,11 @@ Docker-Stack, den das Panel nur verwaltet, wäre ein zweites Panel mit eigener
 Datenhaltung und eigener Vorstellung davon, wem was gehört.
 
 Es steht: Domänen, Postfächer, Weiterleitungen, Catch-All und DKIM in
-Datenbank, Dienst, API und Oberfläche. Der Agent schreibt daraus die Map-Dateien für
+Datenbank, Dienst, API und Oberfläche. Dazu die Konfiguration, ohne die das
+alles nur in Dateien stünde: Dovecot kennt die Passwortdatei des Panels,
+Postfix fragt Dovecot nach dem Ausweis eines Absenders, TLS kommt aus dem
+Zertifikat des Panels, und eingeliefert wird auf 587 — nur verschlüsselt und
+nur mit Ausweis. Der Agent schreibt daraus die Map-Dateien für
 Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
 nie. Ein gesperrter Mandant nimmt keine Post mehr an, ein Catch-All zeigt nur
 auf ein eigenes Postfach, und Postfächer zählen zum Paket.
@@ -225,7 +229,6 @@ Offen ist der Rest:
   Hand, wer die Domäne verwaltet.
 - Rspamd einrichten — bisher richtet `mail.setup` Postfix, den Mailspeicher und
   den OpenDKIM-Milter ein, aber keine Spamprüfung.
-- TLS für SMTP und IMAP aus den vorhandenen Zertifikaten.
 - Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
   sie noch nicht auf einem laufenden Server.
 - Webmail (Roundcube) als Plugin

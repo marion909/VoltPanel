@@ -153,3 +153,75 @@ func TestMaildirsGehoerenKeinemSystemkonto(t *testing.T) {
 		}
 	}
 }
+
+// Ohne diese Datei kennt Dovecot die Passwortdatei nicht, die das Panel
+// schreibt: die Postfächer stünden da, und niemand käme herein.
+func TestDovecotConfNenntDiePasswortdatei(t *testing.T) {
+	out, err := RenderDovecotConf(DovecotData{
+		GeneratedAt: "2026-09-02T12:00:00+02:00",
+		MailRoot:    "/var/vmail",
+		UsersFile:   "/etc/dovecot/volt/users",
+		VMailUID:    5000,
+		VMailGID:    5000,
+		CertPath:    "/var/lib/volt/certs/panel/fullchain.pem",
+		KeyPath:     "/var/lib/volt/certs/panel/privkey.pem",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, will := range []string{
+		"args = scheme=SSHA512 username_format=%u /etc/dovecot/volt/users",
+		"mail_uid = 5000",
+		"first_valid_uid = 5000",
+		"ssl_cert = </var/lib/volt/certs/panel/fullchain.pem",
+		"ssl_min_protocol = TLSv1.2",
+		"/var/spool/postfix/private/auth",
+	} {
+		if !strings.Contains(out, will) {
+			t.Errorf("%q fehlt:\n%s", will, out)
+		}
+	}
+
+	// scheme=SSHA512 ist die Zeile, die zählt: ohne sie liest Dovecot das
+	// Feld als Klartext, und dann kommt niemand mehr herein.
+	if !strings.Contains(out, "scheme=SSHA512") {
+		t.Error("ohne scheme= liest dovecot den hash als klartext")
+	}
+}
+
+// Ein Zertifikat ohne Schlüssel ergibt eine Konfiguration, mit der Dovecot
+// nicht startet — und dann kommt niemand mehr an seine Post.
+func TestDovecotConfLehntHalbesZertifikatAb(t *testing.T) {
+	basis := DovecotData{
+		GeneratedAt: "x", MailRoot: "/var/vmail",
+		UsersFile: "/etc/dovecot/volt/users", VMailUID: 5000, VMailGID: 5000,
+	}
+	nurCert := basis
+	nurCert.CertPath = "/a/fullchain.pem"
+	if _, err := RenderDovecotConf(nurCert); err == nil {
+		t.Error("ein zertifikat ohne schlüssel wurde angenommen")
+	}
+	nurKey := basis
+	nurKey.KeyPath = "/a/privkey.pem"
+	if _, err := RenderDovecotConf(nurKey); err == nil {
+		t.Error("ein schlüssel ohne zertifikat wurde angenommen")
+	}
+
+	// Gar keines ist in Ordnung — dann läuft Dovecot mit dem des Pakets.
+	out, err := RenderDovecotConf(basis)
+	if err != nil {
+		t.Fatalf("ohne zertifikat: %v", err)
+	}
+	if strings.Contains(out, "ssl_cert") {
+		t.Error("ohne zertifikat steht trotzdem ssl_cert in der datei")
+	}
+
+	// Und ein Pfad mit Zeilenumbruch schreibt die nächste Direktive.
+	kaputt := basis
+	kaputt.CertPath = "/a/fullchain.pem\nssl_key = </etc/shadow"
+	kaputt.KeyPath = "/a/privkey.pem"
+	if _, err := RenderDovecotConf(kaputt); err == nil {
+		t.Error("ein pfad mit umbruch wurde angenommen")
+	}
+}
