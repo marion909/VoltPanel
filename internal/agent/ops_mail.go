@@ -57,6 +57,9 @@ const (
 	opendkimDir = "/etc/opendkim"
 	// dovecotConfD ist das Verzeichnis, aus dem Dovecot Ergaenzungen liest.
 	dovecotConfD = "/etc/dovecot/conf.d"
+	// rspamdDir sagt, ob Rspamd installiert ist. Seine Regeln bringt es
+	// selbst mit; das Panel traegt es nur als zweiten Milter ein.
+	rspamdDir = "/etc/rspamd"
 )
 
 // MailboxParams ist ein Postfach, wie das Panel es beschreibt.
@@ -584,27 +587,37 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		schritte = append(schritte, "dovecot fehlt — die postfächer sind nicht abrufbar")
 	}
 
-	// Der Milter nur, wenn OpenDKIM wirklich da ist. Sonst spräche Postfix mit
-	// einem Dienst, den es nicht gibt — milter_default_action=accept fängt das
-	// zwar ab, aber jede Mail liefe erst in einen Zeitfehler.
+	// Die Milter — nur die, die wirklich dastehen. Postfix mit einem Dienst
+	// sprechen zu lassen, den es nicht gibt, kostet bei jeder Mail erst einen
+	// Zeitfehler; milter_default_action=accept fängt es ab, aber langsam.
+	var milter []string
 	if dirExists(opendkimDir) {
-		milter := [][2]string{
-			{"smtpd_milters", "inet:localhost:8891"},
-			{"non_smtpd_milters", "inet:localhost:8891"},
-			// Fällt der Milter aus, geht die Mail unsigniert raus statt gar
-			// nicht. Unsigniert ist ein Nachteil bei der Zustellung; nicht
-			// zugestellt ist ein Ausfall.
+		milter = append(milter, "inet:localhost:8891")
+		schritte = append(schritte, "opendkim als milter")
+	} else {
+		schritte = append(schritte, "opendkim fehlt — ohne dkim landet post häufiger im spam")
+	}
+	if dirExists(rspamdDir) {
+		// Rspamd hängt hinter OpenDKIM: erst unterschreiben, dann bewerten.
+		// Andersherum bewertete es eine Mail, die noch keine Unterschrift hat.
+		milter = append(milter, "inet:localhost:11332")
+		schritte = append(schritte, "rspamd als milter")
+	}
+	if len(milter) > 0 {
+		liste := strings.Join(milter, " ")
+		for _, e := range [][2]string{
+			{"smtpd_milters", liste},
+			{"non_smtpd_milters", liste},
+			// Fällt ein Milter aus, geht die Mail unsigniert und ungeprüft
+			// raus statt gar nicht. Unsigniert ist ein Nachteil bei der
+			// Zustellung; nicht zugestellt ist ein Ausfall.
 			{"milter_default_action", "accept"},
 			{"milter_protocol", "6"},
-		}
-		for _, e := range milter {
+		} {
 			if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
 				return nil, opErr(OpMailSetup, "postconf %s: %s", e[0], truncate(out, 200))
 			}
 		}
-		schritte = append(schritte, "opendkim als milter eingetragen")
-	} else {
-		schritte = append(schritte, "opendkim fehlt — ohne dkim landet post häufiger im spam")
 	}
 
 	// Leere Maps anlegen, damit Postfix beim Neuladen nicht über eine fehlende

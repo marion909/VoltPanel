@@ -191,6 +191,7 @@ func (s *Server) setupRoutes() {
 	auth.GET("/mail/status", s.handleMailStatus, s.requireRole(store.RoleAdmin))
 	auth.POST("/mail/setup", s.handleMailSetup, s.requireRole(store.RoleAdmin))
 	auth.GET("/mail/check", s.handleMailCheck)
+	auth.GET("/mail/settings", s.handleMailSettings)
 	auth.GET("/mail/domains", s.handleListMailDomains)
 	auth.POST("/mail/domains", s.handleCreateMailDomain)
 	auth.PATCH("/mail/domains/:id", s.handleUpdateMailDomain)

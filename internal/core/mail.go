@@ -418,6 +418,44 @@ func pruefePasswort(p string) error {
 	return nil
 }
 
+// MailSettings ist, was ein Kunde in sein Mailprogramm einträgt.
+//
+// Eine eigene Auskunft und nicht Teil des Zustandsberichts: den darf nur ein
+// Administrator sehen, diese hier braucht jeder, der ein Postfach hat. Ohne
+// sie steht ein Kunde vor einem angelegten Postfach und weiß nicht, wohin
+// damit — der häufigste Grund für eine Rückfrage, die es nicht bräuchte.
+type MailSettings struct {
+	Host string `json:"host"`
+	// IMAP über TLS, SMTP über STARTTLS auf der Einlieferung. Beides sind
+	// keine Einstellungen, sondern das, was mail.setup eingerichtet hat.
+	IMAPPort int    `json:"imap_port"`
+	IMAPEnc  string `json:"imap_encryption"`
+	SMTPPort int    `json:"smtp_port"`
+	SMTPEnc  string `json:"smtp_encryption"`
+	// Username sagt, was in das Feld gehört: die ganze Adresse, nicht der
+	// Teil davor.
+	Username string `json:"username"`
+}
+
+// Settings sagt, wie ein Mailprogramm sich verbindet.
+func (s *MailService) Settings(ctx context.Context) *MailSettings {
+	host := ""
+	if facts, err := s.agent.MailFactsOf(ctx); err == nil {
+		host = strings.TrimSpace(facts.Hostname)
+	}
+	if host == "" {
+		// Ohne Auskunft vom Server der Name des Panels: er zeigt hierher, und
+		// das Zertifikat gilt für ihn. Geraten wird nichts.
+		host = s.cfg.PanelDomain
+	}
+	return &MailSettings{
+		Host:     host,
+		IMAPPort: 993, IMAPEnc: "SSL/TLS",
+		SMTPPort: 587, SMTPEnc: "STARTTLS",
+		Username: "die vollständige Mailadresse",
+	}
+}
+
 // --- DKIM -------------------------------------------------------------------
 
 // DKIMInfo ist der DNS-Eintrag, den eine Domäne braucht.

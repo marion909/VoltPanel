@@ -27,6 +27,7 @@ const boxForm = ref({ domain_id: null, local_part: '', password: '', quota_mb: 0
 const aliasForm = ref({ domain_id: null, source: '', destination: '' })
 const dkim = ref({})
 const check = ref(null)
+const settings = ref(null)
 const checkBusy = ref(false)
 
 const inputStyle = {
@@ -43,18 +44,20 @@ const aliaseVon = (id) => aliases.value.filter((a) => a.domain_id === id)
 async function load() {
   loading.value = true
   try {
-    const [s, d, b, a] = await Promise.all([
+    const [s, d, b, a, cfg] = await Promise.all([
       // Der Zustandsbericht ist Administratoren vorbehalten — für alle
       // anderen bleibt er leer, und die Listen stehen trotzdem.
       api.get('/mail/status').catch(() => null),
       api.get('/mail/domains'),
       api.get('/mail/mailboxes'),
       api.get('/mail/aliases'),
+      api.get('/mail/settings').catch(() => null),
     ])
     status.value = s
     domains.value = d
     boxes.value = b
     aliases.value = a
+    settings.value = cfg
     error.value = ''
   } catch (err) {
     error.value = err.message
@@ -411,7 +414,37 @@ onMounted(load)
           </header>
 
           <div v-if="offen[d.id]" class="mt-4 space-y-4">
-            <!-- Postfächer -->
+                  <!-- Was in ein Mailprogramm gehört. Ohne diese Angaben steht ein
+                 Kunde vor einem angelegten Postfach und weiß nicht, wohin
+                 damit — der häufigste Grund für eine Rückfrage, die es nicht
+                 bräuchte. -->
+            <section v-if="settings">
+              <h3 class="mb-2 text-[12px] font-medium">{{ t('mail.clientTitle') }}</h3>
+              <table class="text-[12px]">
+                <tbody>
+                  <tr>
+                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">IMAP</td>
+                    <td class="py-0.5 font-mono">
+                      {{ settings.host }}:{{ settings.imap_port }} · {{ settings.imap_encryption }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">SMTP</td>
+                    <td class="py-0.5 font-mono">
+                      {{ settings.host }}:{{ settings.smtp_port }} · {{ settings.smtp_encryption }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">
+                      {{ t('mail.clientUser') }}
+                    </td>
+                    <td class="py-0.5">{{ t('mail.clientUserValue') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+      <!-- Postfächer -->
             <section>
               <h3 class="mb-2 text-[12px] font-medium">{{ t('mail.mailboxes') }}</h3>
               <ul class="space-y-1">

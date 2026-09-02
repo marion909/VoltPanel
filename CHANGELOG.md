@@ -15,6 +15,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.8 — 2026-09-02
+
+- Rspamd als zweiter Milter, und die Angaben fürs Mailprogramm im Panel
+
 ## v0.4.7 — 2026-09-02
 
 - Zustellbarkeitsprüfung: PTR, MX, SPF, DKIM, DMARC, TLS, offenes Relay

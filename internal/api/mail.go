@@ -40,6 +40,14 @@ func (s *Server) handleMailSetup(c echo.Context) error {
 // Im Scope des Aufrufers: geprüft werden die eigenen Domänen. Die Befunde über
 // den Server selbst — PTR, TLS, offenes Relay — stehen trotzdem darin, und das
 // ist richtig so: sie betreffen jeden, der über diesen Server sendet.
+// handleMailSettings sagt, was in ein Mailprogramm gehört.
+//
+// Für jeden Angemeldeten: wer ein Postfach hat, braucht die Angaben. Sie sagen
+// nichts über andere Mandanten — Servername und Ports sind für alle dieselben.
+func (s *Server) handleMailSettings(c echo.Context) error {
+	return c.JSON(http.StatusOK, s.mail.Settings(c.Request().Context()))
+}
+
 func (s *Server) handleMailCheck(c echo.Context) error {
 	res, err := s.mail.Check(c.Request().Context(), s.scopeFor(c))
 	if err != nil {

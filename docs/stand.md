@@ -234,8 +234,8 @@ Offen ist der Rest:
 - SPF-, DKIM- und DMARC-Einträge automatisch über die Cloudflare-Anbindung aus
   Phase 2 setzen. Den DKIM-Eintrag zeigt das Panel; ins DNS trägt ihn noch von
   Hand, wer die Domäne verwaltet.
-- Rspamd einrichten — bisher richtet `mail.setup` Postfix, den Mailspeicher und
-  den OpenDKIM-Milter ein, aber keine Spamprüfung.
+- Rspamd bringt seine Regeln selbst mit; das Panel trägt es nur als zweiten
+  Milter ein. Was es damit aussortiert, ist noch nirgends sichtbar.
 - Autoconfig und Autodiscover für Thunderbird und Outlook.
 - Quota wirklich durchsetzen: die Regel steht in der Dovecot-Datei, geprüft ist
   sie noch nicht auf einem laufenden Server.
