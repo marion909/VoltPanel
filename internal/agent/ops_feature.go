@@ -27,8 +27,15 @@ var featurePakete = map[string][]string{
 	// Postfix zieht bei der Installation einen debconf-Dialog hoch; aptInstall
 	// setzt DEBIAN_FRONTEND=noninteractive, deshalb geht es durch. Die
 	// Grundeinstellung danach macht `mail.setup`.
-	"postfix":  {"postfix"},
-	"dovecot":  {"dovecot-core", "dovecot-imapd"},
+	"postfix": {"postfix"},
+	// dovecot-lmtpd fehlte hier bis Debian 13/Dovecot 2.4 — davor lieferte
+	// dovecot-core das LMTP-Binary noch mit. Ohne das Paket startet der
+	// lmtp-Dienst nicht ("access(/usr/lib/dovecot/lmtp) failed: No such
+	// file or directory"), und mail.setup stellt die Zustellung trotzdem auf
+	// LMTP um — Mail bliebe dann in der Postfix-Warteschlange stecken, ohne
+	// dass eine der beiden Seiten das laut sagt. Auf einem echten Server so
+	// gefunden.
+	"dovecot":  {"dovecot-core", "dovecot-imapd", "dovecot-lmtpd"},
 	"opendkim": {"opendkim", "opendkim-tools"},
 	"rspamd":   {"rspamd"},
 	// Redis: Phase 7, der erste Eintrag im Plugin-Katalog (internal/core/plugins.go).
