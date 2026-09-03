@@ -795,6 +795,17 @@ func (c *Client) InstallWordPress(ctx context.Context, p WordPressInstallParams)
 	return res.Text, err
 }
 
+// InstallWebmail holt Roundcube, konfiguriert es und spielt sein
+// Datenbankschema ein.
+func (c *Client) InstallWebmail(ctx context.Context, p WebmailInstallParams) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, roundcubeTimeout+time.Minute)
+	defer cancel()
+
+	var res TextResult
+	err := c.Call(ctx, OpWebmailInstall, p, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

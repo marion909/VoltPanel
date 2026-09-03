@@ -38,6 +38,7 @@ type Server struct {
 	mail      *core.MailService
 	plugins   *core.PluginService
 	appstore  *core.AppStoreService
+	webmail   *core.WebmailService
 	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
@@ -94,6 +95,7 @@ func New(opts Options) (*Server, error) {
 		mail:      core.NewMailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		plugins:   core.NewPluginService(opts.Store, opts.Agent),
 		appstore:  core.NewAppStoreService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
+		webmail:   core.NewWebmailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
@@ -195,6 +197,12 @@ func (s *Server) setupRoutes() {
 	auth.POST("/plugins/:id/install", s.handleInstallPlugin, s.requireRole(store.RoleAdmin))
 	auth.POST("/plugins/:id/uninstall", s.handleUninstallPlugin, s.requireRole(store.RoleAdmin))
 	auth.POST("/plugins/:id/set", s.handleSetPlugin, s.requireRole(store.RoleAdmin))
+
+	// Webmail: eine einzige, server-weite Installation — siehe
+	// internal/core/webmail.go.
+	auth.GET("/webmail", s.handleWebmailStatus, s.requireRole(store.RoleAdmin))
+	auth.POST("/webmail", s.handleWebmailInstall, s.requireRole(store.RoleAdmin))
+	auth.DELETE("/webmail", s.handleWebmailUninstall, s.requireRole(store.RoleAdmin))
 
 	// Mail. Eine Maildomäne gehört einem Mandanten, deshalb entscheidet der
 	// Scope — wie bei Sites. Nur das Einrichten des Mailspeichers und der

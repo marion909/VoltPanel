@@ -436,14 +436,32 @@ func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, e
 	}
 	defer f.Close()
 
+	if err := s.importSQLFile(ctx, p.Database, f); err != nil {
+		// Als Eingabefehler: scheitert der Import, liegt es fast immer an der
+		// Datei. Der Aufrufer soll die Meldung von mysql lesen können und
+		// keinen Gateway-Fehler bekommen, der den Server verdächtigt.
+		return nil, opInputErr(OpMySQLImport, "%v", err)
+	}
+	return TextResult{Text: "import in " + p.Database + " abgeschlossen"}, nil
+}
+
+// importSQLFile spielt eine bereits geöffnete SQL-Datei in eine Datenbank ein
+// — über ein Wegwerf-Konto, das ausschließlich auf diese eine Datenbank
+// Rechte hat.
+//
+// Herausgelöst aus opMySQLImport, damit eine andere Operation im selben
+// Prozess denselben Weg gehen kann (opWebmailInstall für Roundcubes eigenes
+// Schema), ohne sich selbst über den Socket aufzurufen — das hier ist ein
+// normaler Funktionsaufruf, keine zweite RPC-Anfrage.
+func (s *Server) importSQLFile(ctx context.Context, database string, f *os.File) error {
 	db, err := mysqlConn()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	cnf, drop, err := s.importAccount(ctx, db, p.Database)
+	cnf, drop, err := s.importAccount(ctx, db, database)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer drop()
 	defer os.Remove(cnf)
@@ -451,13 +469,10 @@ func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, e
 	if err := runInto(ctx, longTimeout, nil, f, "mysql",
 		"--defaults-file="+cnf, "--protocol=socket",
 		"--socket=/var/run/mysqld/mysqld.sock",
-		"--default-character-set=utf8mb4", p.Database); err != nil {
-		// Als Eingabefehler: scheitert der Import, liegt es fast immer an der
-		// Datei. Der Aufrufer soll die Meldung von mysql lesen können und
-		// keinen Gateway-Fehler bekommen, der den Server verdächtigt.
-		return nil, opInputErr(OpMySQLImport, "%s", importHint(err, p.Database))
+		"--default-character-set=utf8mb4", database); err != nil {
+		return fmt.Errorf("%s", importHint(err, database))
 	}
-	return TextResult{Text: "import in " + p.Database + " abgeschlossen"}, nil
+	return nil
 }
 
 // importAccount legt das Wegwerf-Konto an und schreibt die Optionsdatei, über

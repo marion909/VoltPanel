@@ -1,0 +1,37 @@
+<?php
+/**
+ * Von VoltPanel erzeugt — nicht von Hand bearbeiten.
+ * Jede Änderung geht beim nächsten Schreiben verloren.
+ */
+
+$config = [];
+
+$config['db_dsnw'] = '{{ .DSN | phpstr }}';
+
+// Dovecot und Postfix laufen auf demselben Server wie Roundcube — die
+// Verbindung verlässt die Maschine nie. Das Zertifikat, das Dovecot zeigt,
+// gilt für eine Maildomäne oder das Panel, nicht für den Namen "localhost";
+// eine strikte Namensprüfung schlüge hier immer fehl, ohne dass die
+// Verbindung deshalb weniger vertrauenswürdig wäre.
+$config['imap_host'] = 'ssl://localhost:{{ .IMAPPort }}';
+$config['imap_conn_options'] = [
+    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+];
+$config['smtp_host'] = 'tls://localhost:{{ .SMTPPort }}';
+$config['smtp_conn_options'] = [
+    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+];
+// %u/%p sind Roundcubes eigene Platzhalter für den gerade angemeldeten
+// Benutzer — kein Wert, den diese Vorlage einsetzt.
+$config['smtp_user'] = '%u';
+$config['smtp_pass'] = '%p';
+
+$config['support_url'] = '';
+$config['product_name'] = 'Webmail';
+
+// Verschlüsselt das IMAP-Passwort in der Sitzung. Muss bei diesem
+// Cipher-Verfahren genau 24 Zeichen lang sein.
+$config['des_key'] = '{{ .DESKey | phpstr }}';
+
+$config['plugins'] = ['archive', 'zipdownload'];
+$config['skin'] = 'elastic';

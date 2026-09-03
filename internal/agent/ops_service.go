@@ -73,6 +73,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpFeatureInstall:    s.opFeatureInstall,
 		OpFeatureUninstall:  s.opFeatureUninstall,
 		OpAppStoreWordPress: s.opAppStoreWordPress,
+		OpWebmailInstall:    s.opWebmailInstall,
 		OpNodeList:          s.opNodeList,
 		OpNodeInstall:       s.opNodeInstall,
 		OpNodeRemove:        s.opNodeRemove,

@@ -1,0 +1,87 @@
+# Von VoltPanel generiert für {{ .Hostname }} — nicht von Hand bearbeiten.
+# Änderungen werden beim nächsten Schreiben überschrieben.
+# Erzeugt: {{ .GeneratedAt }}
+#
+# Kein Vhost über RenderSite/site.conf.tmpl: Roundcube gehört keinem
+# Mandanten und keiner Site-Zeile — anders als bei einer gewöhnlichen
+# PHP-Site braucht es außerdem eigene Sperren für Verzeichnisse, die im
+# Archiv liegen, aber nie über HTTP erreichbar sein dürfen (config, SQL,
+# temp, logs).
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .Hostname }};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ .Hostname }};
+
+    ssl_certificate     {{ .CertPath }};
+    ssl_certificate_key {{ .KeyPath }};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    root {{ .WebRoot }};
+    index index.php;
+
+    access_log {{ .LogDir }}/webmail.access.log volt;
+    error_log  {{ .LogDir }}/webmail.error.log warn;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size {{ .MaxBodySize }};
+    charset utf-8;
+    server_tokens off;
+
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Liegt im Archiv, gehört aber nie ins Netz: Datenbankschema,
+    # Konfiguration (auch wenn config.inc.php selbst als PHP ausgeführt
+    # würde, nicht als Text ausgeliefert), Zwischenspeicher, Logs,
+    # Composer-Abhängigkeiten, Testsuite und Kommandozeilenwerkzeuge.
+    location ~ ^/(SQL|config|temp|logs|vendor|tests|bin)/ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:{{ .SocketPath }};
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO       $fastcgi_path_info;
+        fastcgi_param HTTPS           on;
+        fastcgi_read_timeout {{ .FastCGITimeout }}s;
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 8 16k;
+    }
+
+    location ~* \.(?:css|js|jpg|jpeg|png|gif|ico|svg|webp|avif|woff2?|ttf|eot)$ {
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, immutable";
+    }
+}

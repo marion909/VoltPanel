@@ -153,6 +153,10 @@ const (
 	// Site — der App-Store-Teil von Phase 7, siehe internal/core/appstore.go.
 	OpAppStoreWordPress Op = "appstore.wordpress"
 
+	// OpWebmailInstall holt Roundcube in eine bereits eingerichtete, aber
+	// keinem Mandanten gehörende Installation — siehe internal/core/webmail.go.
+	OpWebmailInstall Op = "webmail.install"
+
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"
 	OpNodeInstall Op = "node.install"

@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Webmail: Roundcube als server-weite Installation, ein Klick auf der
+  Plugins-Seite — Systembenutzer, Datenbank, PHP-Pool, Vhost und
+  Zertifikat entstehen zusammen, ohne dass Webmail einem Mandanten gehört
 
 ## v0.4.22 — 2026-09-03
 

@@ -262,7 +262,6 @@ Offen ist der Rest:
 
 - Die Quota greift jetzt, weil Dovecot zustellt und nicht Postfix — auf einem
   laufenden Server erprobt ist sie damit noch nicht.
-- Webmail (Roundcube) als Plugin
 
 Eine Grenze gehört benannt: alle Maildirs gehören einem Benutzer (`vmail`), so
 wie es bei einem virtuellen Mailserver üblich ist. Die Trennung zwischen zwei
@@ -333,12 +332,34 @@ Zustand, den derselbe Aufruf reparieren kann, sobald das Hindernis weg ist.
 Ein Rückbau würde hier mehr zerstören als reparieren, dieselbe Abwägung wie
 beim Anlegen einer Datenbank.
 
+Webmail (Roundcube) steht seither auch — als drittes Muster neben Plugin und
+App-Store, keines von beiden im Kern: Ein Plugin erweitert den Server über
+apt und die Dienst-Whitelist, ohne eigene Datenhaltung. Ein App-Store-Eintrag
+erzeugt eine ganz gewöhnliche, einem Mandanten gehörende Site. Webmail ist
+weder das eine noch das andere — ein aus dem Internet geholtes PHP-Programm
+wie WordPress, aber ohne Mandanten: jedes Postfach jedes Mandanten soll sich
+dort anmelden können, genau wie bei Postfix und Dovecot selbst. `sites` und
+`databases` haben beide einen harten `tenant_id`-Fremdschlüssel; eine
+erfundene "System"-Mandantenzeile, nur damit Webmail dort hineinpasst, wäre
+die größere Verrenkung — und eine, die aus jeder mandantenbezogenen Liste
+wieder herausgefiltert werden müsste. Stattdessen ruft
+`internal/core/webmail.go` dieselben rohen Bausteine direkt auf, die
+SiteService und DatabaseService selbst benutzen (Systembenutzer, Datenbank
+samt Benutzer, ein FPM-Pool aus einem nie gespeicherten `*store.Site`), ohne
+je eine Site- oder Datenbank-Zeile anzulegen. Erreichbar unter
+`webmail.<panel_domain>`, mit eigenem Vhost (eigene Sperren für die
+Verzeichnisse, die im Archiv liegen, aber nie über HTTP erreichbar sein
+dürfen — SQL-Schema, Konfiguration, Zwischenspeicher) und eigenem
+Zertifikat, über denselben Cloudflare-Token-Weg wie bei der Panel-Domain.
+
+Anders als bei WordPress gibt es keine laufend geprüfte Prüfsummen-Adresse —
+Roundcube veröffentlicht keine. Version und Summe stehen deshalb fest im
+Quelltext (`internal/agent/ops_webmail.go`); ein Versionswechsel ist eine
+Codeänderung, keine Handarbeit auf dem Server, muss aber von Hand
+nachgezogen werden, wenn eine neue Roundcube-Fassung erscheint.
+
 Offen:
 
-- Webmail (Roundcube) als weiterer Katalogeintrag. Wie Redis mehr als "Paket
-  plus Dienst": eine eigene Vhost mit eigenem PHP-Pool und eigenem
-  Zugriffspfad, weil Webmail — anders als Redis — von außen erreichbar sein
-  muss.
 - phpMyAdmin steht in der Roadmap ausdrücklich als Plugin, nicht als
   Kernfunktion. Es passt aber in keines der beiden vorhandenen Muster: kein
   Server-Dienst wie Redis, und keine gewöhnliche Site wie WordPress — es
@@ -434,6 +455,17 @@ führt Postinst-Skripte als root aus.
 - Der Release-Schlüssel selbst ist im Quelltext leer. Er entsteht beim
   Einrichten der Veröffentlichung; bis dahin lehnt `volt update` jeden Kanal
   ab, statt ungeprüft zu aktualisieren. Siehe [release.md](release.md).
+- v0.4.20 und v0.4.21: `scripts/changelog-release.sh` wurde vor dem Taggen
+  vergessen. Nachgetragen wurde nur der Text in CHANGELOG.md und die
+  Anzeige auf der GitHub-Release-Seite — nicht die schon signierte
+  `latest.json`, die an genau diesen beiden Releases hängt: sie zeigt dort
+  weiterhin GoReleasers rohe Commit-Liste statt des Textes aus dem
+  Changelog. Der signierende Schlüssel liegt nur als Repository-Secret in
+  der CI, nicht hier — eine nachträgliche Korrektur bräuchte einen echten
+  Lauf der Release-Pipeline für einen schon veröffentlichten Tag, und das
+  ist keine Änderung, die ohne Rücksprache passiert. Ab v0.4.22 stimmt die
+  Reihenfolge wieder; betroffen sind nur diese zwei Fassungen, und nur die
+  angezeigte Release-Notiz — an Binaries oder Prüfsummen ändert das nichts.
 - Das Panel liefert beim ersten Start ein selbstsigniertes Zertifikat aus.
   Einstellungen → Zertifikat des Panels ersetzt es, `volt cert issue
   <panel_domain>` ebenso; die Übernahme braucht keinen Neustart.
