@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api";
 import { t } from "../i18n";
+import AppStoreDialog from "../components/AppStoreDialog.vue";
 
 const sites = ref([]);
 const loading = ref(true);
@@ -112,14 +113,18 @@ const inputStyle = {
       <h1 class="text-[18px] font-semibold tracking-tight">
         {{ t("sites.title") }}
       </h1>
-      <button
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
-        @click="showForm = !showForm"
-      >
-        {{ showForm ? t("common.cancel") : t("sites.new") }}
-      </button>
+      <div class="flex gap-2">
+        <button
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
+          :style="{ background: 'var(--series-1)' }"
+          @click="showForm = !showForm"
+        >
+          {{ showForm ? t("common.cancel") : t("sites.new") }}
+        </button>
+      </div>
     </header>
+
+    <AppStoreDialog class="mb-5" @installed="load" />
 
     <p
       v-if="error"

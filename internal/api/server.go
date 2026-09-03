@@ -37,6 +37,7 @@ type Server struct {
 	apps      *core.AppService
 	mail      *core.MailService
 	plugins   *core.PluginService
+	appstore  *core.AppStoreService
 	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
@@ -92,6 +93,7 @@ func New(opts Options) (*Server, error) {
 		apps:      core.NewAppService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		mail:      core.NewMailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		plugins:   core.NewPluginService(opts.Store, opts.Agent),
+		appstore:  core.NewAppStoreService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
@@ -243,6 +245,11 @@ func (s *Server) setupRoutes() {
 
 	auth.GET("/sites", s.handleListSites)
 	auth.POST("/sites", s.handleCreateSite)
+
+	// App-Store: ein Klick, eine fertige Website — dieselbe Berechtigung wie
+	// beim Anlegen einer Site direkt, siehe internal/core/appstore.go.
+	auth.GET("/appstore", s.handleAppStoreCatalog)
+	auth.POST("/appstore/wordpress", s.handleInstallWordPress)
 	auth.GET("/sites/:id", s.handleGetSite)
 	auth.PATCH("/sites/:id", s.handleUpdateSite)
 	auth.DELETE("/sites/:id", s.handleDeleteSite)

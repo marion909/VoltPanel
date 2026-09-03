@@ -764,6 +764,16 @@ func (c *Client) UninstallFeature(ctx context.Context, feature string) (string, 
 	return res.Text, err
 }
 
+// InstallWordPress holt den WordPress-Kern in eine bereits angelegte Site.
+func (c *Client) InstallWordPress(ctx context.Context, p WordPressInstallParams) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, wordpressTimeout+time.Minute)
+	defer cancel()
+
+	var res TextResult
+	err := c.Call(ctx, OpAppStoreWordPress, p, &res)
+	return res.Text, err
+}
+
 // --- Git-Deploy -------------------------------------------------------------
 
 // Deploy holt den Stand, baut ihn und schaltet um.

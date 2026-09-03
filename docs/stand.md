@@ -258,10 +258,17 @@ losgeht. Die Roadmap setzt Phase 6 spät an, und dabei bleibt es.
 
 **Phase 7 — App Store und Plugin-System** (angefangen)
 
-Der Name der Phase ist zwei Dinge, und gebaut ist bisher nur die eine Hälfte:
-ein Plugin-Mechanismus für Fähigkeiten des Servers selbst. Der App-Store —
-ein Klick, und es steht eine fertige Website mit Datenbank da — ist noch
-offen.
+Der Name der Phase ist zwei Dinge, und beide Hälften stehen inzwischen — die
+zweite bisher mit einem einzigen Eintrag.
+
+Ein Plugin (`internal/core/plugins.go`) erweitert den Server selbst — ein
+zusätzlicher Dienst, den das Panel danach mitverwaltet, mit Ein/Aus-Zustand,
+server-weit wie Docker oder die Firewall. Ein App-Store-Eintrag
+(`internal/core/appstore.go`) dagegen erzeugt eine ganz gewöhnliche Site mit
+ganz gewöhnlicher Datenbank — über dieselben Dienste, über die auch ein Kunde
+sie von Hand anlegt. Danach unterscheidet sich nichts mehr: keine
+fortlaufende Buchführung eines "installierten Eintrags", die aus dem Ruder
+laufen könnte.
 
 Bewusst *nicht* gebaut ist das, was die Roadmap eigentlich beschreibt: ein
 offenes Repository, in das jemand ein signiertes Paket mit eigenem
@@ -290,14 +297,25 @@ Ein-/Ausschalten, Entfernen, mit Zustand in einer eigenen Tabelle
 (`plugins`, ohne `tenant_id` — ein Plugin gehört dem Server, nicht einem
 Mandanten, wie Docker oder die Firewall).
 
+WordPress ist der erste App-Store-Eintrag: `AppStoreService.InstallWordPress`
+legt Site und Datenbank über `SiteService`/`DatabaseService` an — dieselben
+Dienste, die auch das Formular "Neue Website" ruft —, holt den Kern über
+denselben sicher geprüften Weg wie eine Node-Fassung (Archiv laden, gegen
+die von wordpress.org veröffentlichte Prüfsumme halten, mit `archive/tar`
+selbst auspacken statt mit dem Programm `tar`), und schreibt `wp-config.php`
+aus einer eigenen Vorlage. Den letzten Schritt — Titel, erstes Konto,
+Sprache — übernimmt WordPress' eigener Installer im Browser; das
+nachzubauen hieße, denselben etablierten Weg durch eigenen Code zu ersetzen,
+ohne dass jemand darum gebeten hätte.
+
+Scheitert ein Schritt auf halbem Weg, bleibt stehen, was schon entstanden
+ist — eine Site ohne Datenbank oder eine Site ohne WordPress-Dateien ist ein
+Zustand, den derselbe Aufruf reparieren kann, sobald das Hindernis weg ist.
+Ein Rückbau würde hier mehr zerstören als reparieren, dieselbe Abwägung wie
+beim Anlegen einer Datenbank.
+
 Offen:
 
-- Der App-Store-Teil: WordPress mit einem Klick ist der naheliegende erste
-  Eintrag — er bräuchte keine neuen Bausteine, nur die vorhandenen
-  zusammengesetzt (Site anlegen, Datenbank anlegen, den WordPress-Kern mit
-  derselben sicheren Archiv-Entpackung holen, die auch Node-Fassungen
-  benutzt, `wp-config.php` schreiben). Nicht gebaut, weil die sichere
-  Prüfsumme dafür noch nicht verifiziert stand.
 - phpMyAdmin und Webmail (Roundcube) als weitere Katalogeinträge. Beide sind
   in der Roadmap ausdrücklich als Plugins vorgesehen, nicht als
   Kernfunktion — und beide brauchen mehr als "Paket plus Dienst": eine

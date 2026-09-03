@@ -140,6 +140,10 @@ const (
 	OpFeatureInstall   Op = "feature.install"
 	OpFeatureUninstall Op = "feature.uninstall"
 
+	// OpAppStoreWordPress holt den WordPress-Kern in eine bereits angelegte
+	// Site — der App-Store-Teil von Phase 7, siehe internal/core/appstore.go.
+	OpAppStoreWordPress Op = "appstore.wordpress"
+
 	// Node-Fassungen nebeneinander, systemweit unter /opt/volt/node.
 	OpNodeList    Op = "node.list"
 	OpNodeInstall Op = "node.install"

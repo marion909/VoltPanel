@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"os"
@@ -177,7 +178,7 @@ func (s *Server) opNodeInstall(ctx context.Context, raw json.RawMessage) (any, e
 // unbemerkt bricht, in dem Node einen Schlüssel wechselt.
 func (s *Server) nodeChecksum(ctx context.Context, version, name string) (string, error) {
 	url := fmt.Sprintf("%s/v%s/SHASUMS256.txt", nodeBaseURL, version)
-	body, err := s.nodeGet(ctx, url)
+	body, err := httpGetSigned(ctx, url, nodeTimeout)
 	if err != nil {
 		return "", err
 	}
@@ -199,14 +200,22 @@ func (s *Server) nodeChecksum(ctx context.Context, version, name string) (string
 	return "", fmt.Errorf("zu %s gibt es keine prüfsumme — gibt es die version?", name)
 }
 
-func (s *Server) nodeGet(ctx context.Context, url string) (io.ReadCloser, error) {
+// httpGetSigned holt eine URL mit fester Kennung und Zeitgrenze.
+//
+// Allgemein gehalten und nicht bei den Node-Fassungen versteckt: dieselbe
+// Funktion holt auch den WordPress-Kern (internal/agent/ops_appstore.go).
+// Beides sind feste, im Quelltext stehende Adressen — nie eine URL aus einer
+// Anfrage —, und beides braucht dieselbe Vorsicht: eine Zeitgrenze, damit ein
+// hängender Server nicht die Operation blockiert, und eine erkennbare
+// Kennung, falls der Betreiber der Gegenstelle je nachsieht, wer da anfragt.
+func httpGetSigned(ctx context.Context, url string, timeout time.Duration) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "VoltPanel")
 
-	client := &http.Client{Timeout: nodeTimeout}
+	client := &http.Client{Timeout: timeout}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", url, err)
@@ -218,8 +227,19 @@ func (s *Server) nodeGet(ctx context.Context, url string) (io.ReadCloser, error)
 	return res.Body, nil
 }
 
-// nodeExtract lädt das Archiv, packt es aus und gibt die Prüfsumme des Stroms
-// zurück.
+// nodeExtract lädt das Archiv, packt es aus und gibt die SHA-256-Prüfsumme
+// des Stroms zurück — Node veröffentlicht seine Listen in SHA-256.
+func (s *Server) nodeExtract(ctx context.Context, url, dest string) (string, error) {
+	return fetchAndExtract(ctx, url, dest, nodeTimeout, nodeDownloadMax, sha256.New())
+}
+
+// fetchAndExtract lädt ein .tar.gz, packt es aus und gibt die Prüfsumme des
+// Stroms in der übergebenen Hash-Funktion zurück.
+//
+// Allgemein gehalten, damit sowohl Node (SHA-256) als auch der WordPress-Kern
+// (SHA-1, internal/agent/ops_appstore.go) denselben Weg gehen — eine zweite,
+// nachgebaute Fassung dieser Schleife wäre die Stelle, an der eine spätere
+// Änderung nur eine von beiden träfe.
 //
 // Ausgepackt wird mit archive/tar, nicht mit dem Programm tar. Der Grund ist
 // derselbe wie überall in diesem Projekt: ein Archiv ist Eingabe, und wer sie
@@ -227,16 +247,17 @@ func (s *Server) nodeGet(ctx context.Context, url string) (io.ReadCloser, error)
 // verschenkt. Hier wird jeder Eintrag selbst angesehen — und ein Pfad mit ".."
 // oder einem führenden Schrägstrich fliegt raus, statt neben dem Zielordner zu
 // landen.
-func (s *Server) nodeExtract(ctx context.Context, url, dest string) (string, error) {
-	body, err := s.nodeGet(ctx, url)
+func fetchAndExtract(ctx context.Context, url, dest string, timeout time.Duration,
+	maxBytes int64, sum hash.Hash) (string, error) {
+
+	body, err := httpGetSigned(ctx, url, timeout)
 	if err != nil {
 		return "", err
 	}
 	defer body.Close()
 
-	hash := sha256.New()
-	limited := io.LimitReader(body, nodeDownloadMax)
-	gz, err := gzip.NewReader(io.TeeReader(limited, hash))
+	limited := io.LimitReader(body, maxBytes)
+	gz, err := gzip.NewReader(io.TeeReader(limited, sum))
 	if err != nil {
 		return "", fmt.Errorf("archiv lesen: %w", err)
 	}
@@ -262,10 +283,10 @@ func (s *Server) nodeExtract(ctx context.Context, url, dest string) (string, err
 	// Den Rest des Stroms noch durch die Prüfsumme ziehen: gzip hört auf,
 	// sobald der Inhalt vollständig ist, und ohne das fehlten die letzten Bytes
 	// in der Summe.
-	if _, err := io.Copy(hash, limited); err != nil {
+	if _, err := io.Copy(sum, limited); err != nil {
 		return "", fmt.Errorf("archiv lesen: %w", err)
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
 // extractOne schreibt einen einzelnen Eintrag.

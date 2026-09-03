@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- App-Store: WordPress mit einem Klick — Site, Datenbank und der
+  WordPress-Kern in einem Schritt, geprüft wie eine Node-Fassung
 
 ## v0.4.19 — 2026-09-03
 

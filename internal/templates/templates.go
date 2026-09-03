@@ -22,13 +22,13 @@ import (
 	"github.com/marion909/voltpanel/internal/store"
 )
 
-//go:embed nginx/*.tmpl php-fpm/*.tmpl systemd/*.tmpl fail2ban/*.tmpl dovecot.conf.tmpl
+//go:embed nginx/*.tmpl php-fpm/*.tmpl systemd/*.tmpl fail2ban/*.tmpl dovecot.conf.tmpl wordpress-config.php.tmpl
 var files embed.FS
 
 var tmpl = template.Must(template.New("volt").
-	Funcs(template.FuncMap{"join": strings.Join}).
+	Funcs(template.FuncMap{"join": strings.Join, "phpstr": phpstr}).
 	ParseFS(files, "nginx/*.tmpl", "php-fpm/*.tmpl", "systemd/*.tmpl", "fail2ban/*.tmpl",
-		"dovecot.conf.tmpl"))
+		"dovecot.conf.tmpl", "wordpress-config.php.tmpl"))
 
 // Redirect ist eine einzelne Weiterleitungsregel einer Site.
 type Redirect struct {
