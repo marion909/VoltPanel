@@ -40,6 +40,17 @@ mail_inbox_path = %{home}
 protocol lmtp {
   # Dovecot startet LMTP nicht ohne diese Angabe.
   postmaster_address = postmaster@{{ .Hostname }}
+  # Das dovecot-lmtpd-Paket legt 20-lmtp.conf mit einem eigenen protocol
+  # lmtp{}-Block an, der auth_username_format auf %{user | username | lower}
+  # setzt — die Domäne fällt weg, gedacht für ein userdb, das (wie
+  # /etc/passwd) keine Domänen kennt. Protokoll-eigene Einstellungen gelten
+  # unabhängig davon, welche Datei zuerst geladen wurde; unsere
+  # passwd-file-Datenbank ist aber mit der vollen Adresse als Schlüssel
+  # aufgebaut. Ohne diese Zeile hier lieferte Postfix eine eingehende Mail
+  # zwar an, Dovecots eigener userdb-Nachschlag für LMTP schlug aber fehl —
+  # "550 5.1.1 User doesn't exist" für ein Postfach, das es gibt. Auf einem
+  # echten Server so gefunden.
+  auth_username_format = %{user}
 }
 
 service lmtp {

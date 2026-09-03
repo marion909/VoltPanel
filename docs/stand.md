@@ -527,3 +527,15 @@ führt Postinst-Skripte als root aus.
   obwohl das Postfach in den eigenen Dateien korrekt eingetragen war.
   `mail.setup` setzt `mydestination` seit v0.4.28 fest auf `localhost` —
   Postfix' eigene Empfehlung für einen rein virtuellen Aufbau wie diesen.
+- Auch nach v0.4.28 blieb Post auf Dovecot 2.4 in zwei weiteren, engeren
+  Fällen liegen: `dovecot-lmtpd`s eigene 20-lmtp.conf setzt einen
+  protokolleigenen `auth_username_format`, der die Domäne vor dem
+  userdb-Nachschlag abschneidet ("550 5.1.1 User doesn't exist" bei der
+  Zustellung, obwohl das Postfach existiert) — protokolleigene
+  Einstellungen gelten unabhängig davon, welche Datei zuerst geladen
+  wurde, unsere eigene Zeile in `protocol lmtp {}` musste also mitziehen.
+  Und Debians `10-mail.conf` setzt `mail_inbox_path` fest auf den
+  klassischen mbox-Spool `/var/mail/%{user}` (root:mail gehörend) — INBOX
+  allein landete dort, jeder andere Ordner korrekt unter `%{home}`, mit
+  "Mailbox INBOX: Failed to autocreate mailbox: Permission denied" bei
+  jeder Anmeldung. Beides mit der nächsten Fassung nach v0.4.28 behoben.

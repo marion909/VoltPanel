@@ -305,6 +305,28 @@ func TestDovecotConfModernBrauchtDie24Syntax(t *testing.T) {
 			t.Errorf("die 2.4-vorlage enthält %q — das gibt es unter dovecot 2.4 nicht mehr:\n%s", verboten, out)
 		}
 	}
+
+	// Das dovecot-lmtpd-Paket setzt in seiner eigenen 20-lmtp.conf einen
+	// protokolleigenen auth_username_format, der die Domäne abschneidet —
+	// protokolleigene Einstellungen gelten unabhängig von der Ladereihenfolge
+	// der Dateien. Ohne eine eigene Zeile *innerhalb* von protocol lmtp {}
+	// bekäme Dovecots userdb-Nachschlag bei der Zustellung nur noch "admin"
+	// statt "admin@example.at" — die Datei ist aber mit der vollen Adresse als
+	// Schlüssel aufgebaut. "550 5.1.1 User doesn't exist" für ein Postfach,
+	// das es gibt, genau so auf einem echten Server geschehen.
+	start := strings.Index(out, "protocol lmtp {")
+	if start < 0 {
+		t.Fatal("kein protocol lmtp {}-block in der 2.4-vorlage")
+	}
+	ende := strings.Index(out[start:], "\n}")
+	if ende < 0 {
+		t.Fatal("protocol lmtp {}-block nicht geschlossen")
+	}
+	block := out[start : start+ende]
+	if !strings.Contains(block, "auth_username_format = %{user}") {
+		t.Errorf("protocol lmtp {} setzt auth_username_format nicht selbst — "+
+			"20-lmtp.conf schneidet dann die domäne ab:\n%s", block)
+	}
 }
 
 // Modern=false (der Regelfall — Debian 12, Ubuntu 24.04) muss weiter die
