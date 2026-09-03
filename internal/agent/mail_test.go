@@ -81,6 +81,67 @@ func TestMaildirKommtAusDerAdresse(t *testing.T) {
 // Der Aufrufer nennt eine Fähigkeit, keinen Paketnamen. `apt-get install` mit
 // einer Eingabe aus dem Browser wäre eine Rootshell mit Umweg — apt führt
 // Postinst-Skripte als root aus.
+func TestDisablePAMAuthKommentiertDieEinbindungAus(t *testing.T) {
+	pfad := filepath.Join(t.TempDir(), "10-auth.conf")
+	original := "#!include auth-deny.conf.ext\n\n!include auth-system.conf.ext\n#!include auth-sql.conf.ext\n"
+	if err := os.WriteFile(pfad, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	geaendert, err := disablePAMAuth(pfad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !geaendert {
+		t.Fatal("erwartet: geändert=true beim ersten Lauf")
+	}
+
+	nachher, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(nachher), "\n!include auth-system.conf.ext\n") {
+		t.Fatalf("die aktive Einbindung ist noch da: %q", nachher)
+	}
+	if !strings.Contains(string(nachher), "#!include auth-system.conf.ext\n") {
+		t.Fatalf("die auskommentierte Zeile fehlt: %q", nachher)
+	}
+	// Der Rest der Datei bleibt unangetastet.
+	if !strings.Contains(string(nachher), "#!include auth-deny.conf.ext\n") ||
+		!strings.Contains(string(nachher), "#!include auth-sql.conf.ext\n") {
+		t.Fatalf("andere Zeilen wurden verändert: %q", nachher)
+	}
+}
+
+func TestDisablePAMAuthIstIdempotent(t *testing.T) {
+	pfad := filepath.Join(t.TempDir(), "10-auth.conf")
+	original := "#!include auth-deny.conf.ext\n!include auth-system.conf.ext\n"
+	if err := os.WriteFile(pfad, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := disablePAMAuth(pfad); err != nil {
+		t.Fatal(err)
+	}
+	geaendert, err := disablePAMAuth(pfad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if geaendert {
+		t.Fatal("erwartet: geändert=false, wenn die Zeile schon auskommentiert ist")
+	}
+}
+
+func TestDisablePAMAuthOhneDateiIstKeinFehler(t *testing.T) {
+	geaendert, err := disablePAMAuth(filepath.Join(t.TempDir(), "fehlt.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if geaendert {
+		t.Fatal("erwartet: geändert=false ohne Datei")
+	}
+}
+
 func TestFeatureNimmtKeinenPaketnamen(t *testing.T) {
 	for _, name := range FeatureNames() {
 		if !ValidFeature(name) {

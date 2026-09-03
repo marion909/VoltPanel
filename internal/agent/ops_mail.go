@@ -37,10 +37,11 @@ import (
 // Dieselben Muster wie im Store, hier noch einmal: der Agent darf nicht davon
 // abhängen, dass jemand dort später etwas lockert.
 var (
-	reMailLocal      = regexp.MustCompile(`^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$`)
-	reDKIMSelector   = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
-	reMailDomainTeil = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
-	reDovecotVersion = regexp.MustCompile(`^(?:\d+:)?(\d+)\.(\d+)`)
+	reMailLocal         = regexp.MustCompile(`^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$`)
+	reDKIMSelector      = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
+	reMailDomainTeil    = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
+	reDovecotVersion    = regexp.MustCompile(`^(?:\d+:)?(\d+)\.(\d+)`)
+	reAuthSystemInclude = regexp.MustCompile(`(?m)^!include auth-system\.conf\.ext\s*$`)
 )
 
 // dovecotModernConfig sagt, ob die installierte Dovecot-Fassung die mit 2.4
@@ -77,6 +78,39 @@ func dovecotModernConfig(ctx context.Context) bool {
 		return false
 	}
 	return major > 2 || (major == 2 && minor >= 4)
+}
+
+// disablePAMAuth kommentiert Debians eigene Einbindung von PAM als passdb in
+// 10-auth.conf aus.
+//
+// Das Paket bindet sie standardmässig ein — gedacht für Server, die echte
+// Systembenutzer per IMAP anmelden lassen. VoltPanels Postfächer sind
+// ausschliesslich virtuell, kein Systembenutzer kennt sie; PAM antwortet auf
+// jeden Anmeldeversuch mit "user unknown". Schon dieser eine Fehlschlag löst
+// aber innerhalb der PAM-Bibliothek selbst eine eingebaute Verzögerung aus
+// (pam_fail_delay(3), unter Debians Vorgabe rund 2 Sekunden) — unabhängig
+// davon, dass Dovecot direkt danach beim eigenen passwd-file-passdb doch noch
+// erfolgreich anmeldet. Jede einzelne IMAP-Verbindung zahlt sie einzeln, und
+// Roundcube öffnet für einen einzigen Seitenaufruf mehrere (Posteingang,
+// ungelesen-Zähler, Aktualisierung) — auf einem echten Server als "Webmail
+// lädt sehr lange" bemerkt, mit dem PHP-Slowlog exakt in authenticate()
+// hängend, ohne dass irgendwo ein Fehler auftaucht.
+//
+// Auskommentieren statt Löschen: ein dpkg-reconfigure oder ein Paket-Update
+// böte die Zeile sonst als "fehlend" erneut an.
+func disablePAMAuth(pfad string) (bool, error) {
+	data, err := os.ReadFile(pfad)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	gepatcht := reAuthSystemInclude.ReplaceAllString(string(data), "#!include auth-system.conf.ext")
+	if gepatcht == string(data) {
+		return false, nil
+	}
+	return true, writeFileAtomic(pfad, []byte(gepatcht), 0o644)
 }
 
 const (
@@ -645,6 +679,12 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 	// nicht, die der Agent schreibt — die Postfächer stünden da und niemand
 	// käme herein.
 	if dirExists(dovecotConfD) {
+		if geaendert, err := disablePAMAuth(filepath.Join(dovecotConfD, "10-auth.conf")); err != nil {
+			schritte = append(schritte, "10-auth.conf nicht angepasst: "+err.Error())
+		} else if geaendert {
+			schritte = append(schritte, "pam als passdb abgeschaltet — sonst verzögert jede anmeldung um ~2s")
+		}
+
 		// Der Hostname für postmaster_address kommt aus Postfix, nicht aus
 		// einer Anfrage. Fehlt er oder taugt er nicht, bleibt es bei der
 		// Zustellung durch Postfix — eine Dovecot-Konfiguration, die nicht

@@ -538,4 +538,17 @@ führt Postinst-Skripte als root aus.
   klassischen mbox-Spool `/var/mail/%{user}` (root:mail gehörend) — INBOX
   allein landete dort, jeder andere Ordner korrekt unter `%{home}`, mit
   "Mailbox INBOX: Failed to autocreate mailbox: Permission denied" bei
-  jeder Anmeldung. Beides mit der nächsten Fassung nach v0.4.28 behoben.
+  jeder Anmeldung. Beides mit v0.4.29 behoben.
+- Mit v0.4.29 liefen Anmeldung und Zustellung, aber Webmail lud spürbar
+  lange — im PHP-Slowlog jedes Mal exakt an derselben Stelle hängend:
+  `authenticate()` wartend auf Dovecots Antwort. Grund: Debians eigene
+  `10-auth.conf` bindet PAM standardmäßig als erstes passdb ein, gedacht
+  für Server mit echten Systembenutzern. VoltPanels Postfächer sind rein
+  virtuell, PAM meldet für jede Anmeldung "user unknown" — aber schon
+  dieser eine Fehlschlag löst innerhalb der PAM-Bibliothek selbst eine
+  eingebaute Verzögerung aus (`pam_fail_delay(3)`, unter Debian rund 2
+  Sekunden), bevor Dovecot beim eigenen passwd-file-passdb doch noch
+  erfolgreich anmeldet. Roundcube öffnet pro Seitenaufruf mehrere
+  IMAP-Verbindungen (Posteingang, ungelesen-Zähler, Aktualisierung), jede
+  zahlt die Verzögerung einzeln. `mail.setup` kommentiert die Einbindung
+  seit der nächsten Fassung nach v0.4.29 aus.
