@@ -13,9 +13,16 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.21 — 2026-09-03
+
+- Mail: was Rspamd tatsächlich aussortiert, steht jetzt im Panel
+
+## v0.4.20 — 2026-09-03
+
 - App-Store: WordPress mit einem Klick — Site, Datenbank und der
   WordPress-Kern in einem Schritt, geprüft wie eine Node-Fassung
-- Mail: was Rspamd tatsächlich aussortiert, steht jetzt im Panel
 
 ## v0.4.19 — 2026-09-03
 
