@@ -15,6 +15,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.29 — 2026-09-03
+
+- Dovecot 2.4: mail_inbox_path überschreibt Debians mbox-Vorgabe
+- Dovecot 2.4: protocol lmtp setzt auth_username_format selbst
+
 ## v0.4.28 — 2026-09-03
 
 - mail.setup setzt mydestination auf localhost — eingehende Post kam sonst nicht an
