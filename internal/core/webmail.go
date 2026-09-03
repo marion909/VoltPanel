@@ -152,9 +152,20 @@ func (s *WebmailService) Install(ctx context.Context, sc store.Scope, in Install
 		return nil, fmt.Errorf("zertifikat: %w", err)
 	}
 
+	// Ab Roundcube 1.6 liegt der eigentliche Web-Wurzel nicht mehr in webRoot
+	// selbst, sondern in dessen Unterverzeichnis public_html — SQL, config,
+	// program und vendor liegen daneben, nicht mehr darunter. Zeigt root auf
+	// webRoot statt auf webRoot/public_html, liefert Roundcubes eigenes
+	// index.php nur seine eingebaute Warnung aus ("Please, configure your
+	// HTTP server to point to the /public_html directory ..."), geschehen
+	// auf einem echten Server. PHP braucht dafür keine gesonderte
+	// Berechtigung: applyOwner in installRoundcubeFiles/opWebmailInstall
+	// chownt weiterhin den ganzen Baum, nicht nur public_html — Roundcube
+	// selbst bindet program/, config/ usw. relativ über PHP-Includes ein,
+	// nicht über HTTP.
 	vhost, err := templates.RenderWebmailVhost(templates.WebmailVhostData{
 		Hostname: hostname, CertPath: cert.CertPath, KeyPath: cert.KeyPath,
-		WebRoot: webRoot, LogDir: filepath.Join(s.cfg.LogDir, "sites"),
+		WebRoot: filepath.Join(webRoot, "public_html"), LogDir: filepath.Join(s.cfg.LogDir, "sites"),
 		SocketPath: pool.SocketPath,
 	})
 	if err != nil {

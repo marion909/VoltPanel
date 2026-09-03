@@ -347,10 +347,14 @@ wieder herausgefiltert werden müsste. Stattdessen ruft
 SiteService und DatabaseService selbst benutzen (Systembenutzer, Datenbank
 samt Benutzer, ein FPM-Pool aus einem nie gespeicherten `*store.Site`), ohne
 je eine Site- oder Datenbank-Zeile anzulegen. Erreichbar unter
-`webmail.<panel_domain>`, mit eigenem Vhost (eigene Sperren für die
-Verzeichnisse, die im Archiv liegen, aber nie über HTTP erreichbar sein
-dürfen — SQL-Schema, Konfiguration, Zwischenspeicher) und eigenem
-Zertifikat, über denselben Cloudflare-Token-Weg wie bei der Panel-Domain.
+`webmail.<panel_domain>`, mit eigenem Vhost und eigenem Zertifikat, über
+denselben Cloudflare-Token-Weg wie bei der Panel-Domain. Der Vhost zeigt auf
+`public_html` innerhalb des ausgepackten Archivs, nicht auf dessen Wurzel —
+ab Roundcube 1.6 liegen SQL-Schema, Konfiguration und Abhängigkeiten neben,
+nicht mehr unter dem, was ein Webserver ausliefern soll; eigene Sperren im
+Vhost für genau diese Verzeichnisse bleiben trotzdem stehen, als zweite
+Absicherung, falls root je wieder auf die falsche Stelle zeigen sollte —
+genau das ist einmal passiert und stand hinter Version 0.4.26.
 
 Anders als bei WordPress gibt es keine laufend geprüfte Prüfsummen-Adresse —
 Roundcube veröffentlicht keine. Version und Summe stehen deshalb fest im
