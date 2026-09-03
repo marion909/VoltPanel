@@ -15,6 +15,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.28 — 2026-09-03
+
+- mail.setup setzt mydestination auf localhost — eingehende Post kam sonst nicht an
+
 ## v0.4.27 — 2026-09-03
 
 - Dovecot liest die Passwortdatei jetzt wirklich als eigene Gruppe
