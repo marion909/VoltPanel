@@ -246,11 +246,24 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 	}
 
 	// Die Passwortdatei ist die eine, die niemand lesen darf außer Dovecot.
-	// 0640 und die Gruppe des Dienstes; kommt der Benutzer nicht vor, bleibt
-	// es bei root — dann liest Dovecot sie als root, was es ohnehin tut.
+	// 0640 und die Gruppe des Dienstes; kommt die Gruppe nicht vor, bleibt es
+	// bei root — dann liest Dovecot sie als root, was es ohnehin tut, wenn
+	// der auth-worker (noch) nicht unter einem eigenen Konto läuft.
+	//
+	// Der Chown fehlte hier bisher, obwohl dieser Kommentar ihn schon immer
+	// beschrieb — Dovecots auth-worker läuft aber als eigener, unprivilegierter
+	// Systembenutzer (üblicherweise "dovecot"), nicht als root, und konnte die
+	// Datei darum nie lesen: passwd-file scheiterte an jeder Anmeldung mit
+	// "Permission denied", und die Anmeldung fiel still auf PAM zurück. Auf
+	// einem echten Server so gefunden.
 	pfad := filepath.Join(dovecotMailDir, "users")
 	if err := writeFileAtomic(pfad, []byte(users), 0o640); err != nil {
 		return nil, opErr(OpMailApply, "%s schreiben: %v", pfad, err)
+	}
+	if g, err := user.LookupGroup("dovecot"); err == nil {
+		if gid, err := strconv.Atoi(g.Gid); err == nil {
+			_ = os.Chown(pfad, 0, gid)
+		}
 	}
 
 	if err := s.schreibeDKIM(ctx, p.DKIM); err != nil {
