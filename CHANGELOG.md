@@ -15,6 +15,7 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 - App-Store: WordPress mit einem Klick — Site, Datenbank und der
   WordPress-Kern in einem Schritt, geprüft wie eine Node-Fassung
+- Mail: was Rspamd tatsächlich aussortiert, steht jetzt im Panel
 
 ## v0.4.19 — 2026-09-03
 

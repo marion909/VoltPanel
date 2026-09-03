@@ -25,6 +25,17 @@ func (s *Server) handleMailStatus(c echo.Context) error {
 	return c.JSON(http.StatusOK, st)
 }
 
+// handleMailSpamStats zeigt, was Rspamd tatsächlich aussortiert — nicht nur,
+// dass der Milter eingetragen ist. Administratoren vorbehalten wie der
+// übrige Zustandsbericht: die Zahlen gelten für den ganzen Server.
+func (s *Server) handleMailSpamStats(c echo.Context) error {
+	st, err := s.mail.SpamStats(c.Request().Context())
+	if err != nil {
+		return storeError(err)
+	}
+	return c.JSON(http.StatusOK, st)
+}
+
 func (s *Server) handleMailSetup(c echo.Context) error {
 	ctx := c.Request().Context()
 	out, err := s.mail.Setup(ctx)

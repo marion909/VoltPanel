@@ -236,10 +236,16 @@ Postfix und die Passwortdatei für Dovecot; die beiden lesen die Panel-Datenbank
 nie. Ein gesperrter Mandant nimmt keine Post mehr an, ein Catch-All zeigt nur
 auf ein eigenes Postfach, und Postfächer zählen zum Paket.
 
+Und was Rspamd tatsächlich aussortiert, steht jetzt auch da: eine Zeile mit
+geprüft/als Spam eingestuft/unbedenklich, dazu Rspamds eigene Aufschlüsselung
+nach Aktion (no action, add header, greylist, reject — unverändert von dort
+übernommen, nicht selbst benannt). Rspamds Controller antwortet lokal auf
+127.0.0.1:11334 unauthentifiziert; ein eigenes Controller-Passwort zu
+unterstützen wäre mehr Fläche für ein Werkzeug, dessen einzige Aufgabe hier
+ist, vier Zahlen abzulesen.
+
 Offen ist der Rest:
 
-- Rspamd bringt seine Regeln selbst mit; das Panel trägt es nur als zweiten
-  Milter ein. Was es damit aussortiert, ist noch nirgends sichtbar.
 - Autoconfig und Autodiscover für Thunderbird und Outlook.
 - Die Quota greift jetzt, weil Dovecot zustellt und nicht Postfix — auf einem
   laufenden Server erprobt ist sie damit noch nicht.

@@ -58,10 +58,13 @@ const (
 	opendkimDir = "/etc/opendkim"
 	// dovecotConfD ist das Verzeichnis, aus dem Dovecot Ergaenzungen liest.
 	dovecotConfD = "/etc/dovecot/conf.d"
-	// rspamdDir sagt, ob Rspamd installiert ist. Seine Regeln bringt es
-	// selbst mit; das Panel traegt es nur als zweiten Milter ein.
-	rspamdDir = "/etc/rspamd"
 )
+
+// rspamdDir sagt, ob Rspamd installiert ist. Seine Regeln bringt es selbst
+// mit; das Panel traegt es nur als zweiten Milter ein (unten) und liest
+// seine Statistik (ops_rspamd.go). Als Variable, nicht als Konstante: der
+// Test in ops_rspamd_test.go ersetzt sie durch ein eigenes Verzeichnis.
+var rspamdDir = "/etc/rspamd"
 
 // MailboxParams ist ein Postfach, wie das Panel es beschreibt.
 type MailboxParams struct {

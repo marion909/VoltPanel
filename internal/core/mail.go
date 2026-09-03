@@ -51,6 +51,11 @@ func (s *MailService) Status(ctx context.Context) (*agent.MailStatus, error) {
 	return s.agent.MailStatusOf(ctx)
 }
 
+// SpamStats sagt, was Rspamd tatsächlich aussortiert.
+func (s *MailService) SpamStats(ctx context.Context) (*agent.RspamdStats, error) {
+	return s.agent.RspamdStatsOf(ctx)
+}
+
 // Setup richtet den Mailspeicher ein.
 //
 // Wie bei FTP nicht bei der Installation: ein Mailserver gehört nicht auf

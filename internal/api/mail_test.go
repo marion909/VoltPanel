@@ -138,3 +138,16 @@ func TestFeatureInstallNurFuerAdmins(t *testing.T) {
 		}
 	}
 }
+
+// Die Rspamd-Statistik gilt für den ganzen Server, nicht für einen
+// Mandanten — dieselbe Regel wie beim übrigen Zustandsbericht. Ein Kunde
+// bekommt sie nicht.
+func TestMailSpamStatsNurFuerAdmins(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "bob@example.at") // Kunde
+
+	rec := ts.do(http.MethodGet, "/api/v1/mail/spamstats", nil)
+	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
+		t.Errorf("Status %d, erwartet 403 — %s", rec.Code, rec.Body.String())
+	}
+}

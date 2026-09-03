@@ -201,6 +201,7 @@ func (s *Server) setupRoutes() {
 	// Zustandsbericht bleiben beim Administrator: das eine legt einen
 	// Systembenutzer an, das andere sagt etwas über die Maschine.
 	auth.GET("/mail/status", s.handleMailStatus, s.requireRole(store.RoleAdmin))
+	auth.GET("/mail/spamstats", s.handleMailSpamStats, s.requireRole(store.RoleAdmin))
 	auth.POST("/mail/setup", s.handleMailSetup, s.requireRole(store.RoleAdmin))
 	auth.GET("/mail/check", s.handleMailCheck)
 	auth.GET("/mail/settings", s.handleMailSettings)

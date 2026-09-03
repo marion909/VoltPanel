@@ -133,6 +133,10 @@ const (
 	OpMailSetup  Op = "mail.setup"
 	OpMailApply  Op = "mail.apply"
 	OpMailFacts  Op = "mail.facts"
+	// OpMailSpamStats fragt Rspamds eigenen Controller nach seiner Statistik
+	// — was tatsächlich als Spam gilt, nicht nur, dass der Milter eingetragen
+	// ist.
+	OpMailSpamStats Op = "mail.spamstats"
 
 	// OpFeatureInstall holt nach, was das Panel verwaltet — aus einer festen
 	// Liste, nie mit einem Paketnamen aus der Anfrage. OpFeatureUninstall

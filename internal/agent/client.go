@@ -735,6 +735,14 @@ func (c *Client) MailFactsOf(ctx context.Context) (*MailFacts, error) {
 	return &res, err
 }
 
+// RspamdStatsOf fragt Rspamds eigene Statistik ab — was tatsächlich als Spam
+// gilt, nicht nur, dass der Milter eingetragen ist.
+func (c *Client) RspamdStatsOf(ctx context.Context) (*RspamdStats, error) {
+	var res RspamdStats
+	err := c.Call(ctx, OpMailSpamStats, nil, &res)
+	return &res, err
+}
+
 // ApplyMail schreibt den vollständigen Sollzustand in die Map-Dateien.
 func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, error) {
 	var res TextResult

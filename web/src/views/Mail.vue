@@ -30,6 +30,7 @@ const check = ref(null)
 const dnsErgebnis = ref({})
 const settings = ref(null)
 const checkBusy = ref(false)
+const spam = ref(null)
 
 const inputStyle = {
   borderColor: 'var(--line-axis)',
@@ -45,7 +46,7 @@ const aliaseVon = (id) => aliases.value.filter((a) => a.domain_id === id)
 async function load() {
   loading.value = true
   try {
-    const [s, d, b, a, cfg] = await Promise.all([
+    const [s, d, b, a, cfg, sp] = await Promise.all([
       // Der Zustandsbericht ist Administratoren vorbehalten — für alle
       // anderen bleibt er leer, und die Listen stehen trotzdem.
       api.get('/mail/status').catch(() => null),
@@ -53,12 +54,14 @@ async function load() {
       api.get('/mail/mailboxes'),
       api.get('/mail/aliases'),
       api.get('/mail/settings').catch(() => null),
+      api.get('/mail/spamstats').catch(() => null),
     ])
     status.value = s
     domains.value = d
     boxes.value = b
     aliases.value = a
     settings.value = cfg
+    spam.value = sp
     error.value = ''
   } catch (err) {
     error.value = err.message
@@ -310,6 +313,38 @@ onMounted(load)
       >
         {{ busy ? t('mail.settingUp') : t('mail.setup') }}
       </button>
+    </div>
+
+    <!-- Was Rspamd tatsächlich aussortiert — nicht nur, dass der Milter
+         eingetragen ist. Nur für installierte, erreichbare Rspamd-Instanzen:
+         ein leerer Block wäre keine Auskunft. -->
+    <div
+      v-if="spam && spam.installed"
+      class="mb-5 rounded-lg border p-4"
+      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    >
+      <h2 class="mb-2 text-[14px] font-medium">{{ t('mail.spamTitle') }}</h2>
+      <p v-if="!spam.reachable" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+        {{ spam.hinweis || t('mail.spamUnreachable') }}
+      </p>
+      <template v-else>
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-[12px]">
+          <span>{{ t('mail.spamScanned') }}: <strong>{{ spam.scanned }}</strong></span>
+          <span :style="{ color: 'var(--status-critical)' }">
+            {{ t('mail.spamCount') }}: <strong>{{ spam.spam_count }}</strong>
+          </span>
+          <span :style="{ color: 'var(--status-good)' }">
+            {{ t('mail.hamCount') }}: <strong>{{ spam.ham_count }}</strong>
+          </span>
+        </div>
+        <div
+          v-if="spam.actions && Object.keys(spam.actions).length"
+          class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]"
+          :style="{ color: 'var(--ink-muted)' }"
+        >
+          <span v-for="(n, name) in spam.actions" :key="name">{{ name }}: {{ n }}</span>
+        </div>
+      </template>
     </div>
 
     <!-- Ein Passwort steht genau einmal da. Danach nur noch auf Abruf, und

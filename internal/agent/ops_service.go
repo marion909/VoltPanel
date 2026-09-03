@@ -68,6 +68,7 @@ func (s *Server) newRegistry() map[Op]Handler {
 		OpMailSetup:         s.opMailSetup,
 		OpMailApply:         s.opMailApply,
 		OpMailFacts:         s.opMailFacts,
+		OpMailSpamStats:     s.opMailSpamStats,
 		OpFeatureInstall:    s.opFeatureInstall,
 		OpFeatureUninstall:  s.opFeatureUninstall,
 		OpAppStoreWordPress: s.opAppStoreWordPress,
