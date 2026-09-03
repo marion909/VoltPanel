@@ -40,7 +40,44 @@ var (
 	reMailLocal      = regexp.MustCompile(`^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$`)
 	reDKIMSelector   = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
 	reMailDomainTeil = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
+	reDovecotVersion = regexp.MustCompile(`^(?:\d+:)?(\d+)\.(\d+)`)
 )
+
+// dovecotModernConfig sagt, ob die installierte Dovecot-Fassung die mit 2.4
+// eingeführte, umgebaute Config-Syntax braucht (passdb/userdb ohne args=,
+// kein plugin{}-Block mehr, eigene ssl_server_*-Einstellungen statt ssl_cert)
+// statt der bis 2.3 gültigen.
+//
+// Debian 12 und Ubuntu 24.04 liefern noch 2.3.x aus, Debian 13 schon 2.4.x —
+// beide Reihen laufen nebeneinander in freier Wildbahn, und ihre Syntax ist
+// an genau den Stellen, die diese Datei erzeugt, gegenseitig ungültig: ein
+// 2.3-Aufbau scheitert unter 2.4 an "Unknown section name: plugin" und wird
+// von Dovecot komplett verworfen — leise, denn ein Reload, der fehlschlägt,
+// lässt die zuvor geladene (oder die Paket-eigene) Konfiguration einfach
+// weiterlaufen, ohne dass irgendwo ein harter Fehler entsteht. Auf einem
+// echten Server so gefunden: passdb blieb dabei unbenutzt, jede Anmeldung
+// fiel still auf das PAM-passdb des Pakets zurück, das keines der
+// virtuellen Postfächer kennt.
+//
+// dpkg-query statt `dovecot --version`: dieselbe, schon vorhandene,
+// rein lesende Prüfung wie packageInstalled — kein zusätzliches Binary in
+// der Whitelist nötig.
+func dovecotModernConfig(ctx context.Context) bool {
+	out, err := run(ctx, shortTimeout, "dpkg-query", "-W", "-f", "${Version}", "dovecot-core")
+	if err != nil {
+		return false
+	}
+	m := reDovecotVersion.FindStringSubmatch(strings.TrimSpace(out))
+	if m == nil {
+		return false
+	}
+	major, err1 := strconv.Atoi(m[1])
+	minor, err2 := strconv.Atoi(m[2])
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return major > 2 || (major == 2 && minor >= 4)
+}
 
 const (
 	postfixMailDir = "/etc/postfix/volt"
@@ -612,6 +649,7 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 			VMailGID:    gid,
 			CertPath:    cert,
 			KeyPath:     key,
+			Modern:      dovecotModernConfig(ctx),
 		})
 		if err != nil {
 			return nil, opErr(OpMailSetup, "dovecot-konfiguration: %v", err)

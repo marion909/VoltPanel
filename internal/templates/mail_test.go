@@ -255,3 +255,74 @@ func TestDovecotConfLehntHalbesZertifikatAb(t *testing.T) {
 		t.Error("ein pfad mit umbruch wurde angenommen")
 	}
 }
+
+// Modern=true muss die 2.4-Vorlage nehmen — passdb/userdb ohne args=, ohne
+// plugin{}-Block, mit ssl_server_*. Ein Aufbau mit der 2.3-Syntax scheitert
+// unter Dovecot 2.4 an "Unknown section name: plugin" und wird komplett
+// verworfen; genau das auf einem echten Server so gefunden.
+func TestDovecotConfModernBrauchtDie24Syntax(t *testing.T) {
+	out, err := RenderDovecotConf(DovecotData{
+		GeneratedAt: "2026-09-03T12:00:00+02:00",
+		MailRoot:    "/var/vmail",
+		UsersFile:   "/etc/dovecot/volt/users",
+		Hostname:    "mail.example.at",
+		VMailUID:    5000,
+		VMailGID:    5000,
+		CertPath:    "/var/lib/volt/certs/panel/fullchain.pem",
+		KeyPath:     "/var/lib/volt/certs/panel/privkey.pem",
+		Modern:      true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, will := range []string{
+		"passdb passwd-file {",
+		"default_password_scheme = SSHA512",
+		"auth_username_format = %{user}",
+		"passwd_file_path = /etc/dovecot/volt/users",
+		"userdb passwd-file {",
+		"ssl_server_cert_file = /var/lib/volt/certs/panel/fullchain.pem",
+		"ssl_server_key_file = /var/lib/volt/certs/panel/privkey.pem",
+		"ssl_min_protocol = TLSv1.2",
+		"mail_driver = maildir",
+		"mail_path = %{home}",
+		"protocols = imap lmtp",
+		"postmaster_address = postmaster@mail.example.at",
+		"/var/spool/postfix/private/dovecot-lmtp",
+		"/var/spool/postfix/private/auth",
+	} {
+		if !strings.Contains(out, will) {
+			t.Errorf("%q fehlt:\n%s", will, out)
+		}
+	}
+
+	// Was es unter 2.4 nicht mehr gibt, darf auch nicht mehr dastehen — sonst
+	// verwirft Dovecot die ganze Datei, wie auf dem echten Server geschehen.
+	for _, verboten := range []string{"plugin {", "args = ", "ssl_cert ", "mail_uid ", "mail_location"} {
+		if strings.Contains(out, verboten) {
+			t.Errorf("die 2.4-vorlage enthält %q — das gibt es unter dovecot 2.4 nicht mehr:\n%s", verboten, out)
+		}
+	}
+}
+
+// Modern=false (der Regelfall — Debian 12, Ubuntu 24.04) muss weiter die
+// alte Vorlage bekommen. Eine einzelne Struct-Instanz für beide Aufrufe:
+// derselbe Input, nur das eine Feld unterscheidet die Ausgabe.
+func TestDovecotConfOhneModernBleibtBeiDerAltenVorlage(t *testing.T) {
+	basis := DovecotData{
+		GeneratedAt: "x", MailRoot: "/var/vmail",
+		UsersFile: "/etc/dovecot/volt/users", Hostname: "mail.example.at",
+		VMailUID: 5000, VMailGID: 5000,
+	}
+	out, err := RenderDovecotConf(basis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "args = username_format=%u /etc/dovecot/volt/users") {
+		t.Errorf("ohne Modern fehlt die alte args=-Syntax:\n%s", out)
+	}
+	if strings.Contains(out, "passwd_file_path") {
+		t.Error("ohne Modern steht trotzdem die 2.4-einstellung passwd_file_path da")
+	}
+}

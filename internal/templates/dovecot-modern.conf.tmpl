@@ -1,0 +1,78 @@
+# Von VoltPanel erzeugt — nicht von Hand bearbeiten.
+# Jede Änderung geht beim nächsten Schreiben verloren.
+# Erzeugt: {{ .GeneratedAt }}
+#
+# Fassung für Dovecot 2.4 und später (dovecot-modern.conf.tmpl) — 2.4 hat die
+# Config-Syntax an genau den Stellen umgebaut, die diese Datei erzeugt:
+# passdb/userdb ohne das alte args=, keinen plugin{}-Block mehr, eigene
+# ssl_server_*-Einstellungen statt ssl_cert. Ein Aufbau für 2.3 (siehe
+# dovecot.conf.tmpl) scheitert unter 2.4 an "Unknown section name: plugin"
+# und wird komplett verworfen — nicht laut, denn ein Reload, der daran
+# scheitert, lässt die zuvor geladene Konfiguration einfach weiterlaufen.
+# Auf einem echten Server so gefunden: passdb blieb dabei unbenutzt, jede
+# Anmeldung fiel still auf das PAM-passdb des Pakets zurück.
+#
+# Bewusst nicht in dieser Fassung: die Quota (plugin{}/mail_plugins = quota
+# unter 2.3) und first_valid_uid/last_valid_uid. Für beides fand sich keine
+# Adresse in der Dovecot-Dokumentation, die sich anhand einer echten,
+# laufenden 2.4-Installation bestätigen ließ — anders als jede andere Zeile
+# hier, die entweder aus einer tatsächlich geladenen Beispiel-Konfiguration
+# des Debian-Pakets stammt oder mit `doveconf -n` gegen eine echte
+# Installation geprüft wurde. Falsch geraten wäre hier ein Fatal, das die
+# ganze Datei verwirft — also lieber eine Quota weniger als eine Anmeldung,
+# die wieder gar nicht geht.
+
+protocols = imap lmtp
+
+mail_driver = maildir
+mail_path = %{home}
+
+protocol lmtp {
+  # Dovecot startet LMTP nicht ohne diese Angabe.
+  postmaster_address = postmaster@{{ .Hostname }}
+}
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+
+# Benutzer und Passwörter kommen aus der Datei, die das Panel schreibt.
+# default_password_scheme sagt Dovecot, wie das Feld zu lesen ist; ohne die
+# Angabe nimmt es das Feld für Klartext, und dann käme niemand mehr herein.
+passdb passwd-file {
+  default_password_scheme = SSHA512
+  auth_username_format = %{user}
+  passwd_file_path = {{ .UsersFile }}
+}
+
+userdb passwd-file {
+  auth_username_format = %{user}
+  passwd_file_path = {{ .UsersFile }}
+}
+
+{{ if .CertPath }}
+ssl = required
+ssl_server_cert_file = {{ .CertPath }}
+ssl_server_key_file = {{ .KeyPath }}
+# TLS 1.0 und 1.1 gelten als gebrochen. Wer einen Client hat, der nichts
+# Neueres kann, hat ein größeres Problem als seine Mail.
+ssl_min_protocol = TLSv1.2
+{{ else }}
+# Kein Zertifikat gefunden — Dovecot läuft dann mit dem selbstsignierten des
+# Pakets. Ein Mailprogramm meldet das, und das soll es auch.
+{{ end }}
+
+# Der Socket, über den Postfix fragt, ob ein Absender sich ausweisen kann.
+# Ohne ihn nimmt der Server Post an, aber niemand kann über ihn welche
+# verschicken.
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}

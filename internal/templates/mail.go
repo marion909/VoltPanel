@@ -252,6 +252,12 @@ type DovecotData struct {
 	// Mailprogramm einrichtet, und das ist die richtige Auskunft.
 	CertPath string
 	KeyPath  string
+	// Modern: Dovecot 2.4 und später brauchen eine andere Vorlage als 2.3 —
+	// passdb/userdb ohne args=, kein plugin{}-Block mehr, eigene
+	// ssl_server_*-Einstellungen statt ssl_cert. Der Aufrufer bestimmt das
+	// (dovecotModernConfig in ops_mail.go), nicht diese Datei: sie kennt nur
+	// zwei Vorlagen, keine installierte Fassung.
+	Modern bool
 }
 
 // RenderDovecotConf erzeugt die Ergänzung in conf.d.
@@ -285,8 +291,12 @@ func RenderDovecotConf(d DovecotData) (string, error) {
 		return "", fmt.Errorf("zertifikat und schlüssel gehören zusammen")
 	}
 
+	name := "dovecot.conf.tmpl"
+	if d.Modern {
+		name = "dovecot-modern.conf.tmpl"
+	}
 	var b bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&b, "dovecot.conf.tmpl", d); err != nil {
+	if err := tmpl.ExecuteTemplate(&b, name, d); err != nil {
 		return "", err
 	}
 	return b.String(), nil

@@ -485,3 +485,35 @@ führt Postinst-Skripte als root aus.
   erst auf dem Zielsystem.
 - Getestet gegen Debian 12/13 und Ubuntu 24.04. RHEL-Derivate sind laut Roadmap
   ohnehin später vorgesehen.
+- Mail-Anmeldung auf Debian 13 war bis einschließlich v0.4.26 auf einem
+  echten Server komplett kaputt — weder Webmail noch ein Mailprogramm kamen
+  herein, ohne dass irgendwo ein Fehler auftauchte. Ursache war eine Kette
+  aus vier unabhängigen Fehlern, erst beim Ausprobieren auf einem echten
+  Server gefunden, nicht in einem Test:
+  1. Debian 13 liefert Dovecot 2.4 aus, dessen Config-Syntax an den Stellen,
+     die dieses Panel erzeugt, mit 2.3 unvereinbar ist (kein `plugin{}`-Block
+     mehr, `passdb`/`userdb` ohne `args=`, eigene `ssl_server_*`-Namen). Die
+     bis dahin einzige Vorlage passte nur zu 2.3 (Debian 12, Ubuntu 24.04)
+     und ließ sich von Dovecot 2.4 mit "Unknown section name: plugin" komplett
+     verwerfen — ohne den Dienst am Start zu hindern: ein Reload, der daran
+     scheitert, lässt einfach die zuvor geladene Konfiguration weiterlaufen.
+     Ab v0.4.27 wählt der Agent anhand der installierten Paketversion
+     zwischen zwei Vorlagen (`dovecot.conf.tmpl` und
+     `dovecot-modern.conf.tmpl`); die neue verzichtet bewusst auf die Quota
+     und auf `first_valid_uid`/`last_valid_uid` — für beides fand sich keine
+     Angabe, die sich an einer echten 2.4-Installation bestätigen ließ, und
+     falsch geraten hieße wieder: die ganze Datei verworfen.
+  2. Die Passwortdatei für Dovecot bekam nie die Gruppe des Dienstes, obwohl
+     der Kommentar direkt daneben das schon immer behauptete — Dovecots
+     auth-worker läuft unter einem eigenen, unprivilegierten Systemkonto und
+     konnte die Datei darum nie lesen, auf keiner unterstützten Fassung.
+  3. Debian 13 trennt das LMTP-Binary in ein eigenes Paket
+     (`dovecot-lmtpd`), das die Nachinstallation bislang nicht mit anforderte
+     — obwohl `mail.setup` die Zustellung fest auf LMTP umstellt.
+  4. Roundcube ab 1.6 liefert CSS, JS und Bilder über `static.php` mit
+     PATH_INFO aus, dessen Adressen auf die jeweilige Datei-Endung enden
+     (`static.php/skins/elastic/styles.css`), nicht auf `.php` — die PHP-Regel
+     im Webmail-Vhost traf dafür nicht, die Sperre für Bild-/CSS-Endungen
+     schon, und Webmail blieb ohne jedes Bild und ohne jeden Stil stehen.
+  Alle vier sind mit v0.4.27 behoben und gelten für jede künftige
+  Installation, nicht nur für den einen Server, an dem sie auffielen.
