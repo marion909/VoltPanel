@@ -316,13 +316,23 @@ beim Anlegen einer Datenbank.
 
 Offen:
 
-- phpMyAdmin und Webmail (Roundcube) als weitere Katalogeinträge. Beide sind
-  in der Roadmap ausdrücklich als Plugins vorgesehen, nicht als
-  Kernfunktion — und beide brauchen mehr als "Paket plus Dienst": eine
-  eigene Vhost, einen eigenen PHP-Pool, einen unerratbaren Zugriffspfad.
-  Das ist kein technisches Hindernis, aber ein eigener, sorgfältig zu
-  bauender Schritt, gerade weil beide root-nahen Zugriff auf Datenbank
-  respektive Post geben.
+- Webmail (Roundcube) als weiterer Katalogeintrag. Wie Redis mehr als "Paket
+  plus Dienst": eine eigene Vhost mit eigenem PHP-Pool und eigenem
+  Zugriffspfad, weil Webmail — anders als Redis — von außen erreichbar sein
+  muss.
+- phpMyAdmin steht in der Roadmap ausdrücklich als Plugin, nicht als
+  Kernfunktion. Es passt aber in keines der beiden vorhandenen Muster: kein
+  Server-Dienst wie Redis, und keine gewöhnliche Site wie WordPress — es
+  bräuchte root-nahen Zugriff auf jede Datenbank jedes Mandanten und gehört
+  deshalb hinter dieselbe Anmeldung wie das Panel selbst. Das Panel läuft
+  aber nicht hinter Nginx (`volt-web` spricht TLS direkt,
+  `internal/api/server.go`) — es gibt also keinen Vhost, an den sich eine
+  phpMyAdmin-Route einfach anhängen ließe. Ein eigener, session-geprüfter
+  Reverse-Proxy in Go wäre neuer Code mit echtem Gewicht, für ein Werkzeug mit
+  eigener CVE-Geschichte und im selben Atemzug root-nahem Zugriff auf alle
+  Mandanten. Das ist der Fall, für den Prinzip 5 gilt: lieber offen gelassen
+  als in dieser Phase überstürzt und ungeprüft gebaut. Der SQL-Browser aus
+  Phase 3 deckt den Alltag ab.
 - Eine stabile, dokumentierte interne Plugin-API für mehr als den
   Server-Katalog. Die Roadmap sagt selbst, warum das noch früh wäre: sie
   lohnt sich erst, wenn der Kern sich nicht mehr täglich bewegt — sonst
