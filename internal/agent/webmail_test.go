@@ -95,6 +95,35 @@ func TestInstallRoundcubeFilesLehntFalscheSummeAb(t *testing.T) {
 	}
 }
 
+// Ein zweiter Versuch nach einem Fehlschlag weiter unten in opWebmailInstall
+// (Datenbank, Zertifikat, Vhost — alles nach installRoundcubeFiles) trifft
+// auf ein dest, das schon die Dateien des ersten Versuchs enthält. Install
+// schreibt seine Zeile in die webmail-Tabelle erst als letzten Schritt, lehnt
+// also einen zweiten Versuch nicht ab — der muss hier also gelingen, nicht an
+// os.Rename mit "file exists" scheitern.
+func TestInstallRoundcubeFilesUeberschreibtResteEinesFehlgeschlagenenVersuchs(t *testing.T) {
+	archiv := roundcubeTarGz(t, map[string]string{
+		"index.php":                    "<?php // roundcube",
+		"config/config.inc.php.sample": "<?php // sample config",
+		"SQL/mysql.initial.sql":        "-- schema",
+	})
+	mitTestArchiv(t, archiv)
+
+	dest := t.TempDir()
+	if err := installRoundcubeFiles(context.Background(), dest); err != nil {
+		t.Fatalf("erster versuch: %v", err)
+	}
+	if err := installRoundcubeFiles(context.Background(), dest); err != nil {
+		t.Fatalf("zweiter versuch (reste des ersten liegen noch in dest): %v", err)
+	}
+
+	for _, datei := range []string{"index.php", "config/config.inc.php.sample", "SQL/mysql.initial.sql"} {
+		if _, err := os.Stat(filepath.Join(dest, datei)); err != nil {
+			t.Errorf("%s fehlt nach dem zweiten versuch: %v", datei, err)
+		}
+	}
+}
+
 // opWebmailInstall muss den Systembenutzer prüfen, bevor irgendein Byte über
 // das Netz geht. roundcubeURL zeigt für diesen Test absichtlich auf nichts
 // Erreichbares — würde die Prüfung fehlen, liefe der Aufruf bis zu *diesem*

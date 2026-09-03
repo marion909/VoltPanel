@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Webmail-Installation: ein zweiter Versuch nach einem Fehlschlag scheiterte
+  an den eigenen Resten des ersten — "SQL einsetzen: ... file exists"
 
 ## v0.4.23 — 2026-09-03
 

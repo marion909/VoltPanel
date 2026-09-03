@@ -153,6 +153,16 @@ func installRoundcubeFiles(ctx context.Context, dest string) error {
 	for _, e := range entries {
 		von := filepath.Join(tmp, e.Name())
 		nach := filepath.Join(dest, e.Name())
+		// Ein zweiter Versuch nach einem Fehlschlag weiter unten (Datenbank,
+		// Zertifikat, Vhost) trifft hier auf die Reste des ersten — Install
+		// schreibt seine Zeile in die webmail-Tabelle erst ganz am Ende, also
+		// gibt es beim Wiederholen noch keine, die einen Neuversuch verböte.
+		// os.Rename schlüge sonst an genau der Stelle fehl, an der der erste
+		// Versuch stehengeblieben ist. Idempotent heißt hier: die frisch
+		// geprüften Dateien ersetzen die Reste, statt an ihnen zu scheitern.
+		if err := os.RemoveAll(nach); err != nil {
+			return fmt.Errorf("%s vor dem einsetzen entfernen: %w", e.Name(), err)
+		}
 		if err := os.Rename(von, nach); err != nil {
 			return fmt.Errorf("%s einsetzen: %w", e.Name(), err)
 		}
