@@ -517,3 +517,13 @@ führt Postinst-Skripte als root aus.
      schon, und Webmail blieb ohne jedes Bild und ohne jeden Stil stehen.
   Alle vier sind mit v0.4.27 behoben und gelten für jede künftige
   Installation, nicht nur für den einen Server, an dem sie auffielen.
+- Mit v0.4.27 lief die Anmeldung, aber eingehende Post an eine frisch
+  eingerichtete Domäne kam trotzdem nicht an, wenn deren Name zufällig
+  gleich dem Postfix-eigenen `myhostname` des Servers war (kein seltener
+  Fall: die Hauptdomäne ist oft auch der Servername) — Postfix listet
+  `$myhostname` standardmäßig in `mydestination` und prüft einen Empfänger
+  einer dort gelisteten Domäne gegen die lokale Empfängertabelle, nicht
+  gegen `virtual_mailbox_maps`: "User unknown in local recipient table",
+  obwohl das Postfach in den eigenen Dateien korrekt eingetragen war.
+  `mail.setup` setzt `mydestination` seit v0.4.28 fest auf `localhost` —
+  Postfix' eigene Empfehlung für einen rein virtuellen Aufbau wie diesen.

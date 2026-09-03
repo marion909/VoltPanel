@@ -556,6 +556,20 @@ func (s *Server) opMailSetup(ctx context.Context, _ json.RawMessage) (any, error
 		// Ohne diese Zeile nimmt Postfix Post für jede Domäne an, die in
 		// virtual_mailbox_domains steht — und leitet sie an sich selbst weiter.
 		{"virtual_transport", "virtual"},
+		// mydestination lässt Postfix standardmäßig $myhostname mit einschließen
+		// — und wenn $myhostname zufällig derselbe Name ist wie eine über das
+		// Panel eingerichtete Mail-Domäne (kein seltener Fall: der eigene
+		// Servername ist oft auch die Hauptdomäne), steht diese Domäne dann in
+		// mydestination UND in virtual_mailbox_domains zugleich. Postfix prüft
+		// einen Empfänger einer Domäne aus mydestination gegen die lokale
+		// Empfängertabelle (/etc/passwd, virtual_alias_maps), nicht gegen
+		// virtual_mailbox_maps — jedes Postfach lehnt es dann mit "User unknown
+		// in local recipient table" ab, obwohl es in den eigenen Dateien richtig
+		// steht. localhost ist Postfix' eigene Empfehlung für einen Server, der
+		// ausschließlich virtuelle Domänen bedient (VIRTUAL_README) — auf einem
+		// echten Server so gefunden: eingehende Post an eine frisch
+		// eingerichtete Domäne wurde abgewiesen, ausgehende blieb unbetroffen.
+		{"mydestination", "localhost"},
 	}
 	for _, e := range einstellungen {
 		if out, err := run(ctx, shortTimeout, "postconf", "-e", e[0]+"="+e[1]); err != nil {
