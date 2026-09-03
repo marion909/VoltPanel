@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.26 — 2026-09-03
+
 - Webmail-Vhost zeigte auf die Archivwurzel statt auf public_html — ab
   Roundcube 1.6 nur noch die eingebaute Warnung statt der Anmeldung
 
