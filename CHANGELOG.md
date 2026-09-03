@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Mail: Autoconfig für Thunderbird und Autodiscover für Outlook — ein Klick
+  trägt Zertifikat, Vhost und DNS-Einträge ein
 
 ## v0.4.21 — 2026-09-03
 

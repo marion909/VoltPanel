@@ -139,6 +139,26 @@ func TestFeatureInstallNurFuerAdmins(t *testing.T) {
 	}
 }
 
+// Ein fremder Mandant darf über /autoconfig weder ein Zertifikat für eine
+// fremde Domäne auslösen noch deren Vhost anfassen. Unterschieden wird nicht
+// nur "kein 201" — Alice selbst bekäme ohne hinterlegten Cloudflare-Token
+// ebenfalls keinen Erfolg (400, eine Validierungsmeldung). Der Test prüft
+// deshalb genau den Code, den store.ErrForbidden ergibt (404), damit ein
+// Ausfall der Mandantenprüfung nicht hinter der ohnehin fehlenden
+// Konfiguration verschwindet.
+func TestPublishAutoconfigNurFuerEigenenMandanten(t *testing.T) {
+	ts := newTestServer(t)
+	dom, _ := mailDomainFuer(t, ts, "alice")
+
+	ts.login(t, "bob@example.at") // anderer Mandant
+	domID := strconv.FormatInt(dom.ID, 10)
+
+	rec := ts.do(http.MethodPost, "/api/v1/mail/domains/"+domID+"/autoconfig", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("bob: status %d, erwartet 404 — %s", rec.Code, rec.Body.String())
+	}
+}
+
 // Die Rspamd-Statistik gilt für den ganzen Server, nicht für einen
 // Mandanten — dieselbe Regel wie beim übrigen Zustandsbericht. Ein Kunde
 // bekommt sie nicht.

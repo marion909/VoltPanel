@@ -15,6 +15,7 @@ import (
 	"github.com/marion909/voltpanel/internal/authn"
 	"github.com/marion909/voltpanel/internal/config"
 	"github.com/marion909/voltpanel/internal/store"
+	"github.com/marion909/voltpanel/internal/templates"
 )
 
 // MailService verwaltet Domänen, Postfächer und Weiterleitungen.
@@ -35,6 +36,7 @@ type MailService struct {
 	cfg     *config.Config
 	secrets *authn.SecretBox
 	quota   *QuotaService
+	certs   *CertService
 }
 
 func NewMailService(st *store.Store, ag *agent.Client, cfg *config.Config,
@@ -43,6 +45,7 @@ func NewMailService(st *store.Store, ag *agent.Client, cfg *config.Config,
 	return &MailService{
 		store: st, agent: ag, cfg: cfg, secrets: secrets,
 		quota: NewQuotaService(st, ag, cfg, nil),
+		certs: NewCertService(cfg, st, ag, secrets, nil),
 	}
 }
 
@@ -643,6 +646,110 @@ func (s *MailService) PublishDNS(ctx context.Context, sc store.Scope, domainID i
 			melde("DMARC", BefundKritisch, err.Error())
 		} else {
 			melde("DMARC", BefundGut, "p=none gesetzt — sammelt Berichte, weist nichts ab.")
+		}
+	}
+
+	return out, nil
+}
+
+// PublishAutoconfig richtet Autokonfiguration für Thunderbird und Outlook ein.
+//
+// Beide Programme fragen — bevor ein Kunde irgendetwas von Hand einträgt —
+// eine feste Adresse: Thunderbird https://autoconfig.<domain>/mail/…,
+// Outlook https://autodiscover.<domain>/autodiscover/…. Damit dort etwas
+// antwortet, braucht es drei Dinge, in dieser Reihenfolge: den Inhalt (zwei
+// generierte XML-Dateien, geschrieben über den Agent), ein Zertifikat für
+// beide Namen (DNS-01, weil eine Nginx-Config ohne Zertifikat nicht gilt),
+// und zuletzt den Vhost, der beides zusammenbringt. Die DNS-Einträge kommen
+// als Letztes — sonst zeigte eine schon aufgelöste Adresse für einen Moment
+// auf einen Server, der noch nicht antworten kann.
+//
+// Wie bei PublishDNS: kein Rückbau bei einem Fehler auf halbem Weg. Ein
+// Zertifikat, das schon ausgestellt ist, wird beim nächsten Versuch einfach
+// wiederverwendet — derselbe Ablauf wie beim Zertifikat einer Anmeldedomain.
+func (s *MailService) PublishAutoconfig(ctx context.Context, sc store.Scope, domainID int64) (
+	[]DNSErgebnis, error) {
+
+	d, err := s.store.GetMailDomain(ctx, sc, domainID)
+	if err != nil {
+		return nil, err
+	}
+	tenant, err := s.store.GetTenant(ctx, sc, d.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	if tenant.CloudflareToken == "" {
+		return nil, errors.New("für diesen mandanten ist kein cloudflare-token hinterlegt — " +
+			"ohne token lässt sich weder das zertifikat noch der dns-eintrag automatisch setzen")
+	}
+	token, err := s.secrets.Decrypt(tenant.CloudflareToken)
+	if err != nil {
+		return nil, fmt.Errorf("cloudflare-token: %w", err)
+	}
+
+	facts, err := s.agent.MailFactsOf(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("serveradresse: %w", err)
+	}
+	if len(facts.PublicIPs) == 0 {
+		return nil, errors.New("der server hat keine öffentliche adresse gemeldet — " +
+			"ohne sie lässt sich kein dns-eintrag setzen")
+	}
+	ip := facts.PublicIPs[0]
+
+	settings := s.Settings(ctx)
+	autoconfigHost := "autoconfig." + d.Domain
+	autodiscoverHost := "autodiscover." + d.Domain
+
+	var out []DNSErgebnis
+	melde := func(name, status, text string) {
+		out = append(out, DNSErgebnis{Name: name, Status: status, Text: text})
+	}
+
+	mozillaPath, microsoftPath, err := s.agent.WriteMailAutoconfig(ctx, d.Domain, settings.Host,
+		settings.IMAPPort, settings.SMTPPort)
+	if err != nil {
+		melde("Konfiguration", BefundKritisch, err.Error())
+		return out, nil
+	}
+	melde("Konfiguration", BefundGut, "für "+d.Domain+" geschrieben.")
+
+	cert, err := s.certs.Issue(ctx, sc, IssueOptions{
+		Domains:         []string{autoconfigHost, autodiscoverHost},
+		CloudflareToken: token, TenantID: d.TenantID,
+	})
+	if err != nil {
+		melde("Zertifikat", BefundKritisch, err.Error())
+		return out, nil
+	}
+	melde("Zertifikat", BefundGut, "für "+autoconfigHost+" und "+autodiscoverHost+" ausgestellt.")
+
+	vhost, err := templates.RenderAutoconfigVhost(templates.AutoconfigVhostData{
+		AutoconfigHost: autoconfigHost, AutodiscoverHost: autodiscoverHost,
+		CertPath: cert.CertPath, KeyPath: cert.KeyPath,
+		MozillaPath: mozillaPath, MicrosoftPath: microsoftPath,
+	})
+	if err != nil {
+		melde("Vhost", BefundKritisch, err.Error())
+		return out, nil
+	}
+	if err := s.agent.WriteVhost(ctx, autoconfigHost, vhost); err != nil {
+		melde("Vhost", BefundKritisch, err.Error())
+		return out, nil
+	}
+	melde("Vhost", BefundGut, "aktiv.")
+
+	cf := newCloudflareClient(token)
+	zone, err := cf.zoneID(ctx, d.Domain)
+	if err != nil {
+		melde("DNS", BefundKritisch, err.Error())
+		return out, nil
+	}
+	for _, host := range []string{autoconfigHost, autodiscoverHost} {
+		if err := cf.setzeA(ctx, zone, host, ip); err != nil {
+			melde(host, BefundKritisch, err.Error())
+		} else {
+			melde(host, BefundGut, "zeigt jetzt auf "+ip+".")
 		}
 	}
 

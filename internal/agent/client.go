@@ -743,6 +743,19 @@ func (c *Client) RspamdStatsOf(ctx context.Context) (*RspamdStats, error) {
 	return &res, err
 }
 
+// WriteMailAutoconfig schreibt die Mozilla-/Microsoft-Konfiguration einer
+// Maildomäne und liefert die beiden Dateipfade zurück, auf die der zugehörige
+// Vhost verweisen muss.
+func (c *Client) WriteMailAutoconfig(ctx context.Context, domain, host string,
+	imapPort, smtpPort int) (mozillaPath, microsoftPath string, err error) {
+
+	var res map[string]string
+	err = c.Call(ctx, OpMailAutoconfig, AutoconfigParams{
+		Domain: domain, Host: host, IMAPPort: imapPort, SMTPPort: smtpPort,
+	}, &res)
+	return res["mozilla_path"], res["microsoft_path"], err
+}
+
 // ApplyMail schreibt den vollständigen Sollzustand in die Map-Dateien.
 func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, error) {
 	var res TextResult

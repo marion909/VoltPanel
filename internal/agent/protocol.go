@@ -137,6 +137,11 @@ const (
 	// — was tatsächlich als Spam gilt, nicht nur, dass der Milter eingetragen
 	// ist.
 	OpMailSpamStats Op = "mail.spamstats"
+	// OpMailAutoconfig schreibt die Mozilla- und Microsoft-Konfiguration einer
+	// Maildomäne als statische XML-Dateien. Ein eigener Vhost
+	// (autoconfig.<domain> / autodiscover.<domain>) liefert sie danach
+	// unverändert aus — hier entsteht nur der Inhalt, nicht die Config.
+	OpMailAutoconfig Op = "mail.autoconfig"
 
 	// OpFeatureInstall holt nach, was das Panel verwaltet — aus einer festen
 	// Liste, nie mit einem Paketnamen aus der Anfrage. OpFeatureUninstall

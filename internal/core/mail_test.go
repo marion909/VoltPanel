@@ -449,3 +449,41 @@ func setzeDNS(t *testing.T, txt map[string][]string) {
 	dnsHost = func(context.Context, string) ([]string, error) { return nil, errors.New("kein eintrag") }
 	dnsAddr = func(context.Context, string) ([]string, error) { return nil, errors.New("kein eintrag") }
 }
+
+// PublishAutoconfig braucht einen Cloudflare-Token — ohne ihn lässt sich
+// weder das Zertifikat (dns-01) noch der A-Eintrag setzen. Die Prüfung muss
+// feuern, bevor irgendein Aufruf zum Agent geht: bliebe sie aus, schlüge der
+// Aufruf im Test trotzdem fehl (der Agent ist hier nicht erreichbar), aber
+// mit einer ganz anderen Meldung — deshalb wird hier auf den genauen Text
+// geprüft, nicht nur auf "err != nil".
+func TestPublishAutoconfigOhneCloudflareToken(t *testing.T) {
+	env := newTestEnv(t)
+	svc := mailService(env)
+	tenantID := seedMailTenant(t, env, "alice")
+	domID := ersteDomain(t, env, tenantID)
+	sc := store.Scope{TenantID: tenantID, Role: store.RoleOwner}
+
+	_, err := svc.PublishAutoconfig(context.Background(), sc, domID)
+	if err == nil {
+		t.Fatal("ohne cloudflare-token wurde die anfrage angenommen")
+	}
+	if !strings.Contains(err.Error(), "cloudflare-token") {
+		t.Errorf("unerwartete meldung: %v", err)
+	}
+}
+
+// Eine fremde Domain-ID darf PublishAutoconfig nicht erreichen — dieselbe
+// Zusage wie bei jeder anderen Methode dieses Dienstes: GetMailDomain im
+// Scope des Aufrufers findet sie gar nicht erst.
+func TestPublishAutoconfigFremdeDomaeneNichtErreichbar(t *testing.T) {
+	env := newTestEnv(t)
+	svc := mailService(env)
+	aliceID := seedMailTenant(t, env, "alice")
+	bobID := seedMailTenant(t, env, "bob")
+	aliceDomID := ersteDomain(t, env, aliceID)
+
+	scBob := store.Scope{TenantID: bobID, Role: store.RoleOwner}
+	if _, err := svc.PublishAutoconfig(context.Background(), scBob, aliceDomID); err == nil {
+		t.Fatal("bob konnte alices maildomäne veröffentlichen")
+	}
+}

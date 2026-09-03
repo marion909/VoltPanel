@@ -28,6 +28,7 @@ const aliasForm = ref({ domain_id: null, source: '', destination: '' })
 const dkim = ref({})
 const check = ref(null)
 const dnsErgebnis = ref({})
+const autoconfigErgebnis = ref({})
 const settings = ref(null)
 const checkBusy = ref(false)
 const spam = ref(null)
@@ -192,6 +193,14 @@ function umschalten(d) {
 const dnsSetzen = (d) =>
   fuehreAus(async () => {
     dnsErgebnis.value = { ...dnsErgebnis.value, [d.id]: await api.post(`/mail/domains/${d.id}/dns`) }
+  })
+
+const autoconfigSetzen = (d) =>
+  fuehreAus(async () => {
+    autoconfigErgebnis.value = {
+      ...autoconfigErgebnis.value,
+      [d.id]: await api.post(`/mail/domains/${d.id}/autoconfig`),
+    }
   })
 
 const dkimAnlegen = (d) =>
@@ -619,6 +628,33 @@ onMounted(load)
                 <ul v-if="dnsErgebnis[d.id]" class="mt-2 space-y-0.5 text-[11px]">
                   <li
                     v-for="(e, i) in dnsErgebnis[d.id]"
+                    :key="i"
+                    class="flex items-center gap-2"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 shrink-0 rounded-full"
+                      :style="{ background: stufenFarbe[e.status] }"
+                    ></span>
+                    <span class="font-medium">{{ e.name }}</span>
+                    <span :style="{ color: 'var(--ink-secondary)' }">{{ e.text }}</span>
+                  </li>
+                </ul>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    class="rounded-md border px-2 py-1 text-[12px]"
+                    :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
+                    :disabled="busy"
+                    @click="autoconfigSetzen(d)"
+                  >
+                    {{ t('mail.autoconfigPublish') }}
+                  </button>
+                  <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                    {{ t('mail.autoconfigPublishHint') }}
+                  </span>
+                </div>
+                <ul v-if="autoconfigErgebnis[d.id]" class="mt-2 space-y-0.5 text-[11px]">
+                  <li
+                    v-for="(e, i) in autoconfigErgebnis[d.id]"
                     :key="i"
                     class="flex items-center gap-2"
                   >

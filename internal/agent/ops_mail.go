@@ -740,6 +740,72 @@ func (s *Server) opMailFacts(ctx context.Context, _ json.RawMessage) (any, error
 	return res, nil
 }
 
+// AutoconfigParams beschreibt, wofür eine Mozilla-/Microsoft-Konfiguration
+// entstehen soll. Host, IMAPPort und SMTPPort sind dieselben Werte, die
+// MailService.Settings auch einem Kunden zeigt — hier gehen sie einmalig über
+// die Leitung, statt dass der Agent sie sich selbst ausdenkt.
+type AutoconfigParams struct {
+	Domain   string `json:"domain"`
+	Host     string `json:"host"`
+	IMAPPort int    `json:"imap_port"`
+	SMTPPort int    `json:"smtp_port"`
+}
+
+// opMailAutoconfig schreibt die Mozilla- und Microsoft-Konfiguration einer
+// Maildomäne als statische XML-Dateien.
+//
+// Der Vhost, der sie ausliefert (autoconfig.<domain> / autodiscover.<domain>),
+// entsteht separat über opNginxWriteVhost — hier entsteht nur der Inhalt, den
+// er unverändert ausliefert. Kein Templating im Vhost selbst: eine Nginx-
+// Config, die generierten XML-Text in eine Antwortzeile einbetten müsste,
+// bräuchte eine zweite Maskierung obendrauf — eine für XML, eine fürs
+// Nginx-Zeichenkettenformat. Eine Datei plus `alias` braucht keine von beiden.
+func (s *Server) opMailAutoconfig(_ context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[AutoconfigParams](raw, OpMailAutoconfig)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkDomain(p.Domain); err != nil {
+		return nil, err
+	}
+	if err := checkDomain(p.Host); err != nil {
+		return nil, err
+	}
+
+	data := templates.AutoconfigData{
+		Domain: p.Domain, Host: p.Host, IMAPPort: p.IMAPPort, SMTPPort: p.SMTPPort,
+	}
+	mozilla, err := templates.RenderMozillaAutoconfig(data)
+	if err != nil {
+		return nil, opErr(OpMailAutoconfig, "mozilla-konfiguration: %v", err)
+	}
+	microsoft, err := templates.RenderMicrosoftAutodiscover(data)
+	if err != nil {
+		return nil, opErr(OpMailAutoconfig, "microsoft-konfiguration: %v", err)
+	}
+
+	dir := filepath.Join(s.autoconfigDir, p.Domain)
+	if _, err := jail(dir, []string{s.autoconfigDir}); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, opErr(OpMailAutoconfig, "verzeichnis anlegen: %v", err)
+	}
+
+	mozillaPath := filepath.Join(dir, "config-v1.1.xml")
+	microsoftPath := filepath.Join(dir, "autodiscover.xml")
+	if err := writeFileAtomic(mozillaPath, []byte(mozilla), 0o644); err != nil {
+		return nil, opErr(OpMailAutoconfig, "mozilla-konfiguration schreiben: %v", err)
+	}
+	if err := writeFileAtomic(microsoftPath, []byte(microsoft), 0o644); err != nil {
+		return nil, opErr(OpMailAutoconfig, "microsoft-konfiguration schreiben: %v", err)
+	}
+
+	return map[string]string{
+		"mozilla_path": mozillaPath, "microsoft_path": microsoftPath,
+	}, nil
+}
+
 // oeffentlicheAdressen sind die Adressen, unter denen der Server von außen zu
 // sehen sein könnte.
 //

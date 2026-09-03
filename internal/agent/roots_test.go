@@ -21,6 +21,13 @@ var notARoot = map[string]bool{
 	// DeployDir hält die privaten Deploy-Keys. Auch dorthin kommt kein Pfad
 	// aus einer Anfrage — er entsteht aus dem geprüften Namen der Site.
 	"DeployDir": true,
+	// AutoconfigDir hält die generierten Mozilla-/Microsoft-Konfigurationen.
+	// Stünde es in roots, wäre es über jeden datei-basierten Endpunkt
+	// erreichbar (file.write kennt keine tenant_id) — und ein Mandant könnte
+	// die Autokonfiguration einer fremden Maildomäne überschreiben. Der
+	// einzige Zugang bleibt opMailAutoconfig, das seinen eigenen, engeren
+	// jail()-Aufruf gegen genau dieses Verzeichnis macht.
+	"AutoconfigDir": true,
 }
 
 // notARootSuffix: Optionen, die auf etwas anderes als "Dir" enden und trotzdem

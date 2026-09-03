@@ -174,6 +174,23 @@ func (s *Server) handlePublishDNS(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+// handlePublishAutoconfig richtet Autokonfiguration für Thunderbird und
+// Outlook ein — Vhost, Zertifikat und DNS-Einträge für autoconfig.<domain>
+// und autodiscover.<domain>.
+func (s *Server) handlePublishAutoconfig(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	res, err := s.mail.PublishAutoconfig(ctx, s.scopeFor(c), id)
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "mail.autoconfig.publish", "id", c.Param("id"), "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, res)
+}
+
 // handleDKIM liefert den DNS-Eintrag noch einmal.
 func (s *Server) handleDKIM(c echo.Context) error {
 	id, err := pathID(c)

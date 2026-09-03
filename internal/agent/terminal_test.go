@@ -25,14 +25,15 @@ func testServer(t *testing.T) (*Server, string) {
 	}
 
 	srv, err := NewServer(ServerOptions{
-		SocketPath: filepath.Join(dir, "a.sock"),
-		Logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
-		SitesDir:   sites,
-		NginxDir:   filepath.Join(dir, "nginx"),
-		PHPDir:     filepath.Join(dir, "php"),
-		CertDir:    filepath.Join(dir, "certs"),
-		LogDir:     filepath.Join(dir, "log"),
-		BackupDir:  filepath.Join(dir, "backups"),
+		SocketPath:    filepath.Join(dir, "a.sock"),
+		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		SitesDir:      sites,
+		NginxDir:      filepath.Join(dir, "nginx"),
+		PHPDir:        filepath.Join(dir, "php"),
+		CertDir:       filepath.Join(dir, "certs"),
+		LogDir:        filepath.Join(dir, "log"),
+		BackupDir:     filepath.Join(dir, "backups"),
+		AutoconfigDir: filepath.Join(dir, "autoconfig"),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -159,6 +159,45 @@ func (c *cloudflareClient) txtRecords(ctx context.Context, zone, name string) (
 	return out, nil
 }
 
+// aRecords sind die vorhandenen A-Einträge zu einem Namen.
+func (c *cloudflareClient) aRecords(ctx context.Context, zone, name string) (
+	[]cfRecord, error) {
+
+	roh, err := c.ruf(ctx, http.MethodGet,
+		"/zones/"+zone+"/dns_records?type=A&name="+url.QueryEscape(name), nil)
+	if err != nil {
+		return nil, err
+	}
+	var out []cfRecord
+	if err := json.Unmarshal(roh, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// setzeA legt einen A-Eintrag an oder ändert ihn — anders als bei SPF/DMARC
+// immer überschrieben, denn der Name (autoconfig.<domain>,
+// autodiscover.<domain>) gehört dem Panel: es gibt keinen fremden Eintrag,
+// den es zu schonen gälte.
+func (c *cloudflareClient) setzeA(ctx context.Context, zone, name, ip string) error {
+	vorhanden, err := c.aRecords(ctx, zone, name)
+	if err != nil {
+		return err
+	}
+	neu := cfRecord{Type: "A", Name: name, Content: ip, TTL: 1}
+
+	if len(vorhanden) > 0 {
+		if vorhanden[0].Content == ip {
+			return nil
+		}
+		_, err = c.ruf(ctx, http.MethodPut,
+			"/zones/"+zone+"/dns_records/"+vorhanden[0].ID, neu)
+		return err
+	}
+	_, err = c.ruf(ctx, http.MethodPost, "/zones/"+zone+"/dns_records", neu)
+	return err
+}
+
 // setzeTXT legt einen TXT-Eintrag an oder ändert ihn.
 //
 // Geändert wird nur, was diesem Panel gehört — der Aufrufer entscheidet das,

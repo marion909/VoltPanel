@@ -1,0 +1,36 @@
+# Generiert von VoltPanel — {{ .GeneratedAt }}. Nicht von Hand ändern, der
+# nächste Aufruf überschreibt es.
+#
+# Liefert die Mozilla- und Microsoft-Konfiguration einer Maildomäne aus. Der
+# Inhalt selbst entsteht in internal/agent (opMailAutoconfig) als statische
+# Datei — hier steht nur, wo sie liegt.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .AutoconfigHost }} {{ .AutodiscoverHost }};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name {{ .AutoconfigHost }} {{ .AutodiscoverHost }};
+
+    ssl_certificate {{ .CertPath }};
+    ssl_certificate_key {{ .KeyPath }};
+
+    location = /mail/config-v1.1.xml {
+        default_type application/xml;
+        alias {{ .MozillaPath }};
+    }
+
+    location = /autodiscover/autodiscover.xml {
+        default_type application/xml;
+        alias {{ .MicrosoftPath }};
+    }
+
+    location / {
+        return 404;
+    }
+}

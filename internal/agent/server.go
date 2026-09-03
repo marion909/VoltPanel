@@ -48,6 +48,10 @@ type Server struct {
 	// nodeRoot hält die installierten Node-Fassungen. Keine Wurzel: der Pfad
 	// darin entsteht aus einer Hauptversionsnummer, nie aus einer Anfrage.
 	nodeRoot string
+	// autoconfigDir hält die generierten Mozilla-/Microsoft-Konfigurationen je
+	// Maildomäne. Der Pfad darin entsteht aus einer geprüften Domain
+	// (checkDomain), nie aus einem freien Feld.
+	autoconfigDir string
 	// panelDomain kommt aus der Konfiguration, nicht aus der Anfrage: nur so
 	// kann der Web-Prozess sich nicht selbst zum Eigentümer eines fremden
 	// Schlüssels erklären.
@@ -66,18 +70,19 @@ type Server struct {
 }
 
 type ServerOptions struct {
-	SocketPath string
-	PeerUser   string // Systemuser, der sich verbinden darf (üblicherweise "volt")
-	Logger     *slog.Logger
-	NginxDir   string
-	PHPDir     string
-	CertDir    string
-	SitesDir   string
-	LogDir     string
-	BackupDir  string
-	AppDir     string
-	DeployDir  string
-	NodeRoot   string
+	SocketPath    string
+	PeerUser      string // Systemuser, der sich verbinden darf (üblicherweise "volt")
+	Logger        *slog.Logger
+	NginxDir      string
+	PHPDir        string
+	CertDir       string
+	SitesDir      string
+	LogDir        string
+	BackupDir     string
+	AppDir        string
+	DeployDir     string
+	NodeRoot      string
+	AutoconfigDir string
 	// PanelDomain ist die Domain des Panels selbst. Ihr Schlüssel bekommt den
 	// Peer als Eigentümer, weil volt-web ihn lesen muss.
 	PanelDomain string
@@ -99,6 +104,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	setDefault(&opts.AppDir, "/etc/volt/apps")
 	setDefault(&opts.DeployDir, "/etc/volt/deploy")
 	setDefault(&opts.NodeRoot, "/opt/volt/node")
+	setDefault(&opts.AutoconfigDir, "/var/lib/volt/autoconfig")
 
 	peerUID, peerGID := -1, -1
 	if opts.PeerUser != "" {
@@ -115,18 +121,19 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	}
 
 	s := &Server{
-		socketPath:  opts.SocketPath,
-		peerUID:     peerUID,
-		peerGID:     peerGID,
-		log:         opts.Logger,
-		nginxDir:    opts.NginxDir,
-		phpDir:      opts.PHPDir,
-		certDir:     opts.CertDir,
-		logDir:      opts.LogDir,
-		appDir:      opts.AppDir,
-		deployDir:   opts.DeployDir,
-		nodeRoot:    opts.NodeRoot,
-		panelDomain: opts.PanelDomain,
+		socketPath:    opts.SocketPath,
+		peerUID:       peerUID,
+		peerGID:       peerGID,
+		log:           opts.Logger,
+		nginxDir:      opts.NginxDir,
+		phpDir:        opts.PHPDir,
+		certDir:       opts.CertDir,
+		logDir:        opts.LogDir,
+		appDir:        opts.AppDir,
+		deployDir:     opts.DeployDir,
+		nodeRoot:      opts.NodeRoot,
+		autoconfigDir: opts.AutoconfigDir,
+		panelDomain:   opts.PanelDomain,
 		// Alles, was der Agent an Dateien überhaupt anfassen darf.
 		//
 		// BackupDir gehört dazu, weil Dump und Import dort ihre Datei ablegen.

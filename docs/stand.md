@@ -244,9 +244,22 @@ nach Aktion (no action, add header, greylist, reject — unverändert von dort
 unterstützen wäre mehr Fläche für ein Werkzeug, dessen einzige Aufgabe hier
 ist, vier Zahlen abzulesen.
 
+Autoconfig für Thunderbird und Autodiscover für Outlook stehen ebenfalls:
+beide Programme fragen, bevor ein Kunde irgendetwas von Hand einträgt, eine
+feste Adresse — Thunderbird `autoconfig.<domain>`, Outlook
+`autodiscover.<domain>`. Für beide zusammen entsteht ein eigener Vhost mit
+einem gemeinsamen Zertifikat (zwei Namen als SAN, über DNS-01, weil die
+Subdomains beim Anlegen noch nicht auflösen); den Inhalt — zwei statische
+XML-Dateien — schreibt der Agent (`opMailAutoconfig`), damit der Vhost selbst
+keine generierten Werte einbetten muss und keine zweite Maskierung neben der
+für XML braucht. Die A-Einträge kommen zuletzt, über denselben
+Cloudflare-Token wie SPF/DKIM/DMARC — sonst zeigte eine schon aufgelöste
+Adresse für einen Moment auf einen Server, der noch nicht antworten kann.
+Ohne Cloudflare-Token bleibt es bei der manuellen Auskunft unter
+"Mail-Einstellungen", wie schon bei SPF/DKIM/DMARC.
+
 Offen ist der Rest:
 
-- Autoconfig und Autodiscover für Thunderbird und Outlook.
 - Die Quota greift jetzt, weil Dovecot zustellt und nicht Postfix — auf einem
   laufenden Server erprobt ist sie damit noch nicht.
 - Webmail (Roundcube) als Plugin
