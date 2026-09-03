@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Webmail-Installation: derselbe Fehlschlag-dann-Neuversuch traf als
+  Nächstes auf das Datenbankschema — "table already exists"
 
 ## v0.4.24 — 2026-09-03
 

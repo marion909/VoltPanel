@@ -106,6 +106,21 @@ func (s *Server) opWebmailInstall(ctx context.Context, raw json.RawMessage) (any
 		return nil, opErr(OpWebmailInstall, "installer entfernen: %v", err)
 	}
 
+	// Derselbe grund wie beim auspacken oben: ein zweiter versuch nach einem
+	// fehlschlag weiter unten (zertifikat, vhost) trifft hier auf die
+	// tabellen des ersten. Roundcubes mysql.initial.sql kennt kein "CREATE
+	// TABLE IF NOT EXISTS" — ein zweiter import schlüge mit "table already
+	// exists" fehl, geschehen auf einem echten server. Die datenbank gehört
+	// ausschließlich dieser einen installation (angelegt von
+	// WebmailService.Install eigens dafür), ein leeren vor dem einspielen
+	// ist also kein Verlust. Privilegien überleben ein DROP DATABASE — MySQL
+	// bindet sie an den namen, nicht an die existenz des schemas —,
+	// CreateDBUser weiter oben in WebmailService.Install muss deshalb nicht
+	// erneut laufen.
+	if err := resetWebmailDatabase(ctx, p.DBName); err != nil {
+		return nil, opErr(OpWebmailInstall, "%v", err)
+	}
+
 	sqlPath := filepath.Join(dest, "SQL", "mysql.initial.sql")
 	f, err := os.Open(sqlPath)
 	if err != nil {
@@ -121,6 +136,24 @@ func (s *Server) opWebmailInstall(ctx context.Context, raw json.RawMessage) (any
 	}
 
 	return TextResult{Text: "webmail ausgepackt und eingerichtet"}, nil
+}
+
+// resetWebmailDatabase leert die Datenbank vor dem Einspielen des Schemas —
+// idempotent im selben Sinn wie installRoundcubeFiles: ein zweiter Versuch
+// ersetzt, statt an Resten zu scheitern.
+func resetWebmailDatabase(ctx context.Context, name string) error {
+	db, err := mysqlConn()
+	if err != nil {
+		return err
+	}
+	if _, err := db.ExecContext(ctx, "DROP DATABASE IF EXISTS "+quoteIdent(name)); err != nil {
+		return fmt.Errorf("datenbank leeren: %w", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		"CREATE DATABASE "+quoteIdent(name)+" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+		return fmt.Errorf("datenbank neu anlegen: %w", err)
+	}
+	return nil
 }
 
 // installRoundcubeFiles holt und prüft den Roundcube-Kern und packt ihn in
