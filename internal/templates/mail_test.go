@@ -287,6 +287,7 @@ func TestDovecotConfModernBrauchtDie24Syntax(t *testing.T) {
 		"ssl_min_protocol = TLSv1.2",
 		"mail_driver = maildir",
 		"mail_path = %{home}",
+		"mail_inbox_path = %{home}",
 		"protocols = imap lmtp",
 		"postmaster_address = postmaster@mail.example.at",
 		"/var/spool/postfix/private/dovecot-lmtp",

@@ -26,6 +26,16 @@ protocols = imap lmtp
 
 mail_driver = maildir
 mail_path = %{home}
+# Debian's Paket-Vorgabe (10-mail.conf) setzt mail_inbox_path fest auf
+# /var/mail/%{user} — den klassischen mbox-Spool für einzelne Systembenutzer,
+# root:mail gehörend. Ohne diese Zeile hier landet nur INBOX dort statt unter
+# %{home} wie jeder andere Ordner — vmail darf dort nichts anlegen, und jede
+# Anmeldung meldet "Mailbox INBOX: Failed to autocreate mailbox: Permission
+# denied", obwohl der eigentliche Maildir-Baum unter %{home} völlig in
+# Ordnung ist (dort legt Dovecot Sent, Trash usw. anstandslos an — nur INBOX
+# selbst nie, wegen dieses einen abweichenden Pfads). Auf einem echten
+# Server so gefunden.
+mail_inbox_path = %{home}
 
 protocol lmtp {
   # Dovecot startet LMTP nicht ohne diese Angabe.
