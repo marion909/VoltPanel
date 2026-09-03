@@ -65,9 +65,26 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ \.php$ {
-        try_files $uri =404;
+    # Feste Adresse, die Browser von sich aus abrufen — Roundcube selbst
+    # verlinkt sie nirgends. Ohne diese Zeile bliebe sie ein 404, weil unter
+    # public_html keine Datei dieses Namens liegt (siehe unten).
+    location = /favicon.ico {
+        rewrite ^ /static.php/skins/elastic/images/favicon.ico last;
+    }
+
+    # \.php(/|$) statt \.php$: Roundcube liefert ab 1.6 CSS, JS und Bilder
+    # nicht mehr als eigene Dateien unter public_html aus, sondern über
+    # static.php mit PATH_INFO — eine Adresse wie
+    # static.php/skins/elastic/styles.css endet auf .css, nicht auf .php.
+    # Mit der alten, engeren Regel traf für sie die Sperre für Bild-/CSS-
+    # Endungen weiter unten zuerst, und sie liefen ins Leere: kein Stil, keine
+    # Bilder — genau das Bild, das auf einem echten Server auftrat.
+    location ~ \.php(/|$) {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        # Prüft das abgespaltene Skript, nicht die volle Adresse mit
+        # PATH_INFO — die gäbe es als Datei nie, mit try_files $uri liefe
+        # jede static.php-Anfrage sofort in den 404.
+        try_files $fastcgi_script_name =404;
         fastcgi_pass unix:{{ .SocketPath }};
         fastcgi_index index.php;
         include fastcgi_params;
