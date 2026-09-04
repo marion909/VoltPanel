@@ -92,7 +92,51 @@ func joinInside(root, rel string) (string, error) {
 	if abs != root && !strings.HasPrefix(abs, root+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: %q", errPathEscape, rel)
 	}
+
+	// Die Prüfung oben ist rein lexikalisch. Ein Symlink, den der Mandant
+	// selbst innerhalb seiner eigenen Site anlegt (kein besonderes Privileg
+	// nötig), kann auf das Verzeichnis einer fremden Site zeigen — der Agent
+	// löst Symlinks zwar auf, prüft das Ergebnis danach aber nur gegen die
+	// breite, mandantenübergreifende SitesDir-Wurzel, nicht gegen diese
+	// einzelne Site. Deshalb hier zusätzlich beide Seiten symlink-fest
+	// auflösen (so weit sie existieren) und erneut gegen die Site-Wurzel
+	// prüfen, bevor der Pfad den Agent überhaupt erreicht.
+	realRoot, err := resolveExistingPrefix(root)
+	if err != nil {
+		return "", fmt.Errorf("%w: site-wurzel nicht auflösbar", errPathEscape)
+	}
+	realAbs, err := resolveExistingPrefix(abs)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q nicht auflösbar", errPathEscape, rel)
+	}
+	if realAbs != realRoot && !strings.HasPrefix(realAbs, realRoot+string(filepath.Separator)) {
+		return "", fmt.Errorf("%w: %q verlässt die site-wurzel über einen symlink", errPathEscape, rel)
+	}
 	return abs, nil
+}
+
+// resolveExistingPrefix löst Symlinks entlang von path auf, so weit die
+// Segmente bereits existieren. Der noch nicht angelegte Teil (z. B. beim
+// Schreiben einer neuen Datei) wird unverändert angehängt — er kann selbst
+// noch kein Symlink sein, weil es ihn noch nicht gibt.
+func resolveExistingPrefix(path string) (string, error) {
+	var missing []string
+	cur := path
+	for {
+		real, err := filepath.EvalSymlinks(cur)
+		if err == nil {
+			for i := len(missing) - 1; i >= 0; i-- {
+				real = filepath.Join(real, missing[i])
+			}
+			return real, nil
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return "", fmt.Errorf("pfad %q nicht auflösbar: %w", path, err)
+		}
+		missing = append(missing, filepath.Base(cur))
+		cur = parent
+	}
 }
 
 // relativeTo bildet einen absoluten Pfad wieder auf die Site-relative Form ab,

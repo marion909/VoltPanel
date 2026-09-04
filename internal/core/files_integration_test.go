@@ -235,6 +235,28 @@ func TestFileServiceTenantIsolation(t *testing.T) {
 			t.Fatal("Bob konnte eine Datei in Alices Site verschieben")
 		}
 	})
+
+	// Bob legt in seiner eigenen, vollständig von ihm kontrollierten Site
+	// einen Symlink an, der auf Alices Site-Verzeichnis zeigt — das braucht
+	// kein besonderes Privileg. Die rein lexikalische Pfadprüfung sähe das
+	// nicht; erst die Symlink-Auflösung in joinInside fängt das ab.
+	t.Run("symlink innerhalb der eigenen site auf eine fremde site", func(t *testing.T) {
+		link := filepath.Join(bobSite.RootPath, "public", "fremd")
+		if err := os.Symlink(aliceSite.RootPath, link); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(link)
+
+		if content, err := env.files.Read(ctx, bobScope, bobSite.ID, "public/fremd/public/config.php"); err == nil {
+			t.Fatalf("Bob las über den Symlink Alices Datei: %q", content)
+		}
+		if err := env.files.Write(ctx, bobScope, bobSite.ID, "public/fremd/public/uebernommen.php", "pwned"); err == nil {
+			t.Fatal("Bob schrieb über den Symlink in Alices Site")
+		}
+		if _, err := os.Stat(filepath.Join(aliceSite.RootPath, "public", "uebernommen.php")); err == nil {
+			t.Fatal("Alices Verzeichnis enthält eine von Bob untergeschobene Datei")
+		}
+	})
 }
 
 // TestFileServiceRoundTrip prüft die üblichen Vorgänge über die ganze Kette:
