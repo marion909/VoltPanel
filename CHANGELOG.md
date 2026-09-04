@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.36 — 2026-09-04
+
 - PHP-FPM: ExtraINI/DisableFunctions konnten per Zeilenumbruch einen neuen,
   unabhängigen Pool in derselben Datei eröffnen (z. B. mit user = root)
 
