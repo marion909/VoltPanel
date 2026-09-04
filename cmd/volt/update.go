@@ -33,9 +33,29 @@ func (a *app) updateCmd() *cobra.Command {
 
 			fmt.Printf("Installiert: %s\nVerfügbar:   %s (Kanal %s)\n",
 				version.Version, rel.Version, a.cfg.UpdateChannel)
-			if rel.Version == version.Version {
+
+			schemaVersion, err := a.store.SchemaVersion(ctx)
+			if err != nil {
+				return fmt.Errorf("schema-version lesen: %w", err)
+			}
+			// Beide Prüfungen zusammen, nicht nur die Programmversion: Apply
+			// tauscht zuerst das Binary, erst danach laufen syncUnits und
+			// store.Migrate. Bricht der Prozess dazwischen ab (Kill, OOM,
+			// ein zur falschen Zeit gestarteter systemctl restart), liest das
+			// neu gestartete Binary beim nächsten Aufruf bereits seine eigene,
+			// schon neue version.Version — "Bereits aktuell" wäre hier falsch
+			// und würde syncUnits/Migrate nie nachholen, obwohl Units/Schema
+			// noch auf dem alten Stand stehen. Ein abweichendes Schema löst
+			// also denselben Apply-Lauf noch einmal aus; er lädt dasselbe
+			// Release erneut (harmlos) und holt den unterbrochenen Teil nach.
+			if rel.Version == version.Version && schemaVersion == version.SchemaVersion {
 				fmt.Println("\nBereits aktuell.")
 				return nil
+			}
+			if rel.Version == version.Version {
+				fmt.Printf("\nBinary ist bereits auf %s, aber Schema %d passt noch nicht zu %d — "+
+					"ein vorheriges Update wurde offenbar unterbrochen. Wird nachgeholt.\n",
+					rel.Version, schemaVersion, version.SchemaVersion)
 			}
 			if rel.Notes != "" {
 				fmt.Printf("\n%s\n", rel.Notes)

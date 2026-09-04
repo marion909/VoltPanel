@@ -179,7 +179,13 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 		if err := s.store.Close(); err != nil {
 			s.log.Warn("datenbank nicht sauber geschlossen", "err", err)
 		}
-		out, err := os.OpenFile(s.cfg.DBPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+		// Über eine temporäre Datei plus os.Rename statt direkt an s.cfg.DBPath
+		// zu schreiben: ein Prozessabbruch mitten im Kopieren (OOM, Stromausfall,
+		// volle Platte) hinterließe sonst eine abgeschnittene volt.db genau an
+		// dem Pfad, den jeder künftige store.Open verwendet — und genau das soll
+		// die zuvor gezogene Sicherheitskopie eigentlich verhindern helfen.
+		tmp := s.cfg.DBPath + ".tmp"
+		out, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 		if err != nil {
 			return err
 		}
@@ -187,9 +193,20 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 		// Archiv soll die Platte nicht füllen.
 		if _, err := io.Copy(out, io.LimitReader(tr, header.Size)); err != nil {
 			out.Close()
+			os.Remove(tmp)
+			return err
+		}
+		if err := out.Sync(); err != nil {
+			out.Close()
+			os.Remove(tmp)
 			return err
 		}
 		if err := out.Close(); err != nil {
+			os.Remove(tmp)
+			return err
+		}
+		if err := os.Rename(tmp, s.cfg.DBPath); err != nil {
+			os.Remove(tmp)
 			return err
 		}
 		// Die alten WAL-Dateien gehören nicht mehr zur zurückgespielten Datenbank.

@@ -463,7 +463,11 @@ func (u *Updater) Rollback(_ context.Context, snap *Snapshot) error {
 	if err := u.store.Close(); err != nil {
 		u.log.Warn("datenbank nicht sauber geschlossen", "err", err)
 	}
-	if err := copyFile(snap.DBPath, u.cfg.DBPath, 0o600); err != nil {
+	// Atomar wie der Binary-Rückschritt oben: ein Prozessabbruch mitten im
+	// Kopieren soll die bereits scharfe volt.db nicht abschneiden — ausgerechnet
+	// im Sicherheitsnetz-Pfad für einen fehlgeschlagenen Rollback gäbe es dann
+	// kein zweites Netz mehr.
+	if err := copyFileAtomic(snap.DBPath, u.cfg.DBPath, 0o600); err != nil {
 		return fmt.Errorf("datenbank zurückspielen: %w", err)
 	}
 	// Die WAL-Dateien gehören zum alten Stand und würden die Kopie überschreiben.
@@ -534,6 +538,24 @@ func (u *Updater) download(ctx context.Context, asset ReleaseAsset, dst string) 
 		return fmt.Errorf("prüfsumme stimmt nicht: erwartet %s, bekommen %s", asset.SHA256, got)
 	}
 	return f.Sync()
+}
+
+// copyFileAtomic kopiert wie copyFile, aber über eine temporäre Datei im
+// selben Verzeichnis plus os.Rename. Bricht der Prozess mitten im Kopieren ab,
+// bleibt dst dadurch entweder ganz unangetastet oder vollständig ersetzt —
+// nie eine abgeschnittene Datei an genau dem Pfad, den jeder künftige
+// store.Open verwendet.
+func copyFileAtomic(src, dst string, mode os.FileMode) error {
+	tmp := dst + ".tmp"
+	if err := copyFile(src, tmp, mode); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func copyFile(src, dst string, mode os.FileMode) error {
