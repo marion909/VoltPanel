@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.46 — 2026-09-04
+
 - opMySQLDump: ein fehlgeschlagener Dump hinterließ bisher eine leere Datei
   statt des vorherigen Dumps — schreibt jetzt über Temp+Rename
 
