@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.53 — 2026-09-04
+
 - Web-Terminal: zwei Race Conditions behoben — mehr als maxTerminals
   gleichzeitige Sitzungen möglich, und resize griff ohne Sperre auf ptmx zu
 
