@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.58 — 2026-09-04
+
 - SetGrants schrieb neue Rechte zuerst in den Store und erst danach an den
   MySQL-Server — schlug der Agent-Aufruf fehl, stand im Store bereits der
   neue Wert, obwohl er auf dem Server nie galt
