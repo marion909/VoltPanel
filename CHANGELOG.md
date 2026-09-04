@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- internal/core/json.go: tote Funktion decodeJSON entfernt (per staticcheck
+  bestätigt unbenutzt; update.go erzielt denselben Schutz längst direkt über io.LimitReader)
 
 ## v0.4.43 — 2026-09-04
 
