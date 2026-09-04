@@ -331,13 +331,18 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 	if err := writeFileAtomic(pfad, []byte(users), 0o640); err != nil {
 		return nil, opErr(OpMailApply, "%s schreiben: %v", pfad, err)
 	}
+	var meldungen []string
 	if g, err := user.LookupGroup("dovecot"); err == nil {
 		if gid, err := strconv.Atoi(g.Gid); err == nil {
-			_ = os.Chown(pfad, 0, gid)
+			// Schlägt genau dieser Chown fehl, reproduziert das unbemerkt den
+			// bereits einmal auf einem echten Server gefundenen Zustand (siehe
+			// Kommentar oben): passwd-file für Dovecot unlesbar, stiller Rückfall
+			// auf PAM mit ~2s Verzögerung je Anmeldeversuch.
+			if err := os.Chown(pfad, 0, gid); err != nil {
+				meldungen = append(meldungen, "dovecot-gruppe für "+pfad+" nicht gesetzt: "+err.Error())
+			}
 		}
 	}
-
-	var meldungen []string
 	if warnung, err := s.schreibeDKIM(ctx, p.DKIM); err != nil {
 		return nil, err
 	} else if warnung != "" {
@@ -381,6 +386,7 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) (warnung s
 
 	uid, gid := opendkimIDs()
 	var eintraege []templates.DKIMEntry
+	var meldungen []string
 
 	for _, k := range keys {
 		if !reMailDomainTeil.MatchString(k.Domain) || !reDKIMSelector.MatchString(k.Selector) {
@@ -402,8 +408,12 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) (warnung s
 			return "", opErr(OpMailApply, "dkim-schlüssel schreiben: %v", err)
 		}
 		if uid > 0 {
-			_ = os.Chown(pfad, uid, gid)
-			_ = os.Chown(dir, uid, gid)
+			if err := os.Chown(pfad, uid, gid); err != nil {
+				meldungen = append(meldungen, "besitzer von "+pfad+" nicht gesetzt: "+err.Error())
+			}
+			if err := os.Chown(dir, uid, gid); err != nil {
+				meldungen = append(meldungen, "besitzer von "+dir+" nicht gesetzt: "+err.Error())
+			}
 		}
 		eintraege = append(eintraege, templates.DKIMEntry{
 			Domain: k.Domain, Selector: k.Selector, KeyPath: pfad,
@@ -433,9 +443,9 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) (warnung s
 	// Neu laden, nicht neu starten: ein Neustart hielte die Zustellung an,
 	// und Postfix wartet dann auf einen Milter, den es gerade nicht gibt.
 	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "opendkim"); err != nil {
-		return "opendkim nicht neu geladen: " + truncate(out, 200), nil
+		meldungen = append(meldungen, "opendkim nicht neu geladen: "+truncate(out, 200))
 	}
-	return "", nil
+	return strings.Join(meldungen, "; "), nil
 }
 
 // opendkimIDs sucht die Kennung, unter der OpenDKIM läuft.

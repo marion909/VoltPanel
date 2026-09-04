@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- mail.setup: drei os.Chown-Fehler (Dovecot-Passwortdatei, DKIM-Schlüssel)
+  wurden bisher verschluckt — genau der Fehler, der früher schon einmal zu ~2s
+  Anmeldeverzögerung führte, wäre so unbemerkt geblieben
 
 ## v0.4.50 — 2026-09-04
 
