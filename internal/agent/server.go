@@ -21,6 +21,35 @@ import (
 // den Root-Daemon per Riesen-Payload aus dem Speicher drängen.
 const maxLineBytes = 8 << 20 // 8 MiB
 
+// resettableLimitReader ist wie io.LimitReader, aber mit einem Limit, das sich
+// vor jeder neuen Anfrage per reset() wieder auffüllen lässt — anders als
+// io.LimitReader, dessen Grenze über die Lebensdauer des Readers hinweg nur
+// sinkt. Der Zweck: ein einziger json.Decoder kann so über die gesamte
+// Verbindung wiederverwendet werden, statt pro Anfrage einen neuen um einen
+// frischen io.LimitReader zu legen. Ein neu erzeugter Decoder fängt sonst bei
+// null an, obwohl der alte bereits mehr aus der Verbindung gelesen und intern
+// gepuffert haben könnte, als er für die letzte Anfrage verbraucht hat — genau
+// dieser Rest (der Anfang einer bereits eingetroffenen nächsten Anfrage)
+// ginge beim Wegwerfen des alten Decoders verloren.
+type resettableLimitReader struct {
+	r         io.Reader
+	remaining int64
+}
+
+func (lr *resettableLimitReader) reset(n int64) { lr.remaining = n }
+
+func (lr *resettableLimitReader) Read(p []byte) (int, error) {
+	if lr.remaining <= 0 {
+		return 0, fmt.Errorf("anfrage überschreitet %d bytes", maxLineBytes)
+	}
+	if int64(len(p)) > lr.remaining {
+		p = p[:lr.remaining]
+	}
+	n, err := lr.r.Read(p)
+	lr.remaining -= int64(n)
+	return n, err
+}
+
 // Handler führt eine Operation aus. Die Zuordnung Op -> Handler in newRegistry
 // ist die vollständige Liste dessen, was der Agent kann.
 type Handler func(ctx context.Context, raw json.RawMessage) (any, error)
@@ -258,8 +287,14 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	dec := json.NewDecoder(io.LimitReader(reader, maxLineBytes))
+	limited := &resettableLimitReader{r: reader}
+	dec := json.NewDecoder(limited)
 	for {
+		// Nach jeder Anfrage darf wieder die volle Größe gelesen werden — der
+		// Decoder selbst bleibt derselbe, damit ein bereits gepuffertes Stück
+		// der nächsten Anfrage nicht verloren geht.
+		limited.reset(maxLineBytes)
+
 		var req Request
 		if err := dec.Decode(&req); err != nil {
 			if !errors.Is(err, io.EOF) && ctx.Err() == nil {
@@ -273,8 +308,6 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 			s.log.Warn("antwort nicht zustellbar", "err", err)
 			return
 		}
-		// Nach jeder Anfrage darf wieder die volle Größe gelesen werden.
-		dec = json.NewDecoder(io.LimitReader(reader, maxLineBytes))
 	}
 }
 
