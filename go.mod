@@ -1,6 +1,6 @@
 module github.com/marion909/voltpanel
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/go-acme/lego/v4 v4.35.2
@@ -10,7 +10,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/shirou/gopsutil/v4 v4.26.7
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 	modernc.org/sqlite v1.57.0

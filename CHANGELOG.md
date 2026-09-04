@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- golang.org/x/crypto auf v0.56.0 angehoben — schließt zwei bisher nicht
+  erreichbare DoS-Advisories in x/crypto/ssh präventiv
 
 ## v0.4.42 — 2026-09-04
 
