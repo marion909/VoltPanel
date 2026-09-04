@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.38 — 2026-09-04
+
 - fail2ban/postfix/dovecot/opendkim/rspamd starteten nach der Installation
   nie von selbst; ein gescheiterter opendkim-Reload blieb dabei zusätzlich unsichtbar
 
