@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.35 — 2026-09-04
+
 - IP-Whitelist und Login-Ratelimit ließen sich über einen selbst gesetzten
   X-Forwarded-For-Header umgehen — Echo hatte keinen IPExtractor gesetzt
 
