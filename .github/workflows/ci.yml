@@ -73,6 +73,12 @@ jobs:
       - name: Signaturpruefung des Installers
         run: scripts/test-install-signature.sh
 
+      # install_unit() lud eine systemd-Unit bisher ohne jeden Abgleich gegen
+      # latest.json — dieser Lauf haelt eine manipulierte Unit-Datei und ein
+      # latest.json ohne Pruefsumme dagegen.
+      - name: Pruefsummenpruefung der systemd-Units
+        run: scripts/test-install-unit-checksum.sh
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

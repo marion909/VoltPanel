@@ -175,7 +175,7 @@ step "VoltPanel"
 # und die Prüfsumme ist damit nicht mehr optional. Fehlte sie früher, lief die
 # Installation mit einer Warnung weiter; genau dann hätte sie stehen müssen.
 download_verified() {
-    local url="$1" want="$2" dest="$3" tmp got
+    local url="$1" want="$2" dest="$3" mode="$4" tmp got
 
     [ -n "$want" ] || die "Für $url ist keine Prüfsumme hinterlegt."
 
@@ -193,7 +193,7 @@ download_verified() {
         die "Prüfsumme von $url stimmt nicht (erwartet $want, bekommen $got)."
     fi
 
-    install -m 0755 "$tmp" "$dest"
+    install -m "$mode" "$tmp" "$dest"
     rm -f "$tmp"
 }
 
@@ -300,8 +300,8 @@ else
     [ -n "$AGENT_URL" ] || die "Version $REL_VERSION enthält kein volt-agent für linux_${VOLT_ARCH}."
 
     info "Version $REL_VERSION aus Kanal $VOLT_CHANNEL"
-    download_verified "$VOLT_URL"  "$VOLT_SHA"  "$VOLT_BIN_DIR/volt"
-    download_verified "$AGENT_URL" "$AGENT_SHA" "$VOLT_BIN_DIR/volt-agent"
+    download_verified "$VOLT_URL"  "$VOLT_SHA"  "$VOLT_BIN_DIR/volt" 0755
+    download_verified "$AGENT_URL" "$AGENT_SHA" "$VOLT_BIN_DIR/volt-agent" 0755
 fi
 
 info "$("$VOLT_BIN_DIR/volt" --version)"
@@ -389,13 +389,19 @@ fi
 step "Dienste"
 
 install_unit() {
-    local name="$1"
+    local name="$1" want
     if [ -n "$VOLT_LOCAL_DIR" ] && [ -f "$VOLT_LOCAL_DIR/systemd/$name" ]; then
         install -m 0644 "$VOLT_LOCAL_DIR/systemd/$name" "/etc/systemd/system/$name"
     else
-        curl -fsSL "${VOLT_BASE_URL}/${VOLT_CHANNEL}/systemd/${name}" \
-            -o "/etc/systemd/system/${name}" || die "Unit $name nicht ladbar."
-        chmod 0644 "/etc/systemd/system/${name}"
+        # latest.json ist an dieser Stelle bereits gegen verify_manifest
+        # geprueft (siehe oben) und traegt im units-Feld eine Pruefsumme je
+        # Unit (scripts/release-assets.sh). Ohne diesen Abgleich liefe die
+        # Unit ungeprueft direkt in /etc/systemd/system — anders als die
+        # Binaries, die durch verify_manifest+download_verified laufen, und
+        # eine root-ExecStart-Zeile waere darueber unterschiebbar.
+        want="$(jq -r --arg n "$name" '.units[$n].sha256 // empty' "$MANIFEST_FILE" 2>/dev/null)"
+        download_verified "${VOLT_BASE_URL}/${VOLT_CHANNEL}/systemd/${name}" "$want" \
+            "/etc/systemd/system/${name}" 0644
     fi
 }
 
