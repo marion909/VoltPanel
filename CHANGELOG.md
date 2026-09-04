@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.42 — 2026-09-04
+
 - install.sh: systemd-Units luden bisher ohne Prüfsummenabgleich gegen
   latest.json — anders als die Binaries, die verify_manifest+download_verified durchlaufen
 
