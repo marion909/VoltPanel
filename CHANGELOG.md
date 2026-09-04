@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- acme.Issue behandelte jeden Store-Fehler beim Suchen eines bestehenden
+  Zertifikats als "keins vorhanden" und legte im Fehlerfall einen zweiten,
+  doppelten Datensatz an
 
 ## v0.4.56 — 2026-09-04
 

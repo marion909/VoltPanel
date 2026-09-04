@@ -201,12 +201,20 @@ func (s *CertService) Issue(ctx context.Context, sc store.Scope, opts IssueOptio
 
 	// Ein bestehendes Zertifikat derselben Site wird ersetzt, nicht dupliziert.
 	if opts.SiteID != nil {
-		if existing, err := s.store.CertBySite(ctx, sc, *opts.SiteID); err == nil {
+		existing, err := s.store.CertBySite(ctx, sc, *opts.SiteID)
+		switch {
+		case err == nil:
 			cert.ID = existing.ID
 			if err := s.store.UpdateCert(ctx, sc, cert); err != nil {
 				return nil, err
 			}
 			return cert, s.enableSSL(ctx, sc, *opts.SiteID)
+		case !errors.Is(err, store.ErrNotFound):
+			// Ein echter (transienter) Store-Fehler ist kein "es gibt noch
+			// keins" — sonst würde CreateCert gleich danach versucht, einen
+			// zweiten Datensatz für dieselbe Site anzulegen, oder ein
+			// eigentlicher Fehler bliebe unbemerkt verschluckt.
+			return nil, err
 		}
 	}
 	if err := s.store.CreateCert(ctx, sc, cert); err != nil {
