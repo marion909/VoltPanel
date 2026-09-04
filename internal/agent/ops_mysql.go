@@ -540,7 +540,7 @@ func (s *Server) throwawayAccount(ctx context.Context, db *sql.DB, database, pre
 	// deren Passwort niemand mehr kennt, die aber weiter Rechte hätten.
 	s.dropStaleAccounts(ctx, db)
 
-	suffix, err := randomHex(6)
+	suffix, err := randomHex(5)
 	if err != nil {
 		return "", "", nil, opErr(op, "zufall: %v", err)
 	}
@@ -549,7 +549,12 @@ func (s *Server) throwawayAccount(ctx context.Context, db *sql.DB, database, pre
 		return "", "", nil, opErr(op, "zufall: %v", err)
 	}
 
-	username := prefix + suffix
+	// Der Zeitstempel (Sekunden seit der Epoche, 8 Hexziffern — reicht bis weit
+	// über 2106 hinaus) steht im Namen, damit dropStaleAccounts nur wirklich
+	// verwaiste Konten entfernt. Ohne ihn ließe sich ein gerade erst von einer
+	// parallelen Anfrage angelegtes Konto nicht von einem echten Rest eines
+	// abgestürzten Laufs unterscheiden.
+	username := fmt.Sprintf("%s%08x_%s", prefix, uint32(time.Now().Unix()), suffix)
 	account := fmt.Sprintf("'%s'@'localhost'", username)
 	drop := func() {
 		// Eigener Kontext: läuft die Operation in einen Timeout, ist der
@@ -582,7 +587,17 @@ const importUserPrefix = "volt_import_"
 // wieder importiert.
 var throwawayPrefixes = []string{importUserPrefix, queryUserPrefix}
 
+// staleAccountAge ist die Grenze, ab der ein Wegwerf-Konto als verwaist gilt.
+// Weit über jeder legitimen Laufzeit einer einzelnen Operation (longTimeout
+// ist 120s) — der Spielraum ist Absicht, nicht Großzügigkeit: server.go
+// bedient jede Socket-Verbindung in einer eigenen Goroutine, und zwei
+// SQL-Query-/Import-Operationen können deshalb echt parallel laufen. Ohne
+// diesen Zeitstempel-Abgleich räumte jeder Aufruf pauschal auch das gerade
+// erst von einer parallelen Anfrage angelegte Konto weg.
+const staleAccountAge = 10 * time.Minute
+
 func (s *Server) dropStaleAccounts(ctx context.Context, db *sql.DB) {
+	cutoff := time.Now().Add(-staleAccountAge)
 	var stale []string
 	for _, prefix := range throwawayPrefixes {
 		rows, err := db.QueryContext(ctx,
@@ -592,7 +607,8 @@ func (s *Server) dropStaleAccounts(ctx context.Context, db *sql.DB) {
 		}
 		for rows.Next() {
 			var name string
-			if err := rows.Scan(&name); err == nil && reMyUser.MatchString(name) {
+			if err := rows.Scan(&name); err == nil && reMyUser.MatchString(name) &&
+				accountCreatedBefore(name, prefix, cutoff) {
 				stale = append(stale, name)
 			}
 		}
@@ -605,6 +621,24 @@ func (s *Server) dropStaleAccounts(ctx context.Context, db *sql.DB) {
 			s.log.Warn("altes wegwerf-konto nicht entfernt", "konto", name, "err", err)
 		}
 	}
+}
+
+// accountCreatedBefore liest den in throwawayAccount eingebetteten Zeitstempel
+// (prefix + 8 Hexziffern + "_" + Zufallsteil) und sagt, ob das Konto vor
+// cutoff angelegt wurde. Ein Name, der nicht in diese Form passt — etwa ein
+// Rest aus einer Fassung vor diesem Zeitstempel —, gilt als nicht verwaist:
+// besser ein einzelnes altes Konto übersehen als ein gerade erst angelegtes
+// aus einem Missverständnis heraus zu löschen.
+func accountCreatedBefore(name, prefix string, cutoff time.Time) bool {
+	rest := strings.TrimPrefix(name, prefix)
+	if len(rest) < 9 || rest[8] != '_' {
+		return false
+	}
+	sec, err := strconv.ParseUint(rest[:8], 16, 32)
+	if err != nil {
+		return false
+	}
+	return time.Unix(int64(sec), 0).Before(cutoff)
 }
 
 // writeClientConfig legt eine Optionsdatei für den mysql-Client an.
