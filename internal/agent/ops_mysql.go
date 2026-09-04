@@ -71,6 +71,33 @@ func checkMySQLName(kind, value string, re *regexp.Regexp) error {
 	return nil
 }
 
+// mySystemSchemas sind die MySQL-Systemschemata, auf die keine
+// Tenant-Operation zugreifen darf. opMySQLSizes schließt sie bereits aus der
+// reinen Anzeige aus (NOT IN (...) oben); dieselbe Sperre fehlte aber bei den
+// datenverändernden Operationen (Anlegen/Löschen der Datenbank, Dump/Import,
+// Rechtevergabe) — reMyDBName prüft nur die Zeichenform, nicht ob der Name
+// reserviert ist.
+var mySystemSchemas = map[string]bool{
+	"mysql":              true,
+	"information_schema": true,
+	"performance_schema": true,
+	"sys":                true,
+}
+
+// checkMySQLDBName prüft einen Datenbanknamen wie checkMySQLName, lehnt aber
+// zusätzlich die MySQL-Systemschemata ab — ohne das ließe sich serverweit
+// jede Benutzer-/Rechtetabelle löschen (DROP DATABASE mysql) oder einem
+// Tenant-Account volles Recht auf sie erteilen (GRANT ALL ... ON mysql.*).
+func checkMySQLDBName(value string) error {
+	if err := checkMySQLName("datenbankname", value, reMyDBName); err != nil {
+		return err
+	}
+	if mySystemSchemas[value] {
+		return fmt.Errorf("%w: datenbankname %q ist ein mysql-systemschema", errBadInput, value)
+	}
+	return nil
+}
+
 // checkMySQLHost prüft die Herkunft eines Kontos: 'benutzer'@'HIER'.
 //
 // Diese Prüfung wiederholt die aus dem Store — und das ist ihr Zweck. Der Agent
@@ -150,7 +177,7 @@ func (s *Server) opMySQLCreateDB(ctx context.Context, raw json.RawMessage) (any,
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("datenbankname", p.Name, reMyDBName); err != nil {
+	if err := checkMySQLDBName(p.Name); err != nil {
 		return nil, err
 	}
 	if p.Charset == "" {
@@ -185,7 +212,7 @@ func (s *Server) opMySQLDropDB(ctx context.Context, raw json.RawMessage) (any, e
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("datenbankname", p.Name, reMyDBName); err != nil {
+	if err := checkMySQLDBName(p.Name); err != nil {
 		return nil, err
 	}
 
@@ -380,7 +407,7 @@ func (s *Server) opMySQLDump(ctx context.Context, raw json.RawMessage) (any, err
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("datenbankname", p.Database, reMyDBName); err != nil {
+	if err := checkMySQLDBName(p.Database); err != nil {
 		return nil, err
 	}
 	dest, err := jail(p.Path, s.roots)
@@ -422,7 +449,7 @@ func (s *Server) opMySQLImport(ctx context.Context, raw json.RawMessage) (any, e
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("datenbankname", p.Database, reMyDBName); err != nil {
+	if err := checkMySQLDBName(p.Database); err != nil {
 		return nil, err
 	}
 	src, err := jail(p.Path, s.roots)
@@ -630,5 +657,5 @@ func checkMySQLUser(p MySQLUserParams) error {
 	if err := checkMySQLHost(p.HostPattern); err != nil {
 		return err
 	}
-	return checkMySQLName("datenbankname", p.Database, reMyDBName)
+	return checkMySQLDBName(p.Database)
 }

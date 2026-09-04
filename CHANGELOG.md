@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- MySQL: mysql/information_schema/performance_schema/sys waren über die
+  normale Datenbank-Verwaltung erreichbar (DROP DATABASE, GRANT ALL)
 
 ## v0.4.31 — 2026-09-04
 
