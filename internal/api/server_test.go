@@ -306,6 +306,14 @@ func TestCustomerCannotReachAdminRoutes(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("Kunde startet Dienst neu: Status %d, erwartet 403", rec.Code)
 	}
+
+	// Docker-Images gehören keinem Mandanten, sondern dem ganzen Host — wie
+	// die Nachbar-Routen /apps/docker, /apps/images und /apps/images/remove,
+	// die alle bereits requireRole(Admin) tragen.
+	rec = ts.do(http.MethodPost, "/api/v1/apps/pull", map[string]string{"image": "nginx:latest"})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Kunde zieht Docker-Image: Status %d, erwartet 403", rec.Code)
+	}
 }
 
 // TestValidationErrorsAreClientErrors: eine unbrauchbare Eingabe ist 4xx,

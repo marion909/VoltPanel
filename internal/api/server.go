@@ -356,7 +356,7 @@ func (s *Server) setupRoutes() {
 	auth.GET("/apps/node", s.handleNodeVersions)
 	auth.POST("/apps/node", s.handleInstallNode, s.requireRole(store.RoleAdmin))
 	auth.DELETE("/apps/node/:major", s.handleRemoveNode, s.requireRole(store.RoleAdmin))
-	auth.POST("/apps/pull", s.handlePullImage)
+	auth.POST("/apps/pull", s.handlePullImage, s.requireRole(store.RoleAdmin))
 	auth.GET("/apps/stats", s.handleAppStats)
 	auth.GET("/apps/images", s.handleImages, s.requireRole(store.RoleAdmin))
 	auth.POST("/apps/images/remove", s.handleRemoveImage, s.requireRole(store.RoleAdmin))
