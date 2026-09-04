@@ -115,11 +115,17 @@ func (s *Server) handleLogin(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		if !authn.VerifyTOTP(secret, req.TOTPCode) {
+		// step <= zuletzt akzeptierter Schritt heißt: derselbe Code wurde in
+		// diesem Zeitfenster schon einmal verwendet — sonst bliebe ein
+		// abgefangener/mitgeloggter Code dank Skew=1 bis zu ~90s lang beliebig
+		// oft für den Login gültig.
+		ok, step := authn.VerifyTOTP(secret, req.TOTPCode)
+		if !ok || (user.TOTPLastStep != nil && step <= *user.TOTPLastStep) {
 			_ = s.store.NoteLoginFailure(ctx, user.ID, maxFailedLogins, accountLockSecs)
 			s.auditLogin(ctx, user, req.Email, ip, "falscher 2fa-code")
 			return echo.NewHTTPError(http.StatusUnauthorized, "der code stimmt nicht")
 		}
+		_ = s.store.SetTOTPLastStep(ctx, user.ID, step)
 	}
 
 	resp, err := s.startSession(c, user)
@@ -274,7 +280,8 @@ func (s *Server) handleTOTPEnable(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !authn.VerifyTOTP(secret, req.Code) {
+	ok, step := authn.VerifyTOTP(secret, req.Code)
+	if !ok || (user.TOTPLastStep != nil && step <= *user.TOTPLastStep) {
 		return echo.NewHTTPError(http.StatusBadRequest, "der code stimmt nicht")
 	}
 
@@ -283,6 +290,7 @@ func (s *Server) handleTOTPEnable(c echo.Context) error {
 	if err := s.store.UpdateUser(ctx, currentScope(c), user); err != nil {
 		return err
 	}
+	_ = s.store.SetTOTPLastStep(ctx, user.ID, step)
 	s.audit(ctx, user, "auth.2fa_enable", "user", user.Email, "ok", c.RealIP(), nil)
 	return c.JSON(http.StatusOK, map[string]bool{"totp_enabled": true})
 }
@@ -303,7 +311,8 @@ func (s *Server) handleTOTPDisable(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !authn.VerifyTOTP(secret, req.Code) {
+	ok, step := authn.VerifyTOTP(secret, req.Code)
+	if !ok || (user.TOTPLastStep != nil && step <= *user.TOTPLastStep) {
 		return echo.NewHTTPError(http.StatusBadRequest, "der code stimmt nicht")
 	}
 
@@ -312,6 +321,7 @@ func (s *Server) handleTOTPDisable(c echo.Context) error {
 	if err := s.store.UpdateUser(ctx, currentScope(c), user); err != nil {
 		return err
 	}
+	_ = s.store.SetTOTPLastStep(ctx, user.ID, step)
 	s.audit(ctx, user, "auth.2fa_disable", "user", user.Email, "ok", c.RealIP(), nil)
 	return c.JSON(http.StatusOK, map[string]bool{"totp_enabled": false})
 }

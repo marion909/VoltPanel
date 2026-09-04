@@ -67,6 +67,10 @@ type User struct {
 	Role         Role   `json:"role"`
 	TOTPSecret   string `json:"-"`
 	TOTPEnabled  bool   `json:"totp_enabled"`
+	// TOTPLastStep ist der zuletzt akzeptierte 30-Sekunden-Zeitschritt (nil =
+	// noch nie einer). Verhindert, dass ein abgefangener Code innerhalb des
+	// Skew-Fensters mehrfach für Login bzw. 2FA-Ein-/Ausschalten gilt.
+	TOTPLastStep *int64 `json:"-"`
 	MustChangePW bool   `json:"must_change_pw"`
 	Locale       string `json:"locale"`
 	LastLoginAt  *int64 `json:"last_login_at"`

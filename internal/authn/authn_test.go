@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPasswordRoundTrip(t *testing.T) {
@@ -172,7 +173,9 @@ func TestTOTPRoundTrip(t *testing.T) {
 	if !strings.HasPrefix(qr, "data:image/png;base64,") {
 		t.Fatalf("QR-Code ist kein data-URI: %.40s", qr)
 	}
-	if VerifyTOTP(secret, "000000") && VerifyTOTP(secret, "123456") {
+	ok1, _ := VerifyTOTP(secret, "000000")
+	ok2, _ := VerifyTOTP(secret, "123456")
+	if ok1 && ok2 {
 		t.Fatal("VerifyTOTP akzeptiert beliebige Codes")
 	}
 
@@ -180,7 +183,20 @@ func TestTOTPRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !VerifyTOTP(secret, code) {
+	ok, step := VerifyTOTP(secret, code)
+	if !ok {
 		t.Fatal("aktuell gültiger Code wurde abgelehnt")
+	}
+	if want := time.Now().UTC().Unix() / totpPeriod; step != want {
+		t.Fatalf("VerifyTOTP lieferte Schritt %d, erwartet %d", step, want)
+	}
+
+	// Replay: derselbe Schritt darf kein zweites Mal als "neu" erkennbar sein
+	// — die eigentliche Sperre liegt bei den Aufrufern (die den zuletzt
+	// akzeptierten Schritt vergleichen), aber VerifyTOTP muss ihnen dafür
+	// zuverlässig denselben Schritt für denselben Code liefern.
+	ok, step2 := VerifyTOTP(secret, code)
+	if !ok || step2 != step {
+		t.Fatalf("VerifyTOTP lieferte beim zweiten Aufruf mit demselben Code einen anderen Schritt: %d vs. %d", step2, step)
 	}
 }

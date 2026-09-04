@@ -10,7 +10,7 @@ import (
 )
 
 const userCols = `id, tenant_id, email, display_name, password_hash, role,
-	totp_secret, totp_enabled, must_change_pw, locale, last_login_at,
+	totp_secret, totp_enabled, totp_last_step, must_change_pw, locale, last_login_at,
 	failed_logins, locked_until, status, created_at, updated_at`
 
 func (s *Store) CreateUser(ctx context.Context, sc Scope, u *User) error {
@@ -143,6 +143,16 @@ func (s *Store) NoteLoginFailure(ctx context.Context, userID int64, maxAttempts,
 	return err
 }
 
+// SetTOTPLastStep merkt sich den zuletzt akzeptierten TOTP-Zeitschritt.
+// Läuft wie NoteLoginFailure ohne Scope: der Login kennt beim TOTP-Schritt
+// zwar schon den Benutzer, aber der 2FA-Ein-/Ausschalten-Pfad ist bereits
+// authentifiziert und braucht keinen zusätzlichen Tenant-Filter.
+func (s *Store) SetTOTPLastStep(ctx context.Context, userID, step int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET totp_last_step = ?, updated_at = ? WHERE id = ?`, step, now(), userID)
+	return err
+}
+
 // CountUsers wird beim Erststart gebraucht, um zu erkennen, ob überhaupt schon
 // jemand eingerichtet ist.
 func (s *Store) CountUsers(ctx context.Context) (int, error) {
@@ -172,7 +182,7 @@ func scanUser(sc scanner) (*User, error) {
 	var role string
 	var totp, mustChange int
 	err := sc.Scan(&u.ID, &u.TenantID, &u.Email, &u.DisplayName, &u.PasswordHash, &role,
-		&u.TOTPSecret, &totp, &mustChange, &u.Locale, &u.LastLoginAt,
+		&u.TOTPSecret, &totp, &u.TOTPLastStep, &mustChange, &u.Locale, &u.LastLoginAt,
 		&u.FailedLogins, &u.LockedUntil, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
