@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Cronjobs: RunAs ließ jeden existierenden Benutzer zu, nicht nur
+  Site-Systembenutzer; ein unmaskiertes % im Kommando wurde von cron(8) als Zeilenumbruch gelesen
 
 ## v0.4.46 — 2026-09-04
 

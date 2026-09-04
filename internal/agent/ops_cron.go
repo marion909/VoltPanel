@@ -27,7 +27,13 @@ func (s *Server) opCronWrite(ctx context.Context, raw json.RawMessage) (any, err
 	if !reCronFile.MatchString(p.Name) {
 		return nil, opErr(OpCronWrite, "jobname %q: erlaubt sind 3–64 zeichen a-z, 0-9 und unterstrich", p.Name)
 	}
-	if err := checkUsername(p.RunAs); err != nil {
+	// siteUserIDs statt checkUsername: wie ops_app.go, ops_ftp.go, ops_deploy.go
+	// und ops_docker.go es für vergleichbare Felder tun. checkUsername allein
+	// verbietet nur die reservierten Systemkonten (root, www-data, …), lässt
+	// aber jeden anderen existierenden Benutzer durch — ein Cronjob ließe sich
+	// damit dauerhaft unter der Identität eines beliebigen anderen Kontos
+	// einrichten, auch dem Systembenutzer einer fremden Site.
+	if _, _, err := siteUserIDs(OpCronWrite, p.RunAs); err != nil {
 		return nil, err
 	}
 	// Zeitplan und Kommando kommen bereits geprüft aus dem Store. Hier wird
@@ -52,6 +58,8 @@ func (s *Server) opCronWrite(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, opErr(OpCronWrite, "log-verzeichnis: %v", err)
 	}
 
+	command := escapeCronPercent(p.Command)
+
 	// Der Job schreibt seine Ausgabe in eine eigene Datei; ohne das ginge sie
 	// an die lokale Mail des Benutzers, die auf einem Hosting-Server niemand liest.
 	content := fmt.Sprintf(`# Von VoltPanel generiert — nicht von Hand bearbeiten.
@@ -60,7 +68,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 MAILTO=""
 
 %s %s %s >> %s 2>&1
-`, p.Schedule, p.RunAs, p.Command, logPath)
+`, p.Schedule, p.RunAs, command, logPath)
 
 	if err := writeFileAtomic(path, []byte(content), 0o644); err != nil {
 		return nil, opErr(OpCronWrite, "%v", err)
@@ -70,6 +78,18 @@ MAILTO=""
 		return nil, opErr(OpCronWrite, "eigentümer setzen: %v", err)
 	}
 	return TextResult{Text: "cronjob " + p.Name + " geschrieben"}, nil
+}
+
+// escapeCronPercent maskiert '%' im Cron-Kommandofeld.
+//
+// cron(8) wandelt jedes unmaskierte '%' im Kommandofeld in einen
+// Zeilenumbruch um und leitet den Rest als Stdin an das Kommando weiter — ein
+// '%' in z. B. einer URL veränderte damit unbemerkt das Verhalten, ohne dass
+// die Zeilenumbruch-Prüfung in opCronWrite (nur \n, \r, \x00) das bemerkt
+// hätte. Maskiert statt abgelehnt: das Kommando läuft dann wie eingegeben,
+// statt dass ein legitimes '%' im Text den Job unbrauchbar macht.
+func escapeCronPercent(command string) string {
+	return strings.ReplaceAll(command, "%", `\%`)
 }
 
 func (s *Server) opCronRemove(_ context.Context, raw json.RawMessage) (any, error) {
