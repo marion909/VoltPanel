@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- docs/sicherheit.md: "Was noch offen ist" behauptete zwei bereits erledigte
+  Punkte (Web-Terminal, SSRF-Filterung) und dass die Release-Signatur
+  ungeprüft bleibt — beides war seit Längerem überholt
 
 ## v0.4.40 — 2026-09-04
 

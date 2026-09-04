@@ -981,21 +981,19 @@ Schranke wäre ein Update ein Weg, eine beliebige Unit des Systems zu
 überschreiben — etwa die von SSH. Die bisherige Fassung wandert vorher in den
 Snapshot; ein Rollback holt sie zurück.
 
-Was fehlt: die Release-Signatur wird erzeugt, aber nicht geprüft. Es wirkt
-bisher nur der SHA-256-Vergleich gegen `latest.json`, und der ist genau so
-vertrauenswürdig wie die HTTPS-Verbindung zum Kanal.
+Die Release-Signatur wird nicht nur erzeugt, sondern auch geprüft: `volt
+update` (`internal/core/update.go` → `LatestRelease`) ruft `verifyManifest`
+vor dem JSON-Parsen auf, das lädt `latest.json.sig` und prüft sie über
+`internal/release.Verifier.Verify` (ECDSA gegen den `//go:embed`-eten
+Schlüssel) — fail-closed ohne Schlüssel im Binary, außer
+`update_allow_unsigned: true` ist bewusst gesetzt. Der SHA-256-Vergleich der
+Binaries selbst kommt zusätzlich obendrauf, nicht stattdessen. Details und die
+Einrichtung des Schlüssels stehen in [release.md](release.md).
 
 ## Was noch offen ist
 
-- **SSRF** bei Webhook- und Cloudflare-Aufrufen: die ausgehenden Ziele werden
-  noch nicht gegen interne Netze gefiltert. Relevant ab Phase 5 (Git-Deploy).
 - **Fuzzing der Socket-API**: die Roadmap nennt es unter den Gegenmaßnahmen zum
   Root-Daemon; bisher gibt es nur Beispieltests, keinen Fuzzer.
 - **Ratelimit für Dateioperationen**: ein angemeldeter Kunde kann derzeit
   beliebig viele Uploads gleichzeitig starten. Der Deckel je Datei steht
   (512 MiB), eine Gesamtquote noch nicht.
-- **Web-Terminal**: bewusst noch nicht gebaut. Eine Shell im Browser hebelt die
-  Trennung zwischen Web und Agent auf und braucht ein eigenes Konzept.
-- **Release-Signatur**: `install.sh` und `volt update` prüfen die SHA-256-Summe.
-  Die Signatur über cosign ist in der Release-Pipeline vorgesehen, aber die
-  Prüfung beim Client fehlt noch.
