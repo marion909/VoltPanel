@@ -214,17 +214,33 @@ func (s *DatabaseService) SetGrants(ctx context.Context, sc store.Scope, userID 
 		return fmt.Errorf("berechtigung %q ist unbekannt (ALL, READWRITE, READONLY)", grants)
 	}
 
-	user.Grants = strings.ToUpper(grants)
+	grants = strings.ToUpper(grants)
+
+	// Das Konto auf localhost zuerst und für sich: scheitert es, hat sich
+	// nichts geändert, und die gespeicherten Rechte bleiben die gültigen —
+	// wie bei SetPassword. Vorher stand der neue Wert schon im Store, auch
+	// wenn der Agent-Aufruf für jede einzelne Herkunft scheiterte.
+	if err := s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
+		Username: user.Username, HostPattern: user.HostPattern,
+		Database: db.Name, Grants: grants,
+	}); err != nil {
+		return err
+	}
+	// Erst nach dem erfolgreichen Setzen speichern.
+	user.Grants = grants
 	if err := s.store.UpdateDBUser(ctx, sc, user); err != nil {
 		return err
 	}
 
+	// Die Konten der Herkünfte danach. Ein Fehler hier ist keiner, der das
+	// Gespeicherte falsch macht — er bedeutet, dass ein Zugang von außen noch
+	// auf den alten Rechten steht.
 	hosts, err := s.remoteHostsOf(ctx, sc, user.ID)
 	if err != nil {
 		return err
 	}
 	var failed []string
-	for _, host := range append([]string{user.HostPattern}, hosts...) {
+	for _, host := range hosts {
 		if err := s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
 			Username: user.Username, HostPattern: host,
 			Database: db.Name, Grants: user.Grants,
