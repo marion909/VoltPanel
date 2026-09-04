@@ -518,6 +518,14 @@ func extractZipEntry(entry *zip.File, target string) error {
 }
 
 // copyPath kopiert eine Datei oder einen Verzeichnisbaum.
+// copyPath kopiert eine Datei oder einen Baum. Symlinks werden dabei
+// übersprungen, nicht nachgebaut — wie bei der Archiv-Extraktion in
+// derselben Datei ("ein Symlink aus einem hochgeladenen Archiv wäre ein
+// Ausbruch mit Ansage"). Ohne das würde ein bereits im Jail liegender, nach
+// außen zeigender Symlink (z. B. über FTP mit chroot angelegt, wo der rohe
+// Linktext beim Anlegen nicht geprüft wird) klaglos an einen neuen, vom
+// Aufrufer gewählten Ort im Jail dupliziert — potenziell in einen von
+// Nginx/PHP-FPM ausgelieferten Bereich.
 func copyPath(from, to string) error {
 	info, err := os.Lstat(from)
 	if err != nil {
@@ -526,11 +534,7 @@ func copyPath(from, to string) error {
 
 	if !info.IsDir() {
 		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(from)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(target, to)
+			return nil
 		}
 		return copyRegular(from, to, info.Mode().Perm())
 	}
@@ -549,11 +553,7 @@ func copyPath(from, to string) error {
 		case sub.IsDir():
 			return os.MkdirAll(target, sub.Mode().Perm())
 		case sub.Mode()&os.ModeSymlink != 0:
-			link, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(link, target)
+			return nil
 		default:
 			return copyRegular(path, target, sub.Mode().Perm())
 		}

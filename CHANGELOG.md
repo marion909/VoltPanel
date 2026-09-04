@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- file.copy baute Symlinks 1:1 nach, statt sie wie beim Archiv-Entpacken zu
+  überspringen — ein nach außen zeigender Symlink ließ sich damit duplizieren
 
 ## v0.4.49 — 2026-09-04
 
