@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.37 — 2026-09-04
+
 - TOTP: ein abgefangener 2FA-Code galt bis zu ~90s mehrfach (Login,
   2FA-Ein-/Ausschalten) — VerifyTOTP merkt sich jetzt den verbrauchten Zeitschritt
 
