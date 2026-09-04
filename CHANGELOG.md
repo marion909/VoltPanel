@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.39 — 2026-09-04
+
 - Ein nach dem Binary-Tausch abgebrochenes Update wurde beim Retry fälschlich
   als "bereits aktuell" gemeldet; DB-Rollback/-Restore schreiben jetzt atomar
 
