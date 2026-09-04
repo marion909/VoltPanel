@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.34 — 2026-09-04
+
 - POST /apps/pull hatte als einzige Docker-Route keine Admin-Rollenprüfung —
   jeder angemeldete Nutzer konnte den Docker-Daemon des Hosts Images ziehen lassen
 
