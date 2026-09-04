@@ -39,6 +39,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			go srv.RunLoginRateCleanup(ctx)
 
 			// Der Agent muss nicht schon laufen — das Panel soll auch dann
 			// starten, damit man im Browser überhaupt sieht, was fehlt.

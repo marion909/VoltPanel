@@ -281,22 +281,28 @@ func (r *rateLimiter) Cleanup(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			cutoff := time.Now().Add(-r.window)
-			r.mu.Lock()
-			for key, times := range r.buckets {
-				kept := times[:0]
-				for _, t := range times {
-					if t.After(cutoff) {
-						kept = append(kept, t)
-					}
-				}
-				if len(kept) == 0 {
-					delete(r.buckets, key)
-				} else {
-					r.buckets[key] = kept
-				}
+			r.prune()
+		}
+	}
+}
+
+// prune ist der eigentliche Aufräumschritt, unabhängig vom Ticker in Cleanup
+// aufrufbar — insbesondere für einen Test, der nicht zehn Minuten warten will.
+func (r *rateLimiter) prune() {
+	cutoff := time.Now().Add(-r.window)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key, times := range r.buckets {
+		kept := times[:0]
+		for _, t := range times {
+			if t.After(cutoff) {
+				kept = append(kept, t)
 			}
-			r.mu.Unlock()
+		}
+		if len(kept) == 0 {
+			delete(r.buckets, key)
+		} else {
+			r.buckets[key] = kept
 		}
 	}
 }

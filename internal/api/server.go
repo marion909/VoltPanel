@@ -552,6 +552,18 @@ func serveAsset(c echo.Context, fsys http.FileSystem, name string) error {
 }
 
 // Start bindet den Listener und bedient Anfragen bis zum Context-Ende.
+// RunLoginRateCleanup räumt periodisch abgelaufene Einträge aus dem
+// Login-Ratelimiter. Ohne das wächst dessen Bucket-Map mit jeder eindeutigen
+// Quell-IP, die den Login-Endpunkt je erreicht, unbegrenzt und ohne
+// Obergrenze — auf einem öffentlich erreichbaren Panel ein echtes, wenn auch
+// langsames Speicherwachstum durch das alltägliche Hintergrundrauschen aus
+// Bot-Scans. Vom Aufrufer als eigene Goroutine zu starten, analog zu den
+// übrigen Hintergrund-Aufgaben in cmd/volt/serve.go (collector.Run,
+// purgeSessions, QuotaService.RunPeriodically).
+func (s *Server) RunLoginRateCleanup(ctx context.Context) {
+	s.loginRate.Cleanup(ctx)
+}
+
 func (s *Server) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.cfg.ListenAddr, s.cfg.Port)
 	srv := &http.Server{
