@@ -51,8 +51,13 @@ var featurePakete = map[string][]string{
 // meldet. apt darf Dienste während der Installation nicht selbst starten; das
 // macht der Agent danach gezielt.
 var featureDienste = map[string][]string{
-	"docker": {"docker"},
-	"redis":  {"redis-server"},
+	"docker":   {"docker"},
+	"redis":    {"redis-server"},
+	"fail2ban": {"fail2ban"},
+	"postfix":  {"postfix"},
+	"dovecot":  {"dovecot"},
+	"opendkim": {"opendkim"},
+	"rspamd":   {"rspamd"},
 }
 
 // FeatureNames sind die Fähigkeiten, die sich nachinstallieren lassen.

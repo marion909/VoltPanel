@@ -337,11 +337,13 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 		}
 	}
 
-	if err := s.schreibeDKIM(ctx, p.DKIM); err != nil {
+	var meldungen []string
+	if warnung, err := s.schreibeDKIM(ctx, p.DKIM); err != nil {
 		return nil, err
+	} else if warnung != "" {
+		meldungen = append(meldungen, warnung)
 	}
 
-	var meldungen []string
 	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "postfix"); err != nil {
 		meldungen = append(meldungen, "postfix nicht neu geladen: "+truncate(out, 200))
 	}
@@ -364,9 +366,17 @@ func (s *Server) opMailApply(ctx context.Context, raw json.RawMessage) (any, err
 // Ist OpenDKIM nicht installiert, passiert nichts — und das ist kein Fehler:
 // eine Domäne kann einen Schlüssel haben, bevor der Dienst dasteht. Der
 // DNS-Eintrag ist ohnehin der langsamere Teil.
-func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
+//
+// Neben einem harten Fehler (Schlüssel/Tabellen konnten nicht geschrieben
+// werden) liefert die Funktion auch eine weiche Warnung zurück, falls das
+// abschließende Neuladen von opendkim scheitert — analog zu den
+// Postfix-/Dovecot-Meldungen in opMailApply. Vorher wurde dieser Fehler
+// verworfen: Schlüssel- und Tabellendateien standen zwar korrekt, wurden aber
+// nie geladen, ohne dass irgendwo ein Hinweis erschien — Mail ging unsigniert
+// raus.
+func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) (warnung string, err error) {
 	if !fileExists(allowedBinaries["opendkim-testkey"]) && !dirExists(opendkimDir) {
-		return nil
+		return "", nil
 	}
 
 	uid, gid := opendkimIDs()
@@ -374,22 +384,22 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
 
 	for _, k := range keys {
 		if !reMailDomainTeil.MatchString(k.Domain) || !reDKIMSelector.MatchString(k.Selector) {
-			return opInputErr(OpMailApply, "%q/%q ist kein zulässiges dkim-paar",
+			return "", opInputErr(OpMailApply, "%q/%q ist kein zulässiges dkim-paar",
 				k.Domain, k.Selector)
 		}
 		if !strings.Contains(k.PrivateKey, "PRIVATE KEY") {
-			return opInputErr(OpMailApply, "der dkim-schlüssel von %s ist kein pem", k.Domain)
+			return "", opInputErr(OpMailApply, "der dkim-schlüssel von %s ist kein pem", k.Domain)
 		}
 
 		dir := filepath.Join(opendkimDir, "keys", k.Domain)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return opErr(OpMailApply, "%s anlegen: %v", dir, err)
+			return "", opErr(OpMailApply, "%s anlegen: %v", dir, err)
 		}
 		pfad := filepath.Join(dir, k.Selector+".private")
 		// 0600: den Schlüssel liest OpenDKIM und sonst niemand. Wer ihn hat,
 		// unterschreibt Mail im Namen dieser Domäne.
 		if err := writeFileAtomic(pfad, []byte(k.PrivateKey), 0o600); err != nil {
-			return opErr(OpMailApply, "dkim-schlüssel schreiben: %v", err)
+			return "", opErr(OpMailApply, "dkim-schlüssel schreiben: %v", err)
 		}
 		if uid > 0 {
 			_ = os.Chown(pfad, uid, gid)
@@ -403,11 +413,11 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
 	stamp := templates.NowStamp()
 	keyTable, err := templates.RenderDKIMKeyTable(eintraege, stamp)
 	if err != nil {
-		return opInputErr(OpMailApply, "%v", err)
+		return "", opInputErr(OpMailApply, "%v", err)
 	}
 	signing, err := templates.RenderDKIMSigningTable(eintraege, stamp)
 	if err != nil {
-		return opInputErr(OpMailApply, "%v", err)
+		return "", opInputErr(OpMailApply, "%v", err)
 	}
 
 	for name, inhalt := range map[string]string{
@@ -416,14 +426,16 @@ func (s *Server) schreibeDKIM(ctx context.Context, keys []DKIMParams) error {
 		"TrustedHosts": templates.RenderDKIMTrustedHosts(stamp),
 	} {
 		if err := writeFileAtomic(filepath.Join(opendkimDir, name), []byte(inhalt), 0o644); err != nil {
-			return opErr(OpMailApply, "%s schreiben: %v", name, err)
+			return "", opErr(OpMailApply, "%s schreiben: %v", name, err)
 		}
 	}
 
 	// Neu laden, nicht neu starten: ein Neustart hielte die Zustellung an,
 	// und Postfix wartet dann auf einen Milter, den es gerade nicht gibt.
-	_, _ = run(ctx, shortTimeout, "systemctl", "reload", "opendkim")
-	return nil
+	if out, err := run(ctx, shortTimeout, "systemctl", "reload", "opendkim"); err != nil {
+		return "opendkim nicht neu geladen: " + truncate(out, 200), nil
+	}
+	return "", nil
 }
 
 // opendkimIDs sucht die Kennung, unter der OpenDKIM läuft.
