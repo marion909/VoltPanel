@@ -35,9 +35,11 @@ func (s *Server) opNginxWriteVhost(ctx context.Context, raw json.RawMessage) (an
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
+	p.Domain = domain
 
 	path := filepath.Join(s.nginxDir, "sites-available", p.Domain+".conf")
 	if _, err := jail(path, []string{s.nginxDir}); err != nil {
@@ -140,9 +142,11 @@ func (s *Server) opNginxRemoveVhost(ctx context.Context, raw json.RawMessage) (a
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
+	p.Domain = domain
 
 	for _, dir := range []string{"sites-enabled", "sites-available"} {
 		path := filepath.Join(s.nginxDir, dir, p.Domain+".conf")
@@ -285,9 +289,11 @@ func (s *Server) opCertInstall(ctx context.Context, raw json.RawMessage) (any, e
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
+	p.Domain = domain
 	if !strings.Contains(p.CertPEM, "BEGIN CERTIFICATE") {
 		return nil, opErr(OpCertInstall, "cert_pem enthält kein zertifikat")
 	}

@@ -172,11 +172,22 @@ func checkPoolName(n string) error {
 	return nil
 }
 
-func checkDomain(d string) error {
-	if len(d) > 253 || !reDomain.MatchString(strings.ToLower(d)) {
-		return fmt.Errorf("%w: domain %q", errBadInput, d)
+// checkDomain prüft eine Domain und gibt sie kleingeschrieben zurück.
+//
+// Auf dem normalen Weg wird die Domain bereits in internal/core/sites.go und
+// internal/store/repo_site.go kleingeschrieben, bevor sie den Agent
+// erreicht — die eigene Prüfung des Agents erzwang das bisher aber nicht
+// selbst, was dem Prinzip widerspricht, dass sich der Agent nicht darauf
+// verlassen darf, dass der Web-Prozess vorher geprüft hat. Auf
+// case-sensitiven Dateisystemen (ext4/XFS) entstünden bei "Example.com" und
+// "example.com" sonst zwei getrennte Vhost-Dateien, falls ein Aufrufpfad die
+// Normalisierung je umgeht.
+func checkDomain(d string) (string, error) {
+	lower := strings.ToLower(d)
+	if len(d) > 253 || !reDomain.MatchString(lower) {
+		return "", fmt.Errorf("%w: domain %q", errBadInput, d)
 	}
-	return nil
+	return lower, nil
 }
 
 // run führt ein Kommando aus — mit explizitem argv, ohne Shell.

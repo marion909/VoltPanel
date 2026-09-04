@@ -106,11 +106,17 @@ func (s *Server) opNginxTraffic(ctx context.Context, raw json.RawMessage) (any, 
 		}
 		count := TrafficCount{Domain: cursor.Domain, Offset: cursor.Offset, Inode: cursor.Inode}
 
-		if err := checkDomain(cursor.Domain); err != nil {
+		domain, err := checkDomain(cursor.Domain)
+		if err != nil {
 			count.Error = err.Error()
 			res.Files = append(res.Files, count)
 			continue
 		}
+		// Normalisiert weiterreichen: readTraffic baut daraus einen Dateipfad
+		// (s.logDir/<domain>.access.log). Ohne das könnten "Example.com" und
+		// "example.com" auf einem case-sensitiven Dateisystem zwei getrennte
+		// Logdateien treffen, obwohl beide dieselbe Site meinen.
+		cursor.Domain, count.Domain = domain, domain
 		if err := s.readTraffic(&count, cursor); err != nil {
 			count.Error = err.Error()
 		}

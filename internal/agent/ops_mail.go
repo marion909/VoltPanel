@@ -892,12 +892,16 @@ func (s *Server) opMailAutoconfig(_ context.Context, raw json.RawMessage) (any, 
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Host); err != nil {
+	p.Domain = domain
+	host, err := checkDomain(p.Host)
+	if err != nil {
 		return nil, err
 	}
+	p.Host = host
 
 	data := templates.AutoconfigData{
 		Domain: p.Domain, Host: p.Host, IMAPPort: p.IMAPPort, SMTPPort: p.SMTPPort,

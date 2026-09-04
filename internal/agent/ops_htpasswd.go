@@ -26,9 +26,11 @@ func (s *Server) opNginxWriteAuth(ctx context.Context, raw json.RawMessage) (any
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
+	p.Domain = domain
 	if len(p.Entries) == 0 {
 		return nil, opErr(OpNginxWriteAuth, "keine benutzer übergeben")
 	}
@@ -69,9 +71,11 @@ func (s *Server) opNginxRemoveAuth(_ context.Context, raw json.RawMessage) (any,
 	if err != nil {
 		return nil, err
 	}
-	if err := checkDomain(p.Domain); err != nil {
+	domain, err := checkDomain(p.Domain)
+	if err != nil {
 		return nil, err
 	}
+	p.Domain = domain
 
 	path := s.htpasswdPath(p.Domain)
 	if _, err := jail(path, []string{s.nginxDir}); err != nil {

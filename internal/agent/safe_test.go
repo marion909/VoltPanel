@@ -119,15 +119,30 @@ func TestCheckUsernameRejectsSystemAccounts(t *testing.T) {
 
 func TestCheckDomain(t *testing.T) {
 	for _, d := range []string{"example.at", "sub.example.at", "*.example.at", "a-b.example.co.uk"} {
-		if err := checkDomain(d); err != nil {
+		if _, err := checkDomain(d); err != nil {
 			t.Errorf("checkDomain(%q) = %v, erwartet erlaubt", d, err)
 		}
 	}
 	for _, d := range []string{"", "example", "../etc", "exa mple.at", "example.at/../x",
 		"example.at;rm -rf /", "-example.at", strings.Repeat("a", 250) + ".at"} {
-		if err := checkDomain(d); err == nil {
+		if _, err := checkDomain(d); err == nil {
 			t.Errorf("checkDomain(%q) erlaubt, erwartet war eine Ablehnung", d)
 		}
+	}
+}
+
+// TestCheckDomainNormalisiertGrossschreibung hält die Lücke fest, die
+// checkDomain vorher hatte: es prüfte zwar kleingeschrieben, gab aber nie den
+// normalisierten String zurück. Aufrufer, die mit dem Original weiterarbeiten,
+// könnten auf einem case-sensitiven Dateisystem (ext4/XFS) "Example.com" und
+// "example.com" als zwei getrennte Vhost-/Log-Dateien behandeln.
+func TestCheckDomainNormalisiertGrossschreibung(t *testing.T) {
+	got, err := checkDomain("Example.AT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "example.at" {
+		t.Errorf("checkDomain(%q) = %q, erwartet %q", "Example.AT", got, "example.at")
 	}
 }
 

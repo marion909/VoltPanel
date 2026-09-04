@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- checkDomain gibt den kleingeschriebenen Domainnamen jetzt zurück — sonst
+  könnten "Example.com"/"example.com" auf ext4/XFS zwei getrennte Vhost-/Log-Dateien treffen
 
 ## v0.4.51 — 2026-09-04
 
