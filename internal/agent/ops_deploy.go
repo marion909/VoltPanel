@@ -388,6 +388,25 @@ type DeployKeyResult struct {
 	Created   bool   `json:"created"`
 }
 
+// ensureDeployDir legt das Schlüsselverzeichnis mit 0751 an — nicht 0750: es
+// gehört root:root, aber der ssh/git-Aufruf für den Klon läuft per
+// runAsUser unter der Site-UID. Ohne das Execute-Bit für "other" könnte sie
+// das Verzeichnis nicht einmal betreten, SSH-basierte Git-Deploys scheiterten
+// dann grundsätzlich mit "Permission denied", obwohl die einzelne
+// Schlüsseldatei korrekt 0600 der Site-UID gehört. Kein Lese-Bit für "other":
+// die Verzeichnisliste (welche anderen Sites Deploy-Schlüssel haben) bleibt
+// verborgen, nur der eigene, namentlich bekannte Dateiname lässt sich öffnen.
+//
+// Chmod extra, nicht nur der Modus in MkdirAll: der wirkt nur beim Anlegen.
+// Ein vor diesem Fix bereits bestehendes Verzeichnis bliebe sonst bei 0750
+// stehen, bis jemand von Hand nachbessert.
+func ensureDeployDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o751); err != nil {
+		return err
+	}
+	return os.Chmod(dir, 0o751)
+}
+
 // opDeployKey liefert den öffentlichen Schlüssel, mit dem die Site ihr
 // Repository lesen darf.
 //
@@ -412,7 +431,7 @@ func (s *Server) opDeployKey(ctx context.Context, raw json.RawMessage) (any, err
 	res := DeployKeyResult{Name: p.Name}
 
 	if !fileExists(key) {
-		if err := os.MkdirAll(s.deployDir, 0o750); err != nil {
+		if err := ensureDeployDir(s.deployDir); err != nil {
 			return nil, opErr(OpDeployKey, "schlüsselverzeichnis: %v", err)
 		}
 		// ed25519 ohne Passphrase: ein Schlüssel mit Passphrase, die neben ihm

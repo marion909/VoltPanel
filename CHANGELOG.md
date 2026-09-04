@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Git-Deploy: Schlüsselverzeichnis mit 0750 statt 0751 angelegt — die
+  Site-UID konnte es nicht betreten, SSH-Deploys scheiterten grundsätzlich mit "Permission denied"
 
 ## v0.4.47 — 2026-09-04
 
