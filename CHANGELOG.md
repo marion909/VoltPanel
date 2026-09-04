@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.40 — 2026-09-04
+
 - Login-Ratelimiter: die fertige Cleanup()-Funktion wurde nirgends aufgerufen
   — die IP-Bucket-Map wuchs auf einem öffentlichen Panel unbegrenzt
 
