@@ -72,6 +72,21 @@ func New(opts Options) (*Server, error) {
 	// protokolliert vollständig und antwortet knapp.
 	e.HTTPErrorHandler = errorHandler(opts.Logger)
 
+	// Ohne expliziten IPExtractor fällt Echo auf ein Verhalten zurück, das
+	// X-Forwarded-For/X-Real-IP ungeprüft vertraut — unabhängig davon, ob
+	// überhaupt ein Reverse-Proxy davorsteht. Beides hängt an c.RealIP():
+	// die IP-Whitelist (middleware.go) und das Login-Ratelimit (auth.go).
+	// Ohne diese Zeile könnte ein externer Angreifer beide über einen
+	// beliebigen, selbst gesetzten Header umgehen. trust_proxy ist Standard
+	// aus, weil volt-web TLS meist selbst terminiert (siehe docs/release.md);
+	// wer bewusst einen Reverse-Proxy davorstellt, setzt trust_proxy: true
+	// und bekommt die Herkunft aus X-Forwarded-For, sonst nie.
+	if opts.Config != nil && opts.Config.TrustProxy {
+		e.IPExtractor = echo.ExtractIPFromXFFHeader()
+	} else {
+		e.IPExtractor = echo.ExtractIPDirect()
+	}
+
 	s := &Server{
 		echo:      e,
 		cfg:       opts.Config,
