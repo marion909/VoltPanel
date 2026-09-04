@@ -39,6 +39,16 @@ func (s *Server) opFileWrite(_ context.Context, raw json.RawMessage) (any, error
 	if err := writeFileAtomic(path, []byte(p.Content), mode); err != nil {
 		return nil, opErr(OpFileWrite, "%v", err)
 	}
+	if p.Owner != "" {
+		if err := checkUsername(p.Owner); err != nil {
+			return nil, err
+		}
+		if p.Group != "" {
+			if err := checkFileGroup(p.Group); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if err := applyOwner(path, p.Owner, p.Group, false); err != nil {
 		return nil, opErr(OpFileWrite, "%v", err)
 	}
@@ -126,6 +136,16 @@ func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error
 	// Erst der Eigentümer, dann die Rechte. Die Reihenfolge ist nicht
 	// beliebig: chown löscht setgid wieder — auf manchen Systemen auch bei
 	// Verzeichnissen. Wer zuerst chmod aufruft, verliert das Bit still.
+	if p.Owner != "" {
+		if err := checkUsername(p.Owner); err != nil {
+			return nil, err
+		}
+		if p.Group != "" {
+			if err := checkFileGroup(p.Group); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if err := applyOwner(path, p.Owner, p.Group, false); err != nil {
 		return nil, opErr(OpFileMkdir, "%v", err)
 	}
@@ -152,6 +172,11 @@ func (s *Server) opFileChown(_ context.Context, raw json.RawMessage) (any, error
 	}
 	if err := checkUsername(p.Owner); err != nil {
 		return nil, err
+	}
+	if p.Group != "" {
+		if err := checkFileGroup(p.Group); err != nil {
+			return nil, err
+		}
 	}
 	if err := applyOwner(path, p.Owner, p.Group, p.Recursive); err != nil {
 		return nil, opErr(OpFileChown, "%v", err)
@@ -266,13 +291,33 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	return os.Rename(tmpName, path)
 }
 
+// checkFileGroup lehnt reservierte Systemgruppen ab — dieselbe Sperrliste wie
+// checkUsername für den Eigentümer. Ohne sie konnten file.chown/file.write/
+// file.mkdir die Gruppe einer Datei (optional rekursiv) auf jede existierende
+// Systemgruppe setzen, z. B. "root", während der Eigentümer längst gesperrt war.
+func checkFileGroup(g string) error {
+	if !reUsername.MatchString(g) {
+		return fmt.Errorf("%w: gruppenname %q", errBadInput, g)
+	}
+	switch g {
+	case "root", "daemon", "bin", "sys", "www-data", "nobody", "volt", "volt-agent",
+		"sshd", "mysql", "systemd-network", "systemd-resolve":
+		return fmt.Errorf("%w: %q ist eine reservierte systemgruppe", errNotAllow, g)
+	}
+	return nil
+}
+
 // applyOwner setzt Eigentümer und Gruppe über die Namensauflösung des Systems.
+//
+// Vertraut owner/group ungeprüft — Aufrufer mit unsicherer Eingabe (die
+// FileManager-Operationen in dieser Datei sowie ops_chunks.go/ops_files_ext.go)
+// prüfen vorher selbst über checkUsername/checkFileGroup. Intern vertrauenswürdige
+// Aufrufer (ops_app.go, ops_htpasswd.go) übergeben bewusst "root" als
+// Eigentümer — checkUsername hier fest einzubauen hätte genau das
+// grundsätzlich verhindert.
 func applyOwner(path, owner, group string, recursive bool) error {
 	if owner == "" {
 		return nil
-	}
-	if err := checkUsername(owner); err != nil {
-		return err
 	}
 
 	u, err := user.Lookup(owner)

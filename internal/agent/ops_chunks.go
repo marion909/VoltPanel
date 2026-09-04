@@ -114,6 +114,9 @@ func (s *Server) opFileWriteChunk(_ context.Context, raw json.RawMessage) (any, 
 	// Der Eigentümer wird bei jedem Block gesetzt: Der erste legt die Datei an,
 	// und ein späterer Fehler soll keine Datei zurücklassen, die root gehört.
 	if p.Owner != "" {
+		if err := checkUsername(p.Owner); err != nil {
+			return nil, err
+		}
 		if err := applyOwner(path, p.Owner, "", false); err != nil {
 			return nil, opErr(OpFileWriteChunk, "%v", err)
 		}

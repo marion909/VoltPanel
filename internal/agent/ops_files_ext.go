@@ -196,6 +196,11 @@ func (s *Server) opFileArchive(ctx context.Context, raw json.RawMessage) (any, e
 		return nil, opErr(OpFileArchive, "%v", err)
 	}
 
+	if p.Owner != "" {
+		if err := checkUsername(p.Owner); err != nil {
+			return nil, err
+		}
+	}
 	if err := applyOwner(dest, p.Owner, "", false); err != nil {
 		return nil, opErr(OpFileArchive, "%v", err)
 	}
@@ -241,6 +246,9 @@ func (s *Server) opFileExtract(ctx context.Context, raw json.RawMessage) (any, e
 	}
 
 	if p.Owner != "" {
+		if err := checkUsername(p.Owner); err != nil {
+			return nil, err
+		}
 		if err := applyOwner(dest, p.Owner, "", true); err != nil {
 			return nil, opErr(OpFileExtract, "%v", err)
 		}

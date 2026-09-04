@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Datei-Manager: die Zielgruppe von chown/write/mkdir war ungeprüft (root,
+  mysql, …); dabei kam ans Licht, dass die alte Sperre "root" auch als
+  Eigentümer traf und interne App-/htpasswd-Schreibvorgänge brach
 
 ## v0.4.48 — 2026-09-04
 
