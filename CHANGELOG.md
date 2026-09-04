@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- CreateDatabase und Zertifikatsausstellung prüften eine mitgegebene site_id
+  nicht gegen den Mandanten der Anfrage — Defense-in-Depth auf Service-Ebene,
+  ergänzend zur bereits gehärteten Store-Ebene
 
 ## v0.4.55 — 2026-09-04
 

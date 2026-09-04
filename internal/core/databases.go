@@ -70,6 +70,18 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, sc store.Scope, in
 		return nil, err
 	}
 
+	// Wie AppService.CreateApp, CronService.CreateCronjob und
+	// DeployService.Configure: die Site vorher laden und damit prüfen, dass
+	// sie demselben Mandanten gehört wie die neue Zeile. GetSite ist bereits
+	// scope-geprüft und liefert für eine fremde Site ErrNotFound — ohne diese
+	// Zeile könnte ein Mandant eine Datenbank mit eigener tenant_id, aber der
+	// site_id einer fremden Site anlegen.
+	if in.SiteID != nil {
+		if _, err := s.store.GetSite(ctx, tenantScope, *in.SiteID); err != nil {
+			return nil, err
+		}
+	}
+
 	// Erst die Eingabe prüfen, dann normalisieren: "mein-shop" wird zu
 	// "mein_shop", aber "x; DROP DATABASE mysql" wird abgelehnt statt
 	// stillschweigend in einen harmlosen Namen verwandelt.

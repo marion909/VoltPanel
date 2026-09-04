@@ -120,6 +120,24 @@ func (s *CertService) Issue(ctx context.Context, sc store.Scope, opts IssueOptio
 		}
 	}
 
+	// Die Site muss demselben Mandanten gehören wie opts.TenantID — sonst
+	// könnte ein Zertifikat mit der tenant_id eines Mandanten, aber der
+	// site_id einer fremden Site angelegt werden. Aktuell sind alle bekannten
+	// Aufrufer diszipliniert (laden die Site vorher selbst bzw. übergeben
+	// keine SiteID), aber die Zuordnung wurde bisher erst später in enableSSL
+	// implizit geprüft, wenn der Cert-Datensatz bereits angelegt war — analog
+	// zum selben, aber end-to-end exploitierbaren Muster bei
+	// DatabaseService.CreateDatabase.
+	if opts.SiteID != nil {
+		site, err := s.store.GetSite(ctx, sc, *opts.SiteID)
+		if err != nil {
+			return nil, err
+		}
+		if site.TenantID != opts.TenantID {
+			return nil, store.ErrNotFound
+		}
+	}
+
 	// Ohne ausdrücklich übergebenen Token den des Mandanten verwenden — sonst
 	// müsste ihn jeder Aufrufer selbst heraussuchen und entschlüsseln.
 	if opts.CloudflareToken == "" && opts.TenantID > 0 {
