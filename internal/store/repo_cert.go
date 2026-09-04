@@ -13,6 +13,17 @@ func (s *Store) CreateCert(ctx context.Context, sc Scope, c *Cert) error {
 	if err := sc.owns(c.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich ein
+	// Zertifikat unter der site_id eines fremden Mandanten anlegen.
+	if c.SiteID != nil {
+		site, err := s.GetSite(ctx, sc, *c.SiteID)
+		if err != nil {
+			return err
+		}
+		if site.TenantID != c.TenantID {
+			return ErrNotFound
+		}
+	}
 	c.CreatedAt, c.UpdatedAt = now(), now()
 	if c.Status == "" {
 		c.Status = "pending"

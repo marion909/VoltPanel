@@ -17,6 +17,17 @@ func (s *Store) CreateCronjob(ctx context.Context, sc Scope, c *Cronjob) error {
 	if err := sc.owns(c.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich ein
+	// Cronjob unter der site_id eines fremden Mandanten anlegen.
+	if c.SiteID != nil {
+		site, err := s.GetSite(ctx, sc, *c.SiteID)
+		if err != nil {
+			return err
+		}
+		if site.TenantID != c.TenantID {
+			return ErrNotFound
+		}
+	}
 	if err := validateCronjob(c); err != nil {
 		return err
 	}

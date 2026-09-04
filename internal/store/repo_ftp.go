@@ -21,6 +21,18 @@ func (s *Store) CreateFTPAccount(ctx context.Context, sc Scope, a *FTPAccount) e
 	if err := sc.owns(a.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich ein
+	// FTP-Zugang (mit UID/GID/HomeDir) unter der site_id eines fremden
+	// Mandanten anlegen.
+	if a.SiteID != nil {
+		site, err := s.GetSite(ctx, sc, *a.SiteID)
+		if err != nil {
+			return err
+		}
+		if site.TenantID != a.TenantID {
+			return ErrNotFound
+		}
+	}
 	if err := validateFTPAccount(a); err != nil {
 		return err
 	}
@@ -30,7 +42,7 @@ func (s *Store) CreateFTPAccount(ctx context.Context, sc Scope, a *FTPAccount) e
 		INSERT INTO ftp_accounts (tenant_id, site_id, username, password_enc, home_dir,
 			uid, gid, quota_mb, status, last_error, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.TenantID, a.SiteID, a.Username, a.PasswordEnc, a.HomeDir,
+		a.TenantID, nilIfEmpty(a.SiteID), a.Username, a.PasswordEnc, a.HomeDir,
 		a.UID, a.GID, a.QuotaMB, a.Status, a.LastError, a.CreatedAt, a.UpdatedAt)
 	if err != nil {
 		if isUnique(err) {

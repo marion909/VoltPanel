@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Store: zehn Create*-Funktionen prüften eine mitgegebene Fremd-ID (site_id,
+  database_id, db_user_id, target_id) nie gegen den Mandanten der neuen Zeile
 
 ## v0.4.32 — 2026-09-04
 

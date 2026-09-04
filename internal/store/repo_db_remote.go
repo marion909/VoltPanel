@@ -147,6 +147,16 @@ func (s *Store) CreateRemoteHost(ctx context.Context, sc Scope, h *DBRemoteHost)
 	if err := sc.owns(h.TenantID); err != nil {
 		return err
 	}
+	// Der Datenbankbenutzer muss demselben Mandanten gehören — sonst ließe
+	// sich eine Fernzugriffs-Herkunft an das Konto eines fremden Mandanten
+	// anhängen.
+	dbUser, err := s.GetDBUser(ctx, sc, h.DBUserID)
+	if err != nil {
+		return err
+	}
+	if dbUser.TenantID != h.TenantID {
+		return ErrNotFound
+	}
 	host, err := NormalizeRemoteHost(h.Host)
 	if err != nil {
 		return err

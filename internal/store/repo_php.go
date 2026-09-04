@@ -15,6 +15,15 @@ func (s *Store) CreatePHPPool(ctx context.Context, sc Scope, p *PHPPool) error {
 	if err := sc.owns(p.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich ein
+	// PHP-FPM-Pool unter der site_id eines fremden Mandanten anlegen.
+	site, err := s.GetSite(ctx, sc, p.SiteID)
+	if err != nil {
+		return err
+	}
+	if site.TenantID != p.TenantID {
+		return ErrNotFound
+	}
 	p.CreatedAt, p.UpdatedAt = now(), now()
 
 	res, err := s.db.ExecContext(ctx, `

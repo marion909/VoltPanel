@@ -52,6 +52,18 @@ func (s *Store) CreateDatabase(ctx context.Context, sc Scope, d *Database) error
 	if err := sc.owns(d.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören. Ohne diese Zeile könnte
+	// jemand eine Datenbank mit eigener tenant_id, aber der site_id einer
+	// fremden Site anlegen — unauffällig in jeder Liste des fremden Mandanten.
+	if d.SiteID != nil {
+		site, err := s.GetSite(ctx, sc, *d.SiteID)
+		if err != nil {
+			return err
+		}
+		if site.TenantID != d.TenantID {
+			return ErrNotFound
+		}
+	}
 	if err := validateDatabase(d); err != nil {
 		return err
 	}
@@ -179,6 +191,16 @@ func (s *Store) CreateDBUser(ctx context.Context, sc Scope, u *DBUser) error {
 	}
 	if err := validateDBUser(u); err != nil {
 		return err
+	}
+	// Die Datenbank muss demselben Mandanten gehören — sonst ließe sich ein
+	// Datenbankbenutzer (mit selbstgewähltem Passwort) an die physische
+	// Datenbank eines fremden Mandanten hängen.
+	db, err := s.GetDatabase(ctx, sc, u.DatabaseID)
+	if err != nil {
+		return err
+	}
+	if db.TenantID != u.TenantID {
+		return ErrNotFound
 	}
 	u.CreatedAt, u.UpdatedAt = now(), now()
 

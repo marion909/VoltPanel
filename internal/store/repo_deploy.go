@@ -76,6 +76,15 @@ func (s *Store) CreateDeploy(ctx context.Context, sc Scope, d *Deploy) error {
 	if err := sc.owns(d.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich ein
+	// Deploy (samt Webhook) unter der site_id eines fremden Mandanten anlegen.
+	site, err := s.GetSite(ctx, sc, d.SiteID)
+	if err != nil {
+		return err
+	}
+	if site.TenantID != d.TenantID {
+		return ErrNotFound
+	}
 	if err := validateDeploy(d); err != nil {
 		return err
 	}

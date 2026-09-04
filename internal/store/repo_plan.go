@@ -147,6 +147,35 @@ func (s *Store) CreateBackup(ctx context.Context, sc Scope, b *Backup) error {
 	if err := sc.owns(b.TenantID); err != nil {
 		return err
 	}
+	// Site, Datenbank und Backup-Ziel müssen demselben Mandanten gehören —
+	// sonst ließe sich ein Backup-Datensatz an eine fremde Ressource hängen.
+	if b.SiteID != nil {
+		site, err := s.GetSite(ctx, sc, *b.SiteID)
+		if err != nil {
+			return err
+		}
+		if site.TenantID != b.TenantID {
+			return ErrNotFound
+		}
+	}
+	if b.DatabaseID != nil {
+		db, err := s.GetDatabase(ctx, sc, *b.DatabaseID)
+		if err != nil {
+			return err
+		}
+		if db.TenantID != b.TenantID {
+			return ErrNotFound
+		}
+	}
+	if b.TargetID != nil {
+		target, err := s.GetBackupTarget(ctx, sc, *b.TargetID)
+		if err != nil {
+			return err
+		}
+		if target.TenantID != b.TenantID {
+			return ErrNotFound
+		}
+	}
 	b.CreatedAt = now()
 
 	res, err := s.db.ExecContext(ctx, `

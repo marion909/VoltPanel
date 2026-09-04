@@ -136,6 +136,15 @@ func (s *Store) CreateApp(ctx context.Context, sc Scope, a *App) error {
 	if err := sc.owns(a.TenantID); err != nil {
 		return err
 	}
+	// Die Site muss demselben Mandanten gehören — sonst ließe sich eine App
+	// unter der site_id eines fremden Mandanten anlegen.
+	site, err := s.GetSite(ctx, sc, a.SiteID)
+	if err != nil {
+		return err
+	}
+	if site.TenantID != a.TenantID {
+		return ErrNotFound
+	}
 	if err := validateApp(a); err != nil {
 		return err
 	}
