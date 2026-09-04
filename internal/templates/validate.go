@@ -75,6 +75,22 @@ func checkRedirect(r Redirect) error {
 	return nil
 }
 
+// checkINIValue lässt einen Wert durch, der roh in eine php.ini-artige
+// Konfigurationsdatei geschrieben wird (PoolData.ExtraINI, DisableFunctions).
+// Ein Zeilenumbruch gefolgt von "[name]" würde einen komplett neuen,
+// unabhängigen PHP-FPM-Pool in derselben Datei eröffnen — z. B. mit
+// user = root oder einem beliebigen Socket-Pfad. Deshalb sind hier, anders
+// als bei checkDirective (Nginx), keine eigenen Abschnittsklammern erlaubt.
+func checkINIValue(name, value string) error {
+	if strings.ContainsAny(value, "\n\r\x00") {
+		return fmt.Errorf("%s enthält einen zeilenumbruch oder ein nullbyte", name)
+	}
+	if strings.ContainsAny(value, "[]") {
+		return fmt.Errorf("%s darf keinen neuen abschnitt („[...]“) eröffnen", name)
+	}
+	return nil
+}
+
 // checkDirective lässt genau eine Nginx-Direktive durch: eine Zeile, keine
 // geschweiften Klammern, abgeschlossen mit ";".
 func checkDirective(line string) error {

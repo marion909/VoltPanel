@@ -218,6 +218,18 @@ func TestRenderPoolRejectsBadInput(t *testing.T) {
 		{"max_children zu groß", store.PHPPool{PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5000}},
 		{"unbekannter pm", store.PHPPool{PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5, PM: "magic"}},
 		{"memory_limit unsinnig", store.PHPPool{PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5, MemoryLimit: "viel"}},
+		{"extra_ini eröffnet neuen pool", store.PHPPool{
+			PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5,
+			ExtraINI: "foo = bar\n[boese]\nuser = root\nlisten = /run/boese.sock",
+		}},
+		{"extra_ini mit eckigen klammern ohne umbruch", store.PHPPool{
+			PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5,
+			ExtraINI: "foo[] = bar",
+		}},
+		{"disable_functions eröffnet neuen pool", store.PHPPool{
+			PoolName: "pool1", PHPVersion: "8.3", SocketPath: "/run/p.sock", MaxChildren: 5,
+			DisableFunctions: "exec\n[boese]\nuser = root",
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

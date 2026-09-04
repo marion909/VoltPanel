@@ -259,9 +259,14 @@ func (d *PoolData) validate() error {
 	if d.Pool.MaxChildren < 1 || d.Pool.MaxChildren > 500 {
 		return fmt.Errorf("max_children %d liegt außerhalb 1–500", d.Pool.MaxChildren)
 	}
-	// Der Wert landet ungefiltert in der ini-Datei.
-	if strings.ContainsAny(d.Pool.ExtraINI, "\x00") {
-		return fmt.Errorf("zusätzliche ini-einstellungen enthalten ein nullbyte")
+	// Beide Werte landen roh in der Pool-Datei — ein Zeilenumbruch mit
+	// anschließender neuer "[poolname]"-Kopfzeile eröffnete sonst einen
+	// vollständig neuen, unabhängigen PHP-FPM-Pool in derselben Datei.
+	if err := checkINIValue("zusätzliche ini-einstellungen", d.Pool.ExtraINI); err != nil {
+		return err
+	}
+	if err := checkINIValue("disable_functions", d.Pool.DisableFunctions); err != nil {
+		return err
 	}
 	return nil
 }
