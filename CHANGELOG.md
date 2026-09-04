@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.31 — 2026-09-04
+
 - Datei-Manager und FTP-Home: ein Symlink in der eigenen Site auf eine fremde
   Site wurde bisher aufgelöst statt abgelehnt (Cross-Tenant-Datenzugriff)
 
