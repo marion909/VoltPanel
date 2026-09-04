@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- agent.Client: lang laufende Operationen (Update, Paket-/WordPress-/Webmail-
+  Installation) blockierten über die gemeinsame Verbindung jeden anderen
+  Agent-Aufruf im Panel — laufen jetzt über eine eigene zweite Verbindung
 
 ## v0.4.53 — 2026-09-04
 

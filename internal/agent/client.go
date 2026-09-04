@@ -16,19 +16,32 @@ import (
 
 // Client ist das Web-seitige Ende der Socket-Verbindung.
 //
-// Die Verbindung trägt genau eine Anfrage zur Zeit, deshalb serialisiert ein
-// Mutex alle Aufrufe. Das genügt: Agent-Operationen sind selten und kurz,
-// verglichen mit dem HTTP-Verkehr davor.
+// Jede Verbindung trägt genau eine Anfrage zur Zeit, deshalb serialisiert ein
+// Mutex ihre Aufrufe. Es gibt zwei Verbindungen, nicht eine: "fast" für die
+// gewöhnlichen, kurzen Aufrufe (Statusabfragen, Dateizugriffe, Terminal) und
+// "slow" für die wenigen Operationen, die mehrminütige Zeitlimits eintragen
+// (Systemupdate, Paket-/WordPress-/Webmail-Installation). Über eine einzige
+// gemeinsame Verbindung blockierte eine laufende Installation sonst jeden
+// anderen Agent-Aufruf im gesamten Panel für ihre volle Dauer — dem
+// widerspricht der Kommentar, den dieser Absatz ersetzt: "Agent-Operationen
+// sind selten und kurz" trifft auf die lang laufenden gerade nicht zu.
 type Client struct {
 	socketPath string
 	timeout    time.Duration
 
+	fast agentConn
+	slow agentConn
+
+	seq atomic.Uint64
+}
+
+// agentConn ist eine einzelne Socket-Verbindung samt der Sperre, die ihre
+// Aufrufe serialisiert.
+type agentConn struct {
 	mu     sync.Mutex
 	conn   net.Conn
 	reader *bufio.Reader
 	writer *bufio.Writer
-
-	seq atomic.Uint64
 }
 
 func NewClient(socketPath string) *Client {
@@ -36,21 +49,32 @@ func NewClient(socketPath string) *Client {
 }
 
 func (c *Client) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.closeLocked()
+	err1 := c.fast.close()
+	err2 := c.slow.close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }
 
-func (c *Client) closeLocked() error {
-	if c.conn == nil {
+func (ac *agentConn) close() error {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+	return ac.closeLocked()
+}
+
+func (ac *agentConn) closeLocked() error {
+	if ac.conn == nil {
 		return nil
 	}
-	err := c.conn.Close()
-	c.conn, c.reader, c.writer = nil, nil, nil
+	err := ac.conn.Close()
+	ac.conn, ac.reader, ac.writer = nil, nil, nil
 	return err
 }
 
-// Call schickt eine Operation an den Agent und schreibt das Ergebnis nach out.
+// Call schickt eine Operation über die "fast"-Verbindung an den Agent und
+// schreibt das Ergebnis nach out. Für die wenigen Operationen mit
+// mehrminütigem Zeitlimit siehe callSlow.
 //
 // Bei einem Verbindungsfehler wird genau einmal neu verbunden und wiederholt —
 // ein Agent-Neustart (etwa durch `volt update`) soll nicht jede laufende
@@ -65,14 +89,29 @@ func (c *Client) Call(ctx context.Context, op Op, params any, out any) error {
 	if c == nil {
 		return fmt.Errorf("%s: kein agent verbunden", op)
 	}
+	return c.call(ctx, &c.fast, op, params, out)
+}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// callSlow ist Call über die zweite, eigene Verbindung — für Operationen, die
+// selbst mehrminütige Zeitlimits eintragen (Systemupdate, Paket-/WordPress-/
+// Webmail-Installation). Über dieselbe Verbindung wie die kurzen, häufigen
+// Aufrufe blockierte eine laufende Installation sonst jeden anderen
+// Agent-Aufruf im gesamten Panel für ihre volle Dauer.
+func (c *Client) callSlow(ctx context.Context, op Op, params any, out any) error {
+	if c == nil {
+		return fmt.Errorf("%s: kein agent verbunden", op)
+	}
+	return c.call(ctx, &c.slow, op, params, out)
+}
 
-	resp, err := c.callLocked(ctx, op, params)
+func (c *Client) call(ctx context.Context, ac *agentConn, op Op, params any, out any) error {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	resp, err := c.callLocked(ctx, ac, op, params)
 	if err != nil && isTransportError(err) {
-		_ = c.closeLocked()
-		resp, err = c.callLocked(ctx, op, params)
+		_ = ac.closeLocked()
+		resp, err = c.callLocked(ctx, ac, op, params)
 	}
 	if err != nil {
 		return err
@@ -89,8 +128,8 @@ func (c *Client) Call(ctx context.Context, op Op, params any, out any) error {
 	return nil
 }
 
-func (c *Client) callLocked(ctx context.Context, op Op, params any) (*Response, error) {
-	if err := c.connectLocked(); err != nil {
+func (c *Client) callLocked(ctx context.Context, ac *agentConn, op Op, params any) (*Response, error) {
+	if err := c.connectLocked(ac); err != nil {
 		return nil, err
 	}
 
@@ -113,15 +152,15 @@ func (c *Client) callLocked(ctx context.Context, op Op, params any) (*Response, 
 	if d, ok := ctx.Deadline(); ok {
 		deadline = d
 	}
-	if err := c.conn.SetDeadline(deadline); err != nil {
+	if err := ac.conn.SetDeadline(deadline); err != nil {
 		return nil, transportErr{err}
 	}
 
-	if err := writeJSON(c.writer, req); err != nil {
+	if err := writeJSON(ac.writer, req); err != nil {
 		return nil, transportErr{fmt.Errorf("anfrage senden: %w", err)}
 	}
 
-	line, err := c.reader.ReadBytes('\n')
+	line, err := ac.reader.ReadBytes('\n')
 	if err != nil {
 		return nil, transportErr{fmt.Errorf("antwort lesen: %w", err)}
 	}
@@ -138,8 +177,8 @@ func (c *Client) callLocked(ctx context.Context, op Op, params any) (*Response, 
 	return &resp, nil
 }
 
-func (c *Client) connectLocked() error {
-	if c.conn != nil {
+func (c *Client) connectLocked(ac *agentConn) error {
+	if ac.conn != nil {
 		return nil
 	}
 
@@ -173,7 +212,7 @@ func (c *Client) connectLocked() error {
 		return fmt.Errorf("agent lehnt verbindung ab: %s", ack.Error)
 	}
 
-	c.conn, c.reader, c.writer = conn, reader, writer
+	ac.conn, ac.reader, ac.writer = conn, reader, writer
 	return nil
 }
 
@@ -235,7 +274,7 @@ func (c *Client) InstallPHPExtension(ctx context.Context, version, name string) 
 	// Paketinstallationen dauern länger als die Vorgabe des Clients.
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	return c.Call(ctx, OpPHPExtInstall, PHPExtParams{PHPVersion: version, Name: name}, nil)
+	return c.callSlow(ctx, OpPHPExtInstall, PHPExtParams{PHPVersion: version, Name: name}, nil)
 }
 
 // TogglePHPExtension schaltet ein installiertes Modul an oder ab.
@@ -253,7 +292,7 @@ func (c *Client) SystemUpdate(ctx context.Context) (UpdateResult, error) {
 	defer cancel()
 
 	var res UpdateResult
-	err := c.Call(ctx, OpSystemUpdate, nil, &res)
+	err := c.callSlow(ctx, OpSystemUpdate, nil, &res)
 	return res, err
 }
 
@@ -770,7 +809,7 @@ func (c *Client) InstallFeature(ctx context.Context, feature string) (string, er
 	defer cancel()
 
 	var res TextResult
-	err := c.Call(ctx, OpFeatureInstall, map[string]string{"feature": feature}, &res)
+	err := c.callSlow(ctx, OpFeatureInstall, map[string]string{"feature": feature}, &res)
 	return res.Text, err
 }
 
@@ -781,7 +820,7 @@ func (c *Client) UninstallFeature(ctx context.Context, feature string) (string, 
 	defer cancel()
 
 	var res TextResult
-	err := c.Call(ctx, OpFeatureUninstall, map[string]string{"feature": feature}, &res)
+	err := c.callSlow(ctx, OpFeatureUninstall, map[string]string{"feature": feature}, &res)
 	return res.Text, err
 }
 
@@ -791,7 +830,7 @@ func (c *Client) InstallWordPress(ctx context.Context, p WordPressInstallParams)
 	defer cancel()
 
 	var res TextResult
-	err := c.Call(ctx, OpAppStoreWordPress, p, &res)
+	err := c.callSlow(ctx, OpAppStoreWordPress, p, &res)
 	return res.Text, err
 }
 
@@ -802,7 +841,7 @@ func (c *Client) InstallWebmail(ctx context.Context, p WebmailInstallParams) (st
 	defer cancel()
 
 	var res TextResult
-	err := c.Call(ctx, OpWebmailInstall, p, &res)
+	err := c.callSlow(ctx, OpWebmailInstall, p, &res)
 	return res.Text, err
 }
 
