@@ -415,23 +415,39 @@ func (s *Server) opMySQLDump(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, err
 	}
 
-	f, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	// In eine temporäre Datei im selben Verzeichnis schreiben und erst bei
+	// Erfolg an dest umbenennen — anders als O_TRUNC auf dest direkt bliebe
+	// sonst bei einem gescheiterten Dump eine leere Datei stehen, statt des
+	// vorherigen funktionierenden Dumps.
+	tmp, err := os.CreateTemp(filepath.Dir(dest), ".mysqldump-*")
 	if err != nil {
 		return nil, opErr(OpMySQLDump, "zieldatei: %v", err)
 	}
-	defer f.Close()
+	defer os.Remove(tmp.Name())
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return nil, opErr(OpMySQLDump, "zieldatei: %v", err)
+	}
 
-	if err := runInto(ctx, longTimeout, f, nil, "mysqldump",
+	if err := runInto(ctx, longTimeout, tmp, nil, "mysqldump",
 		"--defaults-file=/dev/null", "--protocol=socket",
 		"--socket=/var/run/mysqld/mysqld.sock", "--user=root",
 		"--single-transaction", "--quick", "--routines", "--events",
 		"--default-character-set=utf8mb4", p.Database); err != nil {
+		tmp.Close()
 		return nil, opErr(OpMySQLDump, "%v", err)
 	}
 
-	info, err := f.Stat()
+	info, err := tmp.Stat()
 	if err != nil {
+		tmp.Close()
 		return nil, err
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, opErr(OpMySQLDump, "zieldatei: %v", err)
+	}
+	if err := os.Rename(tmp.Name(), dest); err != nil {
+		return nil, opErr(OpMySQLDump, "zieldatei umbenennen: %v", err)
 	}
 	return map[string]any{"path": dest, "size_bytes": info.Size()}, nil
 }
