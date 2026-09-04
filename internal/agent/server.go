@@ -64,6 +64,13 @@ type Server struct {
 	// beendet sie beim Herunterfahren, damit keine Shell ihn überlebt.
 	termMu sync.Mutex
 	terms  map[string]*terminal
+	// termReserved zählt Plätze, die opTerminalOpen sich schon vor dem
+	// eigentlichen Start reserviert hat — zusammen mit len(terms) die Zahl, die
+	// gegen maxTerminals zählt. Ohne das könnten mehrere gleichzeitige
+	// Öffnen-Anfragen die Prüfung alle bestehen, bevor auch nur eine ihren
+	// Eintrag in terms gesetzt hat, und gemeinsam mehr als maxTerminals
+	// Sitzungen anlegen.
+	termReserved int
 
 	mu   sync.Mutex
 	conn int

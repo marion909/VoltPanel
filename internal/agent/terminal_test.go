@@ -123,6 +123,74 @@ func TestProzessBeendenNurFuerSites(t *testing.T) {
 	}
 }
 
+// TestOpTerminalOpenGibtReservierungBeiFehlschlagFrei deckt die Buchhaltung
+// ab, die den maxTerminals-Fund behebt: opTerminalOpen reserviert einen Platz
+// (termReserved++), bevor PTY und Shell überhaupt starten, und muss ihn bei
+// jedem Fehlschlag wieder freigeben — sonst würde ein Server, auf dem
+// wiederholt Terminals fehlschlagen (hier: kein echter Systembenutzer, auf
+// macOS zusätzlich "nur unter linux"), irgendwann jede weitere Anfrage mit
+// "es laufen bereits N sitzungen" ablehnen, obwohl keine einzige läuft.
+func TestOpTerminalOpenGibtReservierungBeiFehlschlagFrei(t *testing.T) {
+	srv, sites := testServer(t)
+
+	for i := 0; i < maxTerminals+2; i++ {
+		raw, _ := json.Marshal(TerminalParams{User: "site_example_at", Dir: sites, Cols: 80, Rows: 24})
+		if _, err := srv.opTerminalOpen(context.Background(), raw); err == nil {
+			t.Fatal("opTerminalOpen ist ohne echten Systembenutzer unerwartet geglückt")
+		}
+	}
+
+	srv.termMu.Lock()
+	reserved := srv.termReserved
+	srv.termMu.Unlock()
+	if reserved != 0 {
+		t.Fatalf("termReserved = %d nach lauter Fehlschlägen, erwartet 0", reserved)
+	}
+}
+
+// TestOpTerminalOpenZaehltReservierungGegenMaxTerminals hält die eigentliche
+// Race fest: vor dem Fix zählte nur len(s.terms) gegen maxTerminals, geprüft
+// und danach sofort wieder losgelassen — mehrere gleichzeitige Anfragen
+// konnten die Prüfung alle bestehen, bevor auch nur eine ihren Eintrag
+// gesetzt hatte. termReserved simuliert hier bereits laufende, aber noch
+// nicht fertig eingetragene Öffnen-Anfragen.
+func TestOpTerminalOpenZaehltReservierungGegenMaxTerminals(t *testing.T) {
+	srv, sites := testServer(t)
+
+	srv.termMu.Lock()
+	srv.termReserved = maxTerminals
+	srv.termMu.Unlock()
+
+	raw, _ := json.Marshal(TerminalParams{User: "site_example_at", Dir: sites, Cols: 80, Rows: 24})
+	_, err := srv.opTerminalOpen(context.Background(), raw)
+	if err == nil {
+		t.Fatal("opTerminalOpen ignorierte bereits reservierte Plätze")
+	}
+	if !strings.Contains(err.Error(), "sitzungen") {
+		t.Errorf("abgelehnt, aber aus dem falschen Grund: %v", err)
+	}
+}
+
+// TestOpTerminalResizeLehntGeschlosseneSitzungAb deckt die zweite Race ab:
+// opTerminalResize griff vorher ohne term.mu auf term.ptmx zu, während
+// terminal.close() genau dieses ptmx unter derselben Sperre schließt. Der
+// term.closed-Check unter der Sperre fängt eine bereits geschlossene Sitzung
+// jetzt ab, statt setWinsize auf einem möglicherweise schon
+// wiederverwendeten Dateideskriptor aufzurufen.
+func TestOpTerminalResizeLehntGeschlosseneSitzungAb(t *testing.T) {
+	srv, _ := testServer(t)
+
+	term := &terminal{id: "abc123", user: "site_example_at", closed: true}
+	srv.termMu.Lock()
+	srv.terms[term.id] = term
+	srv.termMu.Unlock()
+
+	raw, _ := json.Marshal(TerminalParams{Session: term.id, Cols: 80, Rows: 24})
+	if _, err := srv.opTerminalResize(context.Background(), raw); err == nil {
+		t.Fatal("opTerminalResize akzeptierte eine bereits geschlossene Sitzung")
+	}
+}
+
 // TestFenstergroesseWirdEingegrenzt: die Werte kommen aus dem Browser und gehen
 // als uint16 in einen ioctl.
 func TestFenstergroesseWirdEingegrenzt(t *testing.T) {

@@ -64,13 +64,29 @@ func (s *Server) opTerminalOpen(_ context.Context, raw json.RawMessage) (any, er
 	}
 	cols, rows := clampWindow(p.Cols, p.Rows)
 
+	// Zähler-Prüfung und Platzreservierung atomar unter derselben Sperre: sonst
+	// könnten mehrere gleichzeitige Anfragen die Prüfung alle bestehen, bevor
+	// auch nur eine ihren Eintrag gesetzt hat, und gemeinsam mehr als
+	// maxTerminals Sitzungen anlegen.
 	s.termMu.Lock()
-	running := len(s.terms)
-	s.termMu.Unlock()
-	if running >= maxTerminals {
+	if len(s.terms)+s.termReserved >= maxTerminals {
+		s.termMu.Unlock()
 		return nil, opInputErr(OpTerminalOpen,
 			"es laufen bereits %d sitzungen — bitte zuerst eine schließen", maxTerminals)
 	}
+	s.termReserved++
+	s.termMu.Unlock()
+
+	// Ab hier reserviert, bis der Eintrag entweder in terms landet (ok = true)
+	// oder die Reservierung bei einem Fehlschlag wieder freigegeben wird.
+	ok := false
+	defer func() {
+		if !ok {
+			s.termMu.Lock()
+			s.termReserved--
+			s.termMu.Unlock()
+		}
+	}()
 
 	id, err := randomHex(12)
 	if err != nil {
@@ -109,7 +125,9 @@ func (s *Server) opTerminalOpen(_ context.Context, raw json.RawMessage) (any, er
 
 	s.termMu.Lock()
 	s.terms[id] = term
+	s.termReserved--
 	s.termMu.Unlock()
+	ok = true
 
 	s.log.Info("terminal eröffnet", "sitzung", id, "benutzer", p.User, "pid", cmd.Process.Pid)
 	go s.serveTerminal(term)
@@ -193,6 +211,17 @@ func (s *Server) opTerminalResize(_ context.Context, raw json.RawMessage) (any, 
 		return nil, opInputErr(OpTerminalResize, "sitzung %q gibt es nicht", p.Session)
 	}
 	cols, rows := clampWindow(p.Cols, p.Rows)
+
+	// term.mu sperren, bevor auf ptmx zugegriffen wird — analog zu
+	// terminal.close(), das genau dieses ptmx unter derselben Sperre schließt.
+	// Liefen resize und close gleichzeitig, konnte setWinsize sonst einen
+	// bereits ungültigen (oder wiederverwendeten) Dateideskriptor per ioctl
+	// ansprechen.
+	term.mu.Lock()
+	defer term.mu.Unlock()
+	if term.closed {
+		return nil, opInputErr(OpTerminalResize, "sitzung %q gibt es nicht", p.Session)
+	}
 	if err := setWinsize(term.ptmx, cols, rows); err != nil {
 		return nil, opErr(OpTerminalResize, "%v", err)
 	}
