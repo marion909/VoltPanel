@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.59 — 2026-09-05
+
 - DeployService.RunAsync reservierte die Laufend-Sperre nur lesend
   (istLaufend) und ließ die tatsächliche Sperre erst die gestartete
   Goroutine setzen — zwei nahezu gleichzeitige Trigger (z. B. zwei
