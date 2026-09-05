@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.61 — 2026-09-05
+
 - GeneratePassword zog Zeichen per b%len(alphabet) — da 256 kein Vielfaches
   der 63-Zeichen-Alphabetlänge ist, hatten die ersten vier Zeichen eine
   leicht höhere Trefferwahrscheinlichkeit; jetzt per Rejection-Sampling
