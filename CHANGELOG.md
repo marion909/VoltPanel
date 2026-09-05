@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- VerifyPassword las memory/time/threads ungeprüft aus dem gespeicherten
+  Hash und reichte sie direkt an argon2.IDKey weiter — ein Hash mit
+  überhöhten Parametern hätte bei jedem Verifizierungsversuch beliebigen
+  Ressourcenverbrauch verursacht; jetzt mit Obergrenzen
 
 ## v0.4.61 — 2026-09-05
 

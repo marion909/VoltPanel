@@ -25,6 +25,19 @@ const (
 	saltLen      = 16
 )
 
+// Obergrenzen für Parameter, die VerifyPassword aus einem gespeicherten Hash
+// liest. Der Hash-String trägt seine Parameter selbst (siehe HashPassword) —
+// gelangt einer mit überhöhten Werten in die Datenbank (künftiger Import-/
+// Migrationspfad, Teil-Kompromiss), würde argon2.IDKey ohne diese Grenze mit
+// beliebigem Aufwand rechnen: ein DoS pro Verifizierungsversuch. Das Achtfache
+// der eigenen Parameter deckt künftige, moderate Erhöhungen ab, ohne diesen
+// Hebel zu öffnen.
+const (
+	argonMaxMemory  = 8 * argonMemory // KiB
+	argonMaxTime    = 8 * argonTime
+	argonMaxThreads = 8
+)
+
 var (
 	ErrPasswordMismatch = errors.New("passwort stimmt nicht")
 	ErrHashFormat       = errors.New("passwort-hash hat ein unbekanntes format")
@@ -62,6 +75,11 @@ func VerifyPassword(password, encoded string) error {
 	var time uint32
 	var threads uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
+		return ErrHashFormat
+	}
+	if memory == 0 || memory > argonMaxMemory ||
+		time == 0 || time > argonMaxTime ||
+		threads == 0 || threads > argonMaxThreads {
 		return ErrHashFormat
 	}
 

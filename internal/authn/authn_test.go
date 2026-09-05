@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,6 +38,26 @@ func TestVerifyPasswordRejectsBrokenHash(t *testing.T) {
 		"$argon2id$v=19$m=19456,t=2,p=1$!!!$AA"} {
 		if err := VerifyPassword("x", h); err == nil {
 			t.Errorf("VerifyPassword akzeptierte Hash %q", h)
+		}
+	}
+}
+
+// TestVerifyPasswordRejectsUeberhoehteParameter deckt den Fund ab, dass
+// memory/time/threads bisher ungeprüft aus dem gespeicherten Hash-String an
+// argon2.IDKey weitergereicht wurden. Ein Hash mit überhöhten Werten (z. B.
+// aus einem künftigen Import-/Migrationspfad) hätte sonst bei jedem
+// Verifizierungsversuch beliebigen Ressourcenverbrauch verursacht — ein DoS
+// pro Login-Versuch.
+func TestVerifyPasswordRejectsUeberhoehteParameter(t *testing.T) {
+	for _, h := range []string{
+		"$argon2id$v=19$m=999999999,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"$argon2id$v=19$m=19456,t=999,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"$argon2id$v=19$m=19456,t=2,p=255$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"$argon2id$v=19$m=0,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"$argon2id$v=19$m=19456,t=0,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	} {
+		if err := VerifyPassword("x", h); !errors.Is(err, ErrHashFormat) {
+			t.Errorf("VerifyPassword(%q): %v, erwartet ErrHashFormat", h, err)
 		}
 	}
 }
