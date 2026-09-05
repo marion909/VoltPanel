@@ -209,7 +209,11 @@ func (c *Config) Validate() error {
 	default:
 		return fmt.Errorf("update_channel %q ist weder stable noch beta", c.UpdateChannel)
 	}
-	for _, p := range []string{c.DataDir, c.ConfigDir, c.SitesDir} {
+	for _, p := range []string{
+		c.DataDir, c.ConfigDir, c.SitesDir,
+		c.BackupDir, c.DBPath, c.SocketPath, c.NginxDir, c.PHPFPMDir,
+		c.CertDir, c.SecretKeyPath, c.LogDir,
+	} {
 		if !filepath.IsAbs(p) {
 			return fmt.Errorf("pfad %q muss absolut sein", p)
 		}

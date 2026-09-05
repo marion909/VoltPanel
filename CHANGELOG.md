@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Config.Validate() prüfte nur DataDir/ConfigDir/SitesDir auf einen
+  absoluten Pfad; BackupDir/DBPath/SocketPath/NginxDir/PHPFPMDir/CertDir/
+  SecretKeyPath/LogDir blieben unvalidiert, obwohl auch sie feste absolute
+  Pfade sein sollen
 
 ## v0.4.62 — 2026-09-05
 
