@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.67 — 2026-09-05
+
 - Sieben Audit-Aufrufe (Image entfernen, Plugin install/uninstall/set,
   Feature installieren, Webmail install/uninstall) übergaben bei
   Fehlschlag teils das rohe error als detail (json.Marshal ergibt "{}",
