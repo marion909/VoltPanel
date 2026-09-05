@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.60 — 2026-09-05
+
 - Store: UpdateMailDomain/UpdateMailbox sowie DeleteMailDomain/DeleteMailbox/
   DeleteMailAlias prüften nach dem UPDATE/DELETE nirgends RowsAffected — ein
   Zugriff auf eine fremde/gelöschte ID kam bisher als Erfolg zurück
