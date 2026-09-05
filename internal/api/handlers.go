@@ -128,11 +128,16 @@ func (s *Server) handleCreateSite(c echo.Context) error {
 
 	sc := currentScope(c)
 	// Eine fremde tenant_id ist nur für Rollen erlaubt, die das dürfen —
-	// ForTenant prüft das und liefert sonst ErrForbidden.
+	// ForTenant prüft das und liefert sonst ErrForbidden. Die zurückgegebene,
+	// elevierte Scope muss danach auch tatsächlich verwendet werden — sonst
+	// bliebe CreateSite mit dem ursprünglichen sc unterwegs und scheiterte an
+	// sc.owns(req.TenantID), obwohl ForTenant den Zugriff gerade erlaubt hat.
 	if req.TenantID != 0 && req.TenantID != sc.TenantID {
-		if _, err := sc.ForTenant(req.TenantID); err != nil {
+		elevated, err := sc.ForTenant(req.TenantID)
+		if err != nil {
 			return storeError(err)
 		}
+		sc = elevated
 	}
 
 	ctx := c.Request().Context()

@@ -44,10 +44,16 @@ func (s *Server) handleInstallWordPress(c echo.Context) error {
 	}
 
 	sc := currentScope(c)
+	// Die elevierte Scope aus ForTenant muss auch tatsächlich verwendet
+	// werden — sonst bliebe InstallWordPress mit dem ursprünglichen sc
+	// unterwegs und scheiterte an sc.owns(req.TenantID), obwohl ForTenant den
+	// Zugriff gerade erlaubt hat.
 	if req.TenantID != 0 && req.TenantID != sc.TenantID {
-		if _, err := sc.ForTenant(req.TenantID); err != nil {
+		elevated, err := sc.ForTenant(req.TenantID)
+		if err != nil {
 			return storeError(err)
 		}
+		sc = elevated
 	}
 
 	ctx := c.Request().Context()

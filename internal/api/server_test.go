@@ -563,6 +563,52 @@ func TestQuotaBlocksSiteCreation(t *testing.T) {
 	}
 }
 
+// TestOwnerKannSiteFuerAnderenTenantAnlegen deckt den Fund ab, dass
+// handleCreateSite die von sc.ForTenant(...) zurückgegebene, elevierte Scope
+// verwarf und stattdessen mit dem ursprünglichen, nicht elevierten sc
+// weiterarbeitete. Ein Owner (darf laut Rollenmodell tenant-übergreifend
+// arbeiten) scheiterte dadurch zuverlässig mit 404 (sc.owns() im Store
+// schlägt fehl), sobald er über tenant_id im Body eine Site für einen
+// anderen Mandanten anlegen wollte — fail-closed, aber die dafür vorgesehene
+// Funktionalität war praktisch nie erreichbar.
+//
+// Der Testserver hat keinen laufenden Agent (newTestServer wählt bewusst
+// einen Socket, den es nicht gibt), CreateSite kommt deshalb nie bis zum
+// Erfolg — das Provisioning (Linux-Benutzer, Vhost, …) scheitert danach mit
+// 503. Genau das ist hier aber der Beleg für den Fix: die alte, nicht
+// elevierte Scope hätte schon vorher, beim Anlegen der Store-Zeile, mit 404
+// abgebrochen. Ein 503 zeigt, dass die Tenant-Prüfung diesmal bestanden
+// wurde und der Fehler danach woanders liegt.
+func TestOwnerKannSiteFuerAnderenTenantAnlegen(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	tenants, err := ts.store.ListTenants(context.Background(), store.SystemScope())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bobID int64
+	for _, tn := range tenants {
+		if tn.Slug == "bob" {
+			bobID = tn.ID
+		}
+	}
+	if bobID == 0 {
+		t.Fatal("bob-tenant nicht gefunden")
+	}
+
+	rec := ts.do(http.MethodPost, "/api/v1/sites", map[string]any{
+		"domain": "neu.example.at", "type": "static", "tenant_id": bobID,
+	})
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("Owner legt site für fremden tenant an: Status 404 — die elevierte Scope wurde verworfen: %s",
+			rec.Body.String())
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("Status %d, erwartet 503 (kein Agent im Testserver) — %s", rec.Code, rec.Body.String())
+	}
+}
+
 // --- Site-Einstellungen ----------------------------------------------------
 
 func TestSiteSettingsRoutes(t *testing.T) {

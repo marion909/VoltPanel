@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- handleCreateSite und handleInstallWordPress verwarfen die von
+  sc.ForTenant(...) zurückgegebene, elevierte Scope und arbeiteten
+  weiter mit dem ursprünglichen sc — ein Owner/Admin scheiterte dadurch
+  zuverlässig mit 404, sobald er über tenant_id im Body für einen
+  anderen Mandanten etwas anlegen wollte
 
 ## v0.4.64 — 2026-09-05
 
