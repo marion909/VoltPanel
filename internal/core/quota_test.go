@@ -181,6 +181,55 @@ func TestQuotaMeasure(t *testing.T) {
 	}
 }
 
+// TestQuotaStatusZeigtPostfaecher deckt den Fund ab, dass die
+// Quota-Übersicht (Status) Sites/Datenbanken/Cronjobs/FTP/Disk/Traffic
+// listete, aber keinen Eintrag für Postfächer — obwohl CheckCount das
+// Postfach-Limit längst über genau diese Ressource durchsetzt. Ein
+// Kunde/Reseller, dessen Postfach-Limit erreicht ist, bekam beim Anlegen
+// eine Fehlermeldung, sah aber auf der Quota-Übersicht keine Postfach-Zeile,
+// die das erklärt hätte.
+func TestQuotaStatusZeigtPostfaecher(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	sys := store.SystemScope()
+
+	tenant, _, _ := env.seedSite(t, "alice")
+	seedPlan(t, env, tenant, &store.Plan{Name: "Klein", MaxMailboxes: 5})
+
+	dom := &store.MailDomain{TenantID: tenant.ID, Domain: "alice.at", Active: true}
+	if err := env.store.CreateMailDomain(ctx, sys, dom); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.store.CreateMailbox(ctx, sys, &store.Mailbox{
+		TenantID: tenant.ID, DomainID: dom.ID, LocalPart: "post",
+		PasswordEnc: "verschlüsselt", QuotaMB: 100, Active: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	quota := NewQuotaService(env.store, env.agent, env.cfg, nil)
+	status, err := quota.Status(ctx, sys, tenant.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Usage.Mailboxes != 1 {
+		t.Errorf("Usage.Mailboxes = %d, erwartet 1", status.Usage.Mailboxes)
+	}
+
+	var gefunden bool
+	for _, e := range status.Entries {
+		if e.Resource == ResourceMailboxes {
+			gefunden = true
+			if e.Used != 1 || e.Limit != 5 {
+				t.Errorf("Postfach-Eintrag: used=%d limit=%d, erwartet 1/5", e.Used, e.Limit)
+			}
+		}
+	}
+	if !gefunden {
+		t.Fatal("kein Eintrag für ResourceMailboxes in der Quota-Übersicht")
+	}
+}
+
 // TestQuotaTenantIsolation: der Verbrauch eines fremden Tenants bleibt verborgen.
 func TestQuotaTenantIsolation(t *testing.T) {
 	env := newTestEnv(t)

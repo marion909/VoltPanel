@@ -204,6 +204,7 @@ type TenantUsage struct {
 	Databases    int   `json:"databases"`
 	Cronjobs     int   `json:"cronjobs"`
 	FTPAccounts  int   `json:"ftp_accounts"`
+	Mailboxes    int   `json:"mailboxes"`
 }
 
 // UsageForTenant sammelt alle Zählstände, gegen die Quotas geprüft werden.
@@ -228,6 +229,7 @@ func (s *Store) UsageForTenant(ctx context.Context, sc Scope, tenantID int64) (*
 		"databases":    &usage.Databases,
 		"cronjobs":     &usage.Cronjobs,
 		"ftp_accounts": &usage.FTPAccounts,
+		"mailboxes":    &usage.Mailboxes,
 	} {
 		if err := s.db.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM `+table+` WHERE tenant_id = ?`, tenantID).Scan(target); err != nil {

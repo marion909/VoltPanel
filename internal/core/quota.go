@@ -104,6 +104,7 @@ func (s *QuotaService) Status(ctx context.Context, sc store.Scope, tenantID int6
 		quotaEntry(ResourceDatabases, int64(usage.Databases), int64(plan.MaxDatabases), false),
 		quotaEntry(ResourceCronjobs, int64(usage.Cronjobs), int64(plan.MaxCronjobs), false),
 		quotaEntry(ResourceFTP, int64(usage.FTPAccounts), int64(plan.MaxFTP), false),
+		quotaEntry(ResourceMailboxes, int64(usage.Mailboxes), int64(plan.MaxMailboxes), false),
 		quotaEntry(ResourceDisk, usage.DiskBytes, plan.DiskQuotaMB*1024*1024, true),
 		quotaEntry(ResourceTraffic, usage.TrafficBytes, plan.TrafficQuotaMB*1024*1024, true),
 	}
