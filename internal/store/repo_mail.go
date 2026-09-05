@@ -239,13 +239,16 @@ func (s *Store) UpdateMailDomain(ctx context.Context, sc Scope, d *MailDomain) e
 	}
 	d.UpdatedAt = now()
 
-	_, err := s.db.ExecContext(ctx, `UPDATE mail_domains SET
+	res, err := s.db.ExecContext(ctx, `UPDATE mail_domains SET
 		domain = ?, active = ?, catch_all = ?, dkim_selector = ?,
 		dkim_private = ?, dkim_public = ?, updated_at = ?
 		WHERE id = ? AND tenant_id = ?`,
 		d.Domain, boolToInt(d.Active), d.CatchAll, d.DKIMSelector,
 		d.DKIMPrivate, d.DKIMPublic, d.UpdatedAt, d.ID, d.TenantID)
-	return mailConflict(err, "die domäne "+d.Domain+" ist auf diesem server schon vergeben")
+	if err != nil {
+		return mailConflict(err, "die domäne "+d.Domain+" ist auf diesem server schon vergeben")
+	}
+	return affected(res, nil)
 }
 
 // DeleteMailDomain entfernt eine Domäne samt allem, was daran hängt.
@@ -259,9 +262,9 @@ func (s *Store) DeleteMailDomain(ctx context.Context, sc Scope, id int64) error 
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx,
+	res, err := s.db.ExecContext(ctx,
 		`DELETE FROM mail_domains WHERE id = ? AND tenant_id = ?`, d.ID, d.TenantID)
-	return err
+	return affected(res, err)
 }
 
 // --- Postfächer ------------------------------------------------------------
@@ -358,11 +361,11 @@ func (s *Store) UpdateMailbox(ctx context.Context, sc Scope, m *Mailbox) error {
 	}
 	m.UpdatedAt = now()
 
-	_, err := s.db.ExecContext(ctx, `UPDATE mailboxes SET
+	res, err := s.db.ExecContext(ctx, `UPDATE mailboxes SET
 		password_enc = ?, quota_mb = ?, active = ?, updated_at = ?
 		WHERE id = ? AND tenant_id = ?`,
 		m.PasswordEnc, m.QuotaMB, boolToInt(m.Active), m.UpdatedAt, m.ID, m.TenantID)
-	return err
+	return affected(res, err)
 }
 
 func (s *Store) DeleteMailbox(ctx context.Context, sc Scope, id int64) error {
@@ -370,9 +373,9 @@ func (s *Store) DeleteMailbox(ctx context.Context, sc Scope, id int64) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx,
+	res, err := s.db.ExecContext(ctx,
 		`DELETE FROM mailboxes WHERE id = ? AND tenant_id = ?`, m.ID, m.TenantID)
-	return err
+	return affected(res, err)
 }
 
 // --- Aliase ----------------------------------------------------------------
@@ -465,9 +468,9 @@ func (s *Store) DeleteMailAlias(ctx context.Context, sc Scope, id int64) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx,
+	res, err := s.db.ExecContext(ctx,
 		`DELETE FROM mail_aliases WHERE id = ? AND tenant_id = ?`, a.ID, a.TenantID)
-	return err
+	return affected(res, err)
 }
 
 // --- Zählen, für die Quota des Pakets --------------------------------------

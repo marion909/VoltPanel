@@ -185,3 +185,37 @@ func TestMaildomaeneGehoertGenauEinemMandanten(t *testing.T) {
 		t.Errorf("dieselbe domäne für zwei mandanten: %v", err)
 	}
 }
+
+// TestUpdateMailDomainAufFremdeIDMeldetFehler deckt den Fund ab, dass
+// UpdateMailDomain nach dem UPDATE nie RowsAffected prüfte — ein UPDATE auf
+// eine nicht (mehr) existierende ID kam bisher stillschweigend als Erfolg
+// zurück, statt wie praktisch jede andere Update*-Funktion im Paket
+// ErrNotFound zu liefern.
+func TestUpdateMailDomainAufFremdeIDMeldetFehler(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	tenantA, _, _ := seedTenant(t, st, "alice")
+
+	err := st.UpdateMailDomain(ctx, SystemScope(),
+		&MailDomain{ID: 999999, TenantID: tenantA.ID, Domain: "example.at", Active: true})
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("update einer nicht existierenden domäne: %v, erwartet ErrNotFound", err)
+	}
+}
+
+// TestUpdateMailboxAufFremdeIDMeldetFehler ist dasselbe Muster für
+// UpdateMailbox.
+func TestUpdateMailboxAufFremdeIDMeldetFehler(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	tenantA, _, _ := seedTenant(t, st, "alice")
+
+	err := st.UpdateMailbox(ctx, SystemScope(), &Mailbox{
+		ID: 999999, TenantID: tenantA.ID,
+		LocalPart: "post", Address: "post@example.at",
+		PasswordEnc: "x", QuotaMB: 100, Active: true,
+	})
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("update einer nicht existierenden mailbox: %v, erwartet ErrNotFound", err)
+	}
+}
