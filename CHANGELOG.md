@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.68 — 2026-09-05
+
 - Die Quota-Übersicht (QuotaService.Status) zeigte keinen Eintrag für
   Postfächer, obwohl CreateMailbox das Postfach-Limit längst durchsetzt —
   TenantUsage führte gar kein Zählfeld dafür; jetzt ergänzt
