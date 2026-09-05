@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- handlePortScanSet schrieb den An/Aus-Zustand in das result-Feld des
+  Audit-Logs statt in detail — jede erfolgreiche Portscan-Umschaltung
+  erschien im Audit-Log fälschlich als fehlgeschlagen (Frontend färbt
+  nur result === 'ok' grün)
 
 ## v0.4.65 — 2026-09-05
 

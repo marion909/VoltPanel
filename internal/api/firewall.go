@@ -92,8 +92,8 @@ func (s *Server) handlePortScanSet(c echo.Context) error {
 	if err != nil {
 		return storeError(err)
 	}
-	s.audit(ctx, currentUser(c), "firewall.portscan", "stufe", req.Level,
-		map[bool]string{true: "an", false: "aus"}[req.Enabled], c.RealIP(), nil)
+	s.audit(ctx, currentUser(c), "firewall.portscan", "stufe", req.Level, "ok", c.RealIP(),
+		map[string]any{"aktiv": req.Enabled})
 	return c.JSON(http.StatusOK, map[string]string{"log": out})
 }
 
