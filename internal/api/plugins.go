@@ -27,7 +27,8 @@ func (s *Server) handleInstallPlugin(c echo.Context) error {
 
 	out, err := s.plugins.Install(ctx, id)
 	if err != nil {
-		s.audit(ctx, currentUser(c), "plugin.install", "plugin", id, "fehler", c.RealIP(), err)
+		s.audit(ctx, currentUser(c), "plugin.install", "plugin", id, "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
 	s.audit(ctx, currentUser(c), "plugin.install", "plugin", id, "ok", c.RealIP(), nil)
@@ -41,7 +42,8 @@ func (s *Server) handleUninstallPlugin(c echo.Context) error {
 
 	out, err := s.plugins.Uninstall(ctx, id)
 	if err != nil {
-		s.audit(ctx, currentUser(c), "plugin.uninstall", "plugin", id, "fehler", c.RealIP(), err)
+		s.audit(ctx, currentUser(c), "plugin.uninstall", "plugin", id, "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
 	s.audit(ctx, currentUser(c), "plugin.uninstall", "plugin", id, "ok", c.RealIP(), nil)
@@ -60,7 +62,8 @@ func (s *Server) handleSetPlugin(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	if err := s.plugins.SetEnabled(ctx, id, req.Enabled); err != nil {
-		s.audit(ctx, currentUser(c), "plugin.set", "plugin", id, "fehler", c.RealIP(), err)
+		s.audit(ctx, currentUser(c), "plugin.set", "plugin", id, "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
 	s.audit(ctx, currentUser(c), "plugin.set", "plugin", id, "ok", c.RealIP(),

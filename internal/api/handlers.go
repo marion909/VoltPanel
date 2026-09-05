@@ -448,7 +448,7 @@ func (s *Server) handleInstallFeature(c echo.Context) error {
 	out, err := s.agent.InstallFeature(ctx, feature)
 	if err != nil {
 		s.audit(ctx, currentUser(c), "feature.install", "feature", feature,
-			"fehler", c.RealIP(), err)
+			"error", c.RealIP(), map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
 	s.audit(ctx, currentUser(c), "feature.install", "feature", feature, "ok", c.RealIP(), nil)

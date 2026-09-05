@@ -53,7 +53,7 @@ func (s *Server) handleWebmailInstall(c echo.Context) error {
 		PHPVersion: req.PHPVersion, TenantID: user.TenantID,
 	})
 	if err != nil {
-		s.audit(ctx, user, "webmail.install", "webmail", "", "fehler", c.RealIP(),
+		s.audit(ctx, user, "webmail.install", "webmail", "", "error", c.RealIP(),
 			map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
@@ -65,7 +65,7 @@ func (s *Server) handleWebmailInstall(c echo.Context) error {
 func (s *Server) handleWebmailUninstall(c echo.Context) error {
 	ctx, user := c.Request().Context(), currentUser(c)
 	if err := s.webmail.Uninstall(ctx); err != nil {
-		s.audit(ctx, user, "webmail.uninstall", "webmail", "", "fehler", c.RealIP(),
+		s.audit(ctx, user, "webmail.uninstall", "webmail", "", "error", c.RealIP(),
 			map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}

@@ -104,7 +104,7 @@ func (s *Server) handleRemoveImage(c echo.Context) error {
 	out, err := s.apps.RemoveImage(ctx, req.Ref)
 	if err != nil {
 		s.audit(ctx, currentUser(c), "app.image.remove", "image", req.Ref,
-			"fehler", c.RealIP(), err)
+			"error", c.RealIP(), map[string]string{"fehler": err.Error()})
 		return storeError(err)
 	}
 	s.audit(ctx, currentUser(c), "app.image.remove", "image", req.Ref, "ok", c.RealIP(), nil)

@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/store"
 )
 
 // Plugins betreffen den ganzen Server, nicht einen Mandanten — dieselbe Regel
@@ -74,5 +77,35 @@ func TestPluginInstallUnbekanntUeberHTTP(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "kein bekanntes plugin") {
 		t.Errorf("abgelehnt, aber aus dem falschen grund: %s", rec.Body.String())
+	}
+}
+
+// TestPluginInstallFehlerLandetImAuditDetail deckt den Fund ab, dass
+// handleInstallPlugin bei Fehlschlag das rohe error (keine exportierten
+// Felder, json.Marshal ergibt "{}") statt map[string]string{"fehler": ...}
+// als Audit-Detail übergab, und zusätzlich "fehler" statt "error" als
+// result-Wert nutzte — anders als jede andere Audit-Stelle im Paket.
+func TestPluginInstallFehlerLandetImAuditDetail(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	rec := ts.do(http.MethodPost, "/api/v1/plugins/nicht-im-katalog/install", nil)
+	if rec.Code == http.StatusOK {
+		t.Fatal("ein unbekanntes plugin wurde angenommen")
+	}
+
+	entries, err := ts.store.ListAudit(context.Background(), store.SystemScope(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("kein audit-eintrag geschrieben")
+	}
+	entry := entries[0]
+	if entry.Result != "error" {
+		t.Errorf("result = %q, erwartet \"error\"", entry.Result)
+	}
+	if entry.Detail == "{}" || !strings.Contains(entry.Detail, "kein bekanntes plugin") {
+		t.Errorf("detail enthält die fehlermeldung nicht: %q", entry.Detail)
 	}
 }
