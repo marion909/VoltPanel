@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.65 — 2026-09-05
+
 - handleCreateSite und handleInstallWordPress verwarfen die von
   sc.ForTenant(...) zurückgegebene, elevierte Scope und arbeiteten
   weiter mit dem ursprünglichen sc — ein Owner/Admin scheiterte dadurch
