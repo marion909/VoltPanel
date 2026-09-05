@@ -4,7 +4,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"testing"
+
+	"github.com/marion909/voltpanel/internal/store"
 )
 
 func sig(secret string, body []byte) string {
@@ -112,6 +115,31 @@ func TestHookAdresseOhneZugriffspfad(t *testing.T) {
 	}
 	if contains(url, env.cfg.AccessPath) {
 		t.Errorf("der Zugriffspfad steht in der Hook-Adresse: %s", url)
+	}
+}
+
+// TestRunAsyncReserviertSperreSynchron deckt den Fund ab, dass RunAsync die
+// Laufend-Sperre früher nur lesend prüfte (istLaufend) und erst die
+// gestartete Goroutine sie tatsächlich setzte (beginne). Zwei nahezu
+// gleichzeitige Aufrufe (z. B. zwei Webhook-Zustellungen) konnten dadurch
+// beide den Check passieren. Jetzt reserviert RunAsync die Sperre synchron,
+// bevor es zurückkehrt — ein zweiter Aufruf direkt danach muss deshalb schon
+// scheitern, ganz ohne auf die Goroutine warten zu müssen.
+func TestRunAsyncReserviertSperreSynchron(t *testing.T) {
+	env := newTestEnv(t)
+	_, _, site := env.seedSite(t, "alice")
+
+	svc := NewDeployService(env.store, env.agent, env.cfg, env.secrets, nil)
+	// Leere RepoURL: gitspec.NormalizeURL lehnt sie ohne jeden Netzwerkzugriff
+	// sofort ab — die Goroutine läuft und endet dadurch, ohne dass der Test
+	// auf sie warten müsste.
+	d := &store.Deploy{SiteID: site.ID, RepoURL: "", Ref: "main"}
+
+	if err := svc.RunAsync(d); err != nil {
+		t.Fatalf("erster RunAsync: %v", err)
+	}
+	if err := svc.RunAsync(d); !errors.Is(err, ErrDeployRunning) {
+		t.Fatalf("zweiter RunAsync direkt danach: %v, erwartet ErrDeployRunning", err)
 	}
 }
 

@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- DeployService.RunAsync reservierte die Laufend-Sperre nur lesend
+  (istLaufend) und ließ die tatsächliche Sperre erst die gestartete
+  Goroutine setzen — zwei nahezu gleichzeitige Trigger (z. B. zwei
+  Webhook-Zustellungen) konnten dadurch beide den Check passieren
+- mehrere fehlgeschlagene RecordDeployRun-Aufrufe in DeployService.Run
+  wurden bisher stillschweigend verworfen, ohne jedes Logging
 
 ## v0.4.58 — 2026-09-04
 

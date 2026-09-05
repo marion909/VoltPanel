@@ -140,12 +140,21 @@ func (s *DeployService) Run(ctx context.Context, d *store.Deploy) error {
 		return ErrDeployRunning
 	}
 	defer s.beende(d.SiteID)
+	return s.ausfuehren(ctx, d)
+}
 
+// ausfuehren macht die eigentliche Arbeit. Setzt voraus, dass die
+// Laufend-Sperre für d.SiteID bereits gehalten wird — Run und RunAsync
+// reservieren sie jeweils selbst, damit sie das auch synchron, vor dem Start
+// einer Goroutine, tun können.
+func (s *DeployService) ausfuehren(ctx context.Context, d *store.Deploy) error {
 	site, err := s.store.GetSite(ctx, store.SystemScope(), d.SiteID)
 	if err != nil {
 		return err
 	}
-	_ = s.store.RecordDeployRun(ctx, d.ID, d.LastRelease, d.LastCommit, "running", "")
+	if err := s.store.RecordDeployRun(ctx, d.ID, d.LastRelease, d.LastCommit, "running", ""); err != nil {
+		s.log.Warn("deploy-verlauf nicht gespeichert", "err", err)
+	}
 
 	res, err := s.agent.Deploy(ctx, agent.DeployParams{
 		Name:       store.AppNameForDomain(site.Domain),
@@ -163,7 +172,9 @@ func (s *DeployService) Run(ctx context.Context, d *store.Deploy) error {
 		if res != nil && res.Log != "" {
 			log = res.Log + "\n" + err.Error()
 		}
-		_ = s.store.RecordDeployRun(ctx, d.ID, "", "", "failed", log)
+		if err := s.store.RecordDeployRun(ctx, d.ID, "", "", "failed", log); err != nil {
+			s.log.Warn("deploy-verlauf nicht gespeichert", "err", err)
+		}
 		return err
 	}
 
@@ -171,29 +182,39 @@ func (s *DeployService) Run(ctx context.Context, d *store.Deploy) error {
 	// starten. Ohne das liefe weiter der alte Code aus dem alten Verzeichnis.
 	if app, err := s.store.AppForSite(ctx, store.SystemScope(), site.ID); err == nil {
 		if err := s.apps.applyForSite(ctx, store.SystemScope(), site, app); err != nil {
-			_ = s.store.RecordDeployRun(ctx, d.ID, res.Release, res.Commit, "failed",
-				res.Log+"\napp neu starten: "+err.Error())
+			if err := s.store.RecordDeployRun(ctx, d.ID, res.Release, res.Commit, "failed",
+				res.Log+"\napp neu starten: "+err.Error()); err != nil {
+				s.log.Warn("deploy-verlauf nicht gespeichert", "err", err)
+			}
 			return err
 		}
 	}
 
-	_ = s.store.RecordDeployRun(ctx, d.ID, res.Release, res.Commit, "ok", res.Log)
+	if err := s.store.RecordDeployRun(ctx, d.ID, res.Release, res.Commit, "ok", res.Log); err != nil {
+		s.log.Warn("deploy-verlauf nicht gespeichert", "err", err)
+	}
 	return nil
 }
 
 // RunAsync stößt einen Deploy an und kommt sofort zurück.
 //
+// Die Sperre wird synchron reserviert, bevor die Goroutine überhaupt startet
+// — sonst könnten zwei nahezu gleichzeitige Aufrufe (z. B. zwei
+// Webhook-Zustellungen) beide den Laufend-Check passieren, bevor eine der
+// beiden Goroutinen die Sperre tatsächlich setzt.
+//
 // Eigener Context: der der Anfrage endet, sobald der Browser die Antwort hat,
 // und ein Build, der mitten im npm-Lauf abgebrochen wird, hinterlässt ein
 // halbes node_modules.
 func (s *DeployService) RunAsync(d *store.Deploy) error {
-	if s.istLaufend(d.SiteID) {
+	if !s.beginne(d.SiteID) {
 		return ErrDeployRunning
 	}
 	go func() {
+		defer s.beende(d.SiteID)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
-		if err := s.Run(ctx, d); err != nil {
+		if err := s.ausfuehren(ctx, d); err != nil {
 			s.log.Warn("deploy fehlgeschlagen", "site", d.SiteID, "err", err)
 		}
 	}()
