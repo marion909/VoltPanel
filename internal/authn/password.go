@@ -141,13 +141,38 @@ func GeneratePassword(length int) (string, error) {
 		length = 20
 	}
 
-	buf := make([]byte, length)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
 	out := make([]byte, length)
-	for i, b := range buf {
-		out[i] = alphabet[int(b)%len(alphabet)]
+	buf := make([]byte, length)
+	for i := 0; i < length; {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		for _, b := range buf {
+			ch, ok := pickChar(b, alphabet)
+			if !ok {
+				continue
+			}
+			out[i] = ch
+			i++
+			if i == length {
+				break
+			}
+		}
 	}
 	return string(out), nil
+}
+
+// pickChar bildet b per Rejection-Sampling auf ein Zeichen des Alphabets ab.
+//
+// 256 ist kein Vielfaches von len(alphabet): ein einfaches
+// alphabet[int(b)%len(alphabet)] würde die ersten 256%len(alphabet) Zeichen
+// mit einer Extra-Restklasse und damit leicht höherer Wahrscheinlichkeit
+// ziehen. Bytes ab der Schwelle werden deshalb abgelehnt (Aufrufer zieht neu),
+// statt sie per Modulo zu verzerren.
+func pickChar(b byte, alphabet string) (byte, bool) {
+	limit := byte(256 - 256%len(alphabet))
+	if b >= limit {
+		return 0, false
+	}
+	return alphabet[int(b)%len(alphabet)], true
 }

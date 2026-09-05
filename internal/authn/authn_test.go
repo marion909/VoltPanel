@@ -77,6 +77,32 @@ func TestGeneratePasswordPassesPolicy(t *testing.T) {
 	}
 }
 
+// TestPickCharVerwirftVerzerrendeBytes deckt den Fund ab, dass
+// alphabet[int(b)%len(alphabet)] ohne Rejection-Sampling die ersten
+// 256%len(alphabet) Zeichen des Alphabets mit einer höheren Wahrscheinlichkeit
+// gezogen hätte (256 ist kein Vielfaches der Alphabetlänge). pickChar muss
+// jedes Byte ab dieser Schwelle ablehnen und jedes darunter unverzerrt aufs
+// Alphabet abbilden.
+func TestPickCharVerwirftVerzerrendeBytes(t *testing.T) {
+	const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#%+="
+	limit := 256 - 256%len(alphabet)
+
+	for b := limit; b <= 255; b++ {
+		if _, ok := pickChar(byte(b), alphabet); ok {
+			t.Errorf("byte %d wurde akzeptiert, müsste die Verzerrung vermeiden", b)
+		}
+	}
+	for b := 0; b < limit; b++ {
+		ch, ok := pickChar(byte(b), alphabet)
+		if !ok {
+			t.Fatalf("byte %d wurde abgelehnt, sollte akzeptiert werden", b)
+		}
+		if want := alphabet[b%len(alphabet)]; ch != want {
+			t.Errorf("byte %d -> %q, erwartet %q", b, ch, want)
+		}
+	}
+}
+
 func TestSessionTokenHashing(t *testing.T) {
 	token, hash, err := NewSessionToken()
 	if err != nil {
