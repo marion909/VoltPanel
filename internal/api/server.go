@@ -46,6 +46,10 @@ type Server struct {
 	secrets   *authn.SecretBox
 	log       *slog.Logger
 	loginRate *rateLimiter
+	// totpRate begrenzt Fehlversuche gegen den 2FA-Code je Benutzer — sonst
+	// ließe sich der 6-stellige Code (1.000.000 Kombinationen) bei einer
+	// gekaperten Session in kurzer Zeit durchprobieren.
+	totpRate *rateLimiter
 	// logins hält die Zuordnung Anmeldedomain → Mandant im Speicher.
 	logins    *loginDomains
 	devOrigin string
@@ -113,6 +117,7 @@ func New(opts Options) (*Server, error) {
 		webmail:   core.NewWebmailService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		deploys:   core.NewDeployService(opts.Store, opts.Agent, opts.Config, opts.Secrets, opts.Logger),
 		loginRate: newRateLimiter(5, time.Minute),
+		totpRate:  newRateLimiter(5, time.Minute),
 		logins:    newLoginDomains(opts.Store),
 	}
 
@@ -553,15 +558,30 @@ func serveAsset(c echo.Context, fsys http.FileSystem, name string) error {
 
 // Start bindet den Listener und bedient Anfragen bis zum Context-Ende.
 // RunLoginRateCleanup räumt periodisch abgelaufene Einträge aus dem
-// Login-Ratelimiter. Ohne das wächst dessen Bucket-Map mit jeder eindeutigen
-// Quell-IP, die den Login-Endpunkt je erreicht, unbegrenzt und ohne
-// Obergrenze — auf einem öffentlich erreichbaren Panel ein echtes, wenn auch
-// langsames Speicherwachstum durch das alltägliche Hintergrundrauschen aus
-// Bot-Scans. Vom Aufrufer als eigene Goroutine zu starten, analog zu den
-// übrigen Hintergrund-Aufgaben in cmd/volt/serve.go (collector.Run,
-// purgeSessions, QuotaService.RunPeriodically).
+// Login- und dem TOTP-Ratelimiter. Ohne das wüchse deren Bucket-Map mit
+// jeder eindeutigen Quell-IP bzw. jedem Benutzer, der den jeweiligen
+// Endpunkt je erreicht, unbegrenzt und ohne Obergrenze — auf einem
+// öffentlich erreichbaren Panel ein echtes, wenn auch langsames
+// Speicherwachstum durch das alltägliche Hintergrundrauschen aus Bot-Scans.
+// Vom Aufrufer als eigene Goroutine zu starten, analog zu den übrigen
+// Hintergrund-Aufgaben in cmd/volt/serve.go (collector.Run, purgeSessions,
+// QuotaService.RunPeriodically).
 func (s *Server) RunLoginRateCleanup(ctx context.Context) {
-	s.loginRate.Cleanup(ctx)
+	// Kein s.loginRate.Cleanup(ctx) gefolgt von s.totpRate.Cleanup(ctx): beide
+	// blockieren bis ctx.Done() und liefen so nacheinander statt nebeneinander
+	// — der zweite Ratelimiter bekäme sein Cleanup nie. Ein gemeinsamer
+	// Ticker für beide stattdessen.
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.loginRate.prune()
+			s.totpRate.prune()
+		}
+	}
 }
 
 func (s *Server) Start(ctx context.Context) error {

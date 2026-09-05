@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -276,6 +277,10 @@ func (s *Server) handleTOTPEnable(c echo.Context) error {
 	if user.TOTPSecret == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "zuerst 2fa einrichten")
 	}
+	rateKey := strconv.FormatInt(user.ID, 10)
+	if !s.totpRate.Allow(rateKey) {
+		return echo.NewHTTPError(http.StatusTooManyRequests, "zu viele versuche, kurz warten")
+	}
 	secret, err := s.secrets.Decrypt(user.TOTPSecret)
 	if err != nil {
 		return err
@@ -284,6 +289,7 @@ func (s *Server) handleTOTPEnable(c echo.Context) error {
 	if !ok || (user.TOTPLastStep != nil && step <= *user.TOTPLastStep) {
 		return echo.NewHTTPError(http.StatusBadRequest, "der code stimmt nicht")
 	}
+	s.totpRate.Reset(rateKey)
 
 	user.TOTPEnabled = true
 	ctx := c.Request().Context()
@@ -307,6 +313,10 @@ func (s *Server) handleTOTPDisable(c echo.Context) error {
 	if !user.TOTPEnabled {
 		return c.JSON(http.StatusOK, map[string]bool{"totp_enabled": false})
 	}
+	rateKey := strconv.FormatInt(user.ID, 10)
+	if !s.totpRate.Allow(rateKey) {
+		return echo.NewHTTPError(http.StatusTooManyRequests, "zu viele versuche, kurz warten")
+	}
 	secret, err := s.secrets.Decrypt(user.TOTPSecret)
 	if err != nil {
 		return err
@@ -315,6 +325,7 @@ func (s *Server) handleTOTPDisable(c echo.Context) error {
 	if !ok || (user.TOTPLastStep != nil && step <= *user.TOTPLastStep) {
 		return echo.NewHTTPError(http.StatusBadRequest, "der code stimmt nicht")
 	}
+	s.totpRate.Reset(rateKey)
 
 	user.TOTPEnabled, user.TOTPSecret = false, ""
 	ctx := c.Request().Context()
