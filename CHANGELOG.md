@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.71 — 2026-09-06
+
 - BackupService.Restore überschrieb die Datenbankdatei auch dann, wenn
   das vorherige store.Close() fehlgeschlagen war (nur geloggt, Restore
   lief trotzdem weiter) — bricht jetzt ab, statt einen inkonsistenten
