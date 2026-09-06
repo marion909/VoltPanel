@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.70 — 2026-09-06
+
 - PATCH /sites/:id übernahm einen beliebigen String in site.Status ohne
   Validierung, obwohl das Feld nirgends gelesen/ausgewertet wird — sah
   nach einem Statusfeld mit definierten Übergängen aus, war aber
