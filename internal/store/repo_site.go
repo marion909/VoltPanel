@@ -173,9 +173,9 @@ func (s *Store) TrafficCursors(ctx context.Context) ([]TrafficCursor, error) {
 
 // SetTrafficCursor schreibt den Lesestand fort.
 //
-// Getrennt von AddSiteTraffic, weil beides auch getrennt vorkommt: eine Datei
-// ohne neue Zeilen bewegt keinen Zähler, aber ihr Lesestand kann sich nach
-// einer Rotation trotzdem ändern.
+// Getrennt von AddSiteTrafficAndCursor, weil beides auch getrennt vorkommt:
+// eine Datei ohne neue Zeilen bewegt keinen Zähler, aber ihr Lesestand kann
+// sich nach einer Rotation trotzdem ändern.
 func (s *Store) SetTrafficCursor(ctx context.Context, siteID, offset int64, inode uint64) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE sites SET traffic_offset = ?, traffic_inode = ? WHERE id = ?`,
@@ -183,14 +183,24 @@ func (s *Store) SetTrafficCursor(ctx context.Context, siteID, offset int64, inod
 	return err
 }
 
-// AddSiteTraffic zählt Traffic auf. period ist der Abrechnungszeitraum als
-// "2026-08"; wechselt er, beginnt der Zähler wieder bei null.
-func (s *Store) AddSiteTraffic(ctx context.Context, siteID int64, bytes int64, period string) error {
+// AddSiteTrafficAndCursor zählt Traffic auf und schreibt den Lesestand fort —
+// in einer einzigen UPDATE-Anweisung, atomar, damit ein fehlgeschlagenes
+// Cursor-Update nicht dazu führt, dass derselbe Log-Bereich beim nächsten
+// Lauf noch einmal gelesen und dieselben Bytes ein zweites Mal gezählt
+// werden. period ist der Abrechnungszeitraum als "2026-08"; wechselt er,
+// beginnt der Zähler wieder bei null. Nur für den Fall gedacht, in dem
+// wirklich beides zusammengehört (Bytes > 0); ändert sich nur der Lesestand,
+// bleibt SetTrafficCursor allein zuständig.
+func (s *Store) AddSiteTrafficAndCursor(ctx context.Context, siteID, bytes int64, period string,
+	offset int64, inode uint64) error {
+
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE sites
 		SET traffic_bytes  = CASE WHEN traffic_period = ? THEN traffic_bytes + ? ELSE ? END,
-		    traffic_period = ?
-		WHERE id = ?`, period, bytes, bytes, period, siteID)
+		    traffic_period = ?,
+		    traffic_offset = ?,
+		    traffic_inode  = ?
+		WHERE id = ?`, period, bytes, bytes, period, offset, int64(inode), siteID)
 	return err
 }
 

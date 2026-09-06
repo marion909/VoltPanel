@@ -75,15 +75,19 @@ func (s *QuotaService) CollectTraffic(ctx context.Context) (int, []error) {
 		}
 
 		if f.Bytes > 0 {
-			if err := s.store.AddSiteTraffic(ctx, siteID, f.Bytes, period); err != nil {
+			// Byte-Zuwachs und Lesestand in einer Anweisung: schlüge das
+			// Fortschreiben des Cursors nach einem separat schon
+			// gebuchten Byte-Zuwachs fehl, läse der nächste Lauf denselben
+			// Log-Bereich erneut und zählte dieselben Bytes doppelt ein.
+			if err := s.store.AddSiteTrafficAndCursor(ctx, siteID, f.Bytes, period,
+				f.Offset, f.Inode); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", f.Domain, err))
 				continue
 			}
-		}
-		// Der Lesestand auch dann, wenn nichts dazukam: sonst wird beim
-		// nächsten Lauf dieselbe Stelle noch einmal gelesen, und nach einer
-		// Rotation läge er auf einer Datei, die es nicht mehr gibt.
-		if err := s.store.SetTrafficCursor(ctx, siteID, f.Offset, f.Inode); err != nil {
+		} else if err := s.store.SetTrafficCursor(ctx, siteID, f.Offset, f.Inode); err != nil {
+			// Der Lesestand auch dann, wenn nichts dazukam: sonst wird beim
+			// nächsten Lauf dieselbe Stelle noch einmal gelesen, und nach einer
+			// Rotation läge er auf einer Datei, die es nicht mehr gibt.
 			errs = append(errs, fmt.Errorf("%s: %w", f.Domain, err))
 			continue
 		}

@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- CollectTraffic schrieb Byte-Zuwachs und Lesestand in zwei getrennten
+  UPDATE-Anweisungen — schlug die zweite (Cursor) nach der ersten
+  (Bytes) fehl, zählte der nächste Lauf denselben Log-Bereich doppelt;
+  jetzt eine atomare Anweisung für beides
 
 ## v0.4.72 — 2026-09-06
 
