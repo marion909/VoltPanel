@@ -524,6 +524,34 @@ func TestPlanAndTenantRoutes(t *testing.T) {
 	})
 }
 
+// TestUpdateSiteIgnoriertStatusFeld deckt den Fund ab, dass
+// updateSiteRequest.Status einen beliebigen String ungeprüft übernahm,
+// obwohl das Feld nirgends im Code gelesen oder ausgewertet wird — sah nach
+// einem Statusfeld mit definierten Übergängen aus (wie bei Tenants:
+// active/suspended), war aber ungeprüft beschreibbar und wirkungslos. Das
+// Feld wurde aus dem PATCH-Body entfernt, solange es keine Funktion hat.
+func TestUpdateSiteIgnoriertStatusFeld(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t, "alice@example.at")
+
+	// Kein force_https/hsts im Body: der Vhost-Neubau kann ohne laufenden
+	// Agent trotzdem fehlschlagen (503) — die Prüfung hier gilt nur der
+	// Eingabe, die darf kein 400 auslösen, wie es ein früher validiertes
+	// Statusfeld getan hätte.
+	rec := ts.do(http.MethodPatch, "/api/v1/sites/1", map[string]any{"status": "geloescht"})
+	if rec.Code == http.StatusBadRequest {
+		t.Fatalf("ein unbekanntes status im Body wurde als Eingabefehler abgelehnt: %s", rec.Body.String())
+	}
+
+	site, err := ts.store.GetSite(context.Background(), store.SystemScope(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if site.Status != "active" {
+		t.Errorf("site.Status = %q, das Feld sollte unverändert bleiben", site.Status)
+	}
+}
+
 // TestCustomerCannotManagePlans: Pakete und Mandanten sind Admin-Sache.
 func TestCustomerCannotManagePlans(t *testing.T) {
 	ts := newTestServer(t)

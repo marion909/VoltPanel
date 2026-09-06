@@ -166,7 +166,6 @@ type updateSiteRequest struct {
 	DocumentRoot *string   `json:"document_root"`
 	ForceHTTPS   *bool     `json:"force_https"`
 	HSTS         *bool     `json:"hsts"`
-	Status       *string   `json:"status"`
 }
 
 func (s *Server) handleUpdateSite(c echo.Context) error {
@@ -192,7 +191,6 @@ func (s *Server) handleUpdateSite(c echo.Context) error {
 	applyIf(req.DocumentRoot, &site.DocumentRoot)
 	applyIf(req.ForceHTTPS, &site.ForceHTTPS)
 	applyIf(req.HSTS, &site.HSTS)
-	applyIf(req.Status, &site.Status)
 
 	if err := s.store.UpdateSite(ctx, sc, site); err != nil {
 		return storeError(err)
