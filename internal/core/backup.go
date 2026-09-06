@@ -176,8 +176,12 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 			continue
 		}
 
+		// Eine nicht sauber geschlossene DB (offene WAL-Segmente, hängende
+		// Transaktion) darf nicht überschrieben werden — genau die
+		// Sicherheitskopie oben soll ja vor einem inkonsistenten Zustand
+		// schützen, nicht selbst einen erzeugen.
 		if err := s.store.Close(); err != nil {
-			s.log.Warn("datenbank nicht sauber geschlossen", "err", err)
+			return fmt.Errorf("datenbank nicht sauber geschlossen, restore abgebrochen: %w", err)
 		}
 		// Über eine temporäre Datei plus os.Rename statt direkt an s.cfg.DBPath
 		// zu schreiben: ein Prozessabbruch mitten im Kopieren (OOM, Stromausfall,
