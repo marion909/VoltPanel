@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -479,6 +480,30 @@ func TestPlanAndTenantRoutes(t *testing.T) {
 		// Tenant 2 (Bob) hat eine Site — das Löschen würde Vhost und
 		// Linux-Benutzer verwaist zurücklassen.
 		rec := ts.do(http.MethodDelete, "/api/v1/tenants/2", nil)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("Status %d, erwartet 409 — %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	// TestPlanAndTenantRoutes deckt hier den Fund ab, dass handleDeleteTenant
+	// vor dem Löschen nur Sites/Datenbanken/Cronjobs prüfte. mail_domains,
+	// certs und backup_targets hängen laut Schema direkt (nicht über sites)
+	// mit ON DELETE CASCADE an tenants, wurden aber in TenantUsage nicht
+	// gezählt — ein Mandant ohne Sites/Datenbanken/Cronjobs, aber mit einer
+	// aktiven Maildomäne, ließ sich löschen und riss sie still über die
+	// Kaskade mit.
+	t.Run("mandant mit maildomaene aber ohne sites laesst sich nicht loeschen", func(t *testing.T) {
+		tenant := &store.Tenant{Name: "carol", Slug: "carol"}
+		if err := ts.store.CreateTenant(context.Background(), store.SystemScope(), tenant); err != nil {
+			t.Fatal(err)
+		}
+		if err := ts.store.CreateMailDomain(context.Background(), store.SystemScope(), &store.MailDomain{
+			TenantID: tenant.ID, Domain: "carol.at", Active: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		rec := ts.do(http.MethodDelete, "/api/v1/tenants/"+strconv.FormatInt(tenant.ID, 10), nil)
 		if rec.Code != http.StatusConflict {
 			t.Fatalf("Status %d, erwartet 409 — %s", rec.Code, rec.Body.String())
 		}

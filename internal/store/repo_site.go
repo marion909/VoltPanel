@@ -196,15 +196,18 @@ func (s *Store) AddSiteTraffic(ctx context.Context, siteID int64, bytes int64, p
 
 // TenantUsage summiert den Verbrauch aller Sites eines Tenants.
 type TenantUsage struct {
-	TenantID     int64 `json:"tenant_id"`
-	DiskBytes    int64 `json:"disk_bytes"`
-	DiskFiles    int64 `json:"disk_files"`
-	TrafficBytes int64 `json:"traffic_bytes"`
-	Sites        int   `json:"sites"`
-	Databases    int   `json:"databases"`
-	Cronjobs     int   `json:"cronjobs"`
-	FTPAccounts  int   `json:"ftp_accounts"`
-	Mailboxes    int   `json:"mailboxes"`
+	TenantID      int64 `json:"tenant_id"`
+	DiskBytes     int64 `json:"disk_bytes"`
+	DiskFiles     int64 `json:"disk_files"`
+	TrafficBytes  int64 `json:"traffic_bytes"`
+	Sites         int   `json:"sites"`
+	Databases     int   `json:"databases"`
+	Cronjobs      int   `json:"cronjobs"`
+	FTPAccounts   int   `json:"ftp_accounts"`
+	Mailboxes     int   `json:"mailboxes"`
+	MailDomains   int   `json:"mail_domains"`
+	Certs         int   `json:"certs"`
+	BackupTargets int   `json:"backup_targets"`
 }
 
 // UsageForTenant sammelt alle Zählstände, gegen die Quotas geprüft werden.
@@ -226,10 +229,13 @@ func (s *Store) UsageForTenant(ctx context.Context, sc Scope, tenantID int64) (*
 	// Die übrigen Zähler einzeln — ein Join über vier Tabellen mit COUNT
 	// liefert Kreuzprodukte statt Zählständen.
 	for table, target := range map[string]*int{
-		"databases":    &usage.Databases,
-		"cronjobs":     &usage.Cronjobs,
-		"ftp_accounts": &usage.FTPAccounts,
-		"mailboxes":    &usage.Mailboxes,
+		"databases":      &usage.Databases,
+		"cronjobs":       &usage.Cronjobs,
+		"ftp_accounts":   &usage.FTPAccounts,
+		"mailboxes":      &usage.Mailboxes,
+		"mail_domains":   &usage.MailDomains,
+		"certs":          &usage.Certs,
+		"backup_targets": &usage.BackupTargets,
 	} {
 		if err := s.db.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM `+table+` WHERE tenant_id = ?`, tenantID).Scan(target); err != nil {

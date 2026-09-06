@@ -227,9 +227,11 @@ func (s *Server) handleDeleteTenant(c echo.Context) error {
 	if err != nil {
 		return storeError(err)
 	}
-	if usage.Sites > 0 || usage.Databases > 0 || usage.Cronjobs > 0 {
+	if usage.Sites > 0 || usage.Databases > 0 || usage.Cronjobs > 0 ||
+		usage.MailDomains > 0 || usage.Certs > 0 || usage.BackupTargets > 0 {
 		return echo.NewHTTPError(http.StatusConflict,
-			"tenant hat noch websites, datenbanken oder cronjobs — diese zuerst entfernen")
+			"tenant hat noch websites, datenbanken, cronjobs, maildomänen, "+
+				"zertifikate oder backup-ziele — diese zuerst entfernen")
 	}
 
 	if err := s.store.DeleteTenant(ctx, sc, id); err != nil {
