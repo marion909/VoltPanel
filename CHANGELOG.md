@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.69 — 2026-09-06
+
 - handleDeleteTenant prüfte vor dem Löschen nur Sites/Datenbanken/
   Cronjobs; mail_domains/certs/backup_targets hängen direkt (nicht über
   sites) mit ON DELETE CASCADE an tenants und wurden nie gezählt — ein
