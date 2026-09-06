@@ -276,6 +276,85 @@ func TestImportUeberschreibtNichts(t *testing.T) {
 	}
 }
 
+// buildDBArchive baut ein winziges .tar.gz mit je einer "Auszugs"-Datei pro
+// übergebenem Namen, unter demselben Verzeichnis, das ExportTenant für
+// Datenbank-Dumps verwendet (exportDBDir).
+func buildDBArchive(t *testing.T, names ...string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "bundle.tar.gz")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	defer gz.Close()
+	tw := tar.NewWriter(gz)
+	defer tw.Close()
+
+	for _, name := range names {
+		content := []byte("-- dump von " + name + "\n")
+		if err := tw.WriteHeader(&tar.Header{
+			Name: exportDBDir + "/" + name + ".sql",
+			Mode: 0o600, Size: int64(len(content)),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return path
+}
+
+// TestRestoreDatabasesUeberspringtNichtAngelegte deckt den Fund ab, dass
+// restoreDatabases seine Zulassungsliste (namen) aus **allen** Datenbanken
+// des Bündels baute, statt nur aus denen, die importDatabases eben
+// tatsächlich neu angelegt hat (m.dbs enthält nur erfolgreich angelegte
+// IDs). Schlägt CreateDatabase wegen einer Namenskollision mit einer
+// bereits existierenden, fremden Datenbank fehl, wurde der SQL-Dump aus dem
+// Bündel trotzdem in genau diese fremde Datenbank eingespielt.
+//
+// "kept" steht für eine Datenbank, die importDatabases erfolgreich angelegt
+// hat (ID 1 steht in m.dbs) — für sie darf restoreDatabases den Import
+// versuchen. "dropped" steht für eine, deren CreateDatabase fehlschlug (ID 2
+// fehlt in m.dbs, genau wie bei einer echten Namenskollision) — für sie darf
+// gar nichts versucht werden.
+//
+// Ohne laufendes MariaDB scheitert der versuchte Import selbst (mysqlDSN
+// zeigt auf einen Unix-Socket, den es hier nicht gibt) — das ist gewollt:
+// der Fehlschlag beweist, dass "kept" überhaupt erst bei agent.ImportDatabase
+// ankam, während "dropped" nie auch nur erwähnt werden darf.
+func TestRestoreDatabasesUeberspringtNichtAngelegte(t *testing.T) {
+	env := newTestEnv(t)
+	svc := NewExportService(env.cfg, env.store, env.agent, env.secrets, nil)
+
+	archive := buildDBArchive(t, "kept", "dropped")
+	bundle := &TenantBundle{
+		Databases: []*store.Database{
+			{ID: 1, Name: "kept"},
+			{ID: 2, Name: "dropped"},
+		},
+	}
+	m := &idMap{dbs: map[int64]int64{1: 100}} // nur ID 1 wurde neu angelegt
+	res := &ImportResult{}
+
+	svc.restoreDatabases(t.Context(), archive, bundle, m, res)
+
+	var sahKept bool
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "dropped") {
+			t.Fatalf("dropped wurde versucht, obwohl CreateDatabase dafür fehlschlug: %v", res.Warnings)
+		}
+		if strings.Contains(w, "kept") {
+			sahKept = true
+		}
+	}
+	if !sahKept {
+		t.Fatalf("kept wurde nie versucht — Test selbst kaputt? Warnungen: %v", res.Warnings)
+	}
+}
+
 // TestBuendelIstEingabe: es stammt vom eigenen Server, aber wer es in die Hand
 // bekommt, kann darin stehen lassen, was er will. Dieselbe Sorgfalt wie beim
 // Node-Archiv.

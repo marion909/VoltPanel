@@ -103,7 +103,7 @@ func (s *ExportService) ImportTenant(ctx context.Context, path, passphrase strin
 	// Erst die Zeilen, dann die Dateien: eine Site ohne Verzeichnis lässt sich
 	// nachbauen, ein Verzeichnis ohne Site gehört niemandem.
 	s.unpackFiles(ctx, path, bundle, m, res)
-	s.restoreDatabases(ctx, path, bundle, res)
+	s.restoreDatabases(ctx, path, bundle, m, res)
 
 	// Und zuletzt der Server selbst.
 	s.applySystem(ctx, res)
@@ -710,7 +710,7 @@ func unterhalbRoot(root, path string) bool {
 
 // restoreDatabases spielt die Auszüge ein.
 func (s *ExportService) restoreDatabases(ctx context.Context, archive string,
-	b *TenantBundle, res *ImportResult) {
+	b *TenantBundle, m *idMap, res *ImportResult) {
 
 	if len(b.Databases) == 0 {
 		return
@@ -719,9 +719,15 @@ func (s *ExportService) restoreDatabases(ctx context.Context, archive string,
 		res.Warnings = append(res.Warnings, "datenbanken nicht eingespielt: kein agent verfügbar")
 		return
 	}
+	// Nur Namen, deren Datenbank in importDatabases auch wirklich neu
+	// angelegt wurde (m.dbs enthält nur erfolgreich angelegte IDs) — sonst
+	// bestimmte allein der Dateiname im Archiv, welche fremde, bereits
+	// existierende Datenbank auf diesem Server überschrieben wird.
 	namen := map[string]bool{}
 	for _, db := range b.Databases {
-		namen[db.Name] = true
+		if _, ok := m.dbs[db.ID]; ok {
+			namen[db.Name] = true
+		}
 	}
 
 	err := s.eachEntry(archive, func(h *tar.Header, r io.Reader) error {
