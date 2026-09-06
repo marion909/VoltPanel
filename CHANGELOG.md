@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.72 — 2026-09-06
+
 - restoreDatabases baute seine Zulassungsliste aus allen Datenbanken des
   Bündels statt nur aus den tatsächlich neu angelegten — schlug
   CreateDatabase wegen einer Namenskollision mit einer fremden,
