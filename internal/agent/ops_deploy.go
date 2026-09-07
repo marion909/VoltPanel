@@ -79,9 +79,13 @@ func (s *Server) opDeployRun(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, err
 	}
 
-	// Jeder Stand in seinem eigenen Verzeichnis. Der Name ist die Zeit in UTC:
-	// sortierbar, und beim Aufräumen unten entscheidet die Reihenfolge.
-	release := time.Now().UTC().Format("20060102-150405")
+	// Jeder Stand in seinem eigenen Verzeichnis. Der Name ist die Zeit in UTC,
+	// mit Nanosekunden: sortierbar, und beim Aufräumen unten entscheidet die
+	// Reihenfolge. Sekundenauflösung allein reichte nicht — jede Verbindung
+	// wird in einer eigenen Goroutine bedient, und zwei opDeployRun-Aufrufe
+	// für dieselbe Site innerhalb derselben Sekunde (Doppelklick, doppelt
+	// zugestellter Webhook) erzeugten sonst denselben Zielpfad.
+	release := time.Now().UTC().Format("20060102-150405.000000000")
 	target := filepath.Join(plan.root, releasesDir, release)
 
 	res := &DeployResult{Release: release, Path: target}
@@ -371,7 +375,12 @@ func validDeployName(name string) bool {
 // Nur was dieses Muster trifft, wird beim Aufräumen gelöscht. Ein Verzeichnis,
 // das jemand von Hand dorthin gelegt hat, bleibt stehen — Aufräumen darf nie
 // mehr wegnehmen, als es selbst angelegt hat.
-var reRelease = regexp.MustCompile(`^\d{8}-\d{6}$`)
+//
+// Der Nanosekunden-Teil ist optional: ein bereits vor diesem Fix angelegter
+// Stand hat noch das alte, reine Sekundenformat und muss weiterhin als
+// eigener Stand erkannt werden, sonst würde ein Update das Aufräumen und den
+// Rollback auf ältere Stände abschneiden.
+var reRelease = regexp.MustCompile(`^\d{8}-\d{6}(\.\d{9})?$`)
 
 func validRelease(name string) bool { return reRelease.MatchString(name) }
 

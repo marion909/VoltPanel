@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/marion909/voltpanel/internal/gitspec"
 )
@@ -125,8 +126,15 @@ func TestBuildschritteSindNamen(t *testing.T) {
 // TestNurEigeneStaendeWerdenAufgeraeumt: ein Verzeichnis, das jemand von Hand
 // nach releases/ gelegt hat, bleibt stehen. Aufräumen darf nie mehr wegnehmen,
 // als es selbst angelegt hat.
+//
+// Geprüft wird auch das neue, nanosekundengenaue Format (mit Bruchteil) neben
+// dem alten, reinen Sekundenformat: ein Update darf einen vor dem Wechsel auf
+// Nanosekunden angelegten Stand nicht plötzlich als fremd behandeln.
 func TestNurEigeneStaendeWerdenAufgeraeumt(t *testing.T) {
-	for _, eigen := range []string{"20260901-120000", "20260101-000000"} {
+	for _, eigen := range []string{
+		"20260901-120000", "20260101-000000",
+		"20260901-120000.000000000", "20260901-120000.123456789",
+	} {
 		if !validRelease(eigen) {
 			t.Errorf("%q gilt nicht als eigener Stand", eigen)
 		}
@@ -134,10 +142,29 @@ func TestNurEigeneStaendeWerdenAufgeraeumt(t *testing.T) {
 	for _, fremd := range []string{
 		"", ".", "..", "wichtige-daten", "20260901", "20260901-1200000",
 		"20260901-12000a", "../etc", "20260901-120000.bak",
+		"20260901-120000.12345678", "20260901-120000.1234567890",
 	} {
 		if validRelease(fremd) {
 			t.Errorf("%q würde aufgeräumt", fremd)
 		}
+	}
+}
+
+// TestReleaseNamenKollidierenNichtInnerhalbEinerSekunde deckt den Fund ab,
+// dass der Release-Name nur Sekundenauflösung hatte — zwei opDeployRun-
+// Aufrufe für dieselbe Site innerhalb derselben Sekunde erzeugten denselben
+// Zielpfad, weil jede Verbindung in einer eigenen Goroutine bedient wird.
+func TestReleaseNamenKollidierenNichtInnerhalbEinerSekunde(t *testing.T) {
+	same := time.Date(2026, 9, 1, 12, 0, 0, 123, time.UTC)
+	other := time.Date(2026, 9, 1, 12, 0, 0, 456, time.UTC)
+
+	a := same.Format("20060102-150405.000000000")
+	b := other.Format("20060102-150405.000000000")
+	if a == b {
+		t.Fatalf("zwei Zeitpunkte in derselben Sekunde ergeben denselben Release-Namen: %q", a)
+	}
+	if !validRelease(a) || !validRelease(b) {
+		t.Fatalf("nanosekundengenauer Name gilt nicht als eigener Stand: %q / %q", a, b)
 	}
 }
 
