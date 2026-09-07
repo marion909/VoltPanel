@@ -14,7 +14,6 @@ import (
 	"embed"
 	"fmt"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -110,8 +109,8 @@ func RenderPool(d PoolData) (string, error) {
 
 // RenderShared erzeugt die vhost-übergreifende Config (Upgrade-Map, Default-Server).
 func RenderShared(acmeWebroot string) (string, error) {
-	if !filepath.IsAbs(acmeWebroot) {
-		return "", fmt.Errorf("acme-webroot %q muss absolut sein", acmeWebroot)
+	if err := checkPath("acme-webroot", acmeWebroot); err != nil {
+		return "", err
 	}
 	var buf bytes.Buffer
 	err := tmpl.ExecuteTemplate(&buf, "volt-shared.conf.tmpl",

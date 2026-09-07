@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- RenderShared prüfte ACMEWebroot nur mit filepath.IsAbs() statt mit
+  checkPath() wie jede andere Render*-Funktion im Paket — Zeilenumbrüche,
+  ";", "{", "}" und ".." gelangten so ungeprüft in die für alle Vhosts
+  geltende Default-Server-Config
 
 ## v0.4.78 — 2026-09-07
 

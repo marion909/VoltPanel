@@ -256,3 +256,21 @@ func TestRenderShared(t *testing.T) {
 		t.Error("RenderShared akzeptierte einen relativen Pfad")
 	}
 }
+
+// TestRenderSharedPrueftWieAlleAnderen deckt den Fund ab, dass RenderShared
+// ACMEWebroot nur mit filepath.IsAbs() prüfte statt mit checkPath() wie jede
+// andere Render*-Funktion im Paket — Zeilenumbrüche, ";", "{", "}" und ".."
+// gelangten so ungeprüft in nginx/volt-shared.conf.tmpl, der für *alle*
+// Vhosts geltenden Default-Server-Config.
+func TestRenderSharedPrueftWieAlleAnderen(t *testing.T) {
+	for _, schlecht := range []string{
+		"/var/lib/volt/acme\nserver { listen 8080; }",
+		"/var/lib/volt/acme; rm -rf /",
+		"/var/lib/volt/acme}server{",
+		"/var/lib/volt/../etc",
+	} {
+		if _, err := RenderShared(schlecht); err == nil {
+			t.Errorf("RenderShared(%q) wurde angenommen", schlecht)
+		}
+	}
+}
