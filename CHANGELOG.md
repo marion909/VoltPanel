@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Testlücke geschlossen: internal/core/ftp.go hatte überhaupt keine
+  eigene Testdatei — weder Tenant-Isolation noch der bereits in v0.4.31
+  behobene Symlink-Fund (gemeinsam mit files.go über joinInside) waren
+  für das FTP-Home-Verzeichnis abgedeckt
 
 ## v0.4.85 — 2026-09-07
 
