@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.76 — 2026-09-07
+
 - opPortScanSet sicherte im Enable-Pfad den bisherigen Inhalt nicht,
   bevor Filter/Jail überschrieben wurden — lehnte fail2ban die neue
   Regel beim Reload ab, wurde eine zuvor aktive Erkennung komplett
