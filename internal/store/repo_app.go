@@ -233,30 +233,20 @@ func freeAppPort(ctx context.Context, tx *sql.Tx) (int, error) {
 }
 
 func (s *Store) GetApp(ctx context.Context, sc Scope, id int64) (*App, error) {
-	a, err := scanApp(s.db.QueryRowContext(ctx,
-		`SELECT `+appCols+` FROM apps WHERE id = ?`, id))
+	where, args, err := sc.where("apps", "id = ?")
 	if err != nil {
 		return nil, err
 	}
-	// Erst lesen, dann prüfen: der Scope hängt am tenant_id der Zeile, und den
-	// kennt man vorher nicht. Zurückgegeben wird nichts, was nicht passt.
-	if err := sc.owns(a.TenantID); err != nil {
-		return nil, ErrNotFound
-	}
-	return a, nil
+	return scanApp(s.db.QueryRowContext(ctx, `SELECT `+appCols+` FROM apps`+where, append(args, id)...))
 }
 
 // AppForSite liefert die App einer Site, ErrNotFound wenn es keine gibt.
 func (s *Store) AppForSite(ctx context.Context, sc Scope, siteID int64) (*App, error) {
-	a, err := scanApp(s.db.QueryRowContext(ctx,
-		`SELECT `+appCols+` FROM apps WHERE site_id = ?`, siteID))
+	where, args, err := sc.where("apps", "site_id = ?")
 	if err != nil {
 		return nil, err
 	}
-	if err := sc.owns(a.TenantID); err != nil {
-		return nil, ErrNotFound
-	}
-	return a, nil
+	return scanApp(s.db.QueryRowContext(ctx, `SELECT `+appCols+` FROM apps`+where, append(args, siteID)...))
 }
 
 func (s *Store) ListApps(ctx context.Context, sc Scope) ([]*App, error) {

@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- GetApp/AppForSite/GetDeploy/DeployForSite luden die Zeile bisher ohne
+  tenant_id im SQL und prüften erst danach per sc.owns() — funktional
+  korrekt, aber abweichend vom sonst im Paket verwendeten
+  scope.where()-Muster, das den Tenant-Filter direkt ins SQL bäckt;
+  jetzt vereinheitlicht
 
 ## v0.4.87 — 2026-09-07
 

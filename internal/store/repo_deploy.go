@@ -163,27 +163,20 @@ func truncateLog(s string) string {
 }
 
 func (s *Store) GetDeploy(ctx context.Context, sc Scope, id int64) (*Deploy, error) {
-	d, err := scanDeploy(s.db.QueryRowContext(ctx,
-		`SELECT `+deployCols+` FROM deploys WHERE id = ?`, id))
+	where, args, err := sc.where("deploys", "id = ?")
 	if err != nil {
 		return nil, err
 	}
-	if err := sc.owns(d.TenantID); err != nil {
-		return nil, ErrNotFound
-	}
-	return d, nil
+	return scanDeploy(s.db.QueryRowContext(ctx, `SELECT `+deployCols+` FROM deploys`+where, append(args, id)...))
 }
 
 func (s *Store) DeployForSite(ctx context.Context, sc Scope, siteID int64) (*Deploy, error) {
-	d, err := scanDeploy(s.db.QueryRowContext(ctx,
-		`SELECT `+deployCols+` FROM deploys WHERE site_id = ?`, siteID))
+	where, args, err := sc.where("deploys", "site_id = ?")
 	if err != nil {
 		return nil, err
 	}
-	if err := sc.owns(d.TenantID); err != nil {
-		return nil, ErrNotFound
-	}
-	return d, nil
+	return scanDeploy(s.db.QueryRowContext(ctx,
+		`SELECT `+deployCols+` FROM deploys`+where, append(args, siteID)...))
 }
 
 // DeployByHookID sucht den Deploy zu einer Webhook-Adresse.
