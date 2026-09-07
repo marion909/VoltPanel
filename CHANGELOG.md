@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- php_pools hatte keinen UNIQUE-Index auf site_id — zwei nahezu
+  gleichzeitige CreatePHPPool-Aufrufe für dieselbe Site mit
+  unterschiedlichem pool_name konnten zwei Zeilen anlegen; die zweite
+  blieb im Panel unsichtbar, lief aber als eigener PHP-FPM-Pool weiter
 
 ## v0.4.86 — 2026-09-07
 
