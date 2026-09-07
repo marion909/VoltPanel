@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.75 — 2026-09-07
+
 - MailService.collect() brach beim ersten nicht entschlüsselbaren
   Postfach-Passwort oder DKIM-Schlüssel komplett ab — da praktisch jede
   Mail-Änderung Apply() aufruft, blockierte ein defekter Secret-Eintrag
