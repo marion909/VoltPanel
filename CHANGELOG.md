@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.85 — 2026-09-07
+
 - Testlücke geschlossen: jail() lief bisher nur mit einer einzelnen
   Wurzel getestet, obwohl es in Produktion immer mit der vollen
   Wurzel-Liste läuft — neuer Test hält fest, dass ein Symlink über
