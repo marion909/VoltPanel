@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.83 — 2026-09-07
+
 - installWordPressFiles rief os.Rename ohne vorheriges Aufräumen des
   Ziels auf, anders als installRoundcubeFiles im selben Package — ein
   mitten in der Installationsschleife abgebrochener Versuch hinterließ
