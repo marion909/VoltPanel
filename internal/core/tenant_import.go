@@ -73,11 +73,30 @@ func (s *ExportService) ImportTenant(ctx context.Context, path, passphrase strin
 	sys := store.SystemScope()
 	if vorhanden, err := s.store.ListTenants(ctx, sys); err == nil {
 		for _, t := range vorhanden {
-			if strings.EqualFold(t.Slug, bundle.Tenant.Slug) {
+			if !strings.EqualFold(t.Slug, bundle.Tenant.Slug) {
+				continue
+			}
+			if t.Status != store.TenantImporting {
 				return nil, fmt.Errorf("%w: den mandanten %q gibt es auf diesem server schon",
 					store.ErrConflict, t.Slug)
 			}
+			// Derselbe Slug, aber ein vorheriger Import kam nie bis zum Ende
+			// (Prozess beendet, Absturz) — dieser Mandant hat nie echten
+			// Inhalt bekommen, den jemand vermissen könnte. Weg damit, statt
+			// jeden erneuten Versuch mit demselben Bündel dauerhaft zu
+			// blockieren.
+			if err := s.store.DeleteTenant(ctx, sys, t.ID); err != nil {
+				return nil, fmt.Errorf("hängen gebliebenen import von %q aufräumen: %w", t.Slug, err)
+			}
 		}
+	}
+
+	// endStatus ist der Zustand, den der Mandant nach einem vollständigen
+	// Import haben soll — der aus dem Bündel, nicht "importing". Leer heißt
+	// "aktiv", genau wie beim direkten Anlegen.
+	endStatus := bundle.Tenant.Status
+	if endStatus == "" {
+		endStatus = store.TenantActive
 	}
 
 	res := &ImportResult{Slug: bundle.Tenant.Slug}
@@ -107,6 +126,18 @@ func (s *ExportService) ImportTenant(ctx context.Context, path, passphrase strin
 
 	// Und zuletzt der Server selbst.
 	s.applySystem(ctx, res)
+
+	// Erst jetzt gilt der Import als abgeschlossen — der Mandant verlässt den
+	// "importing"-Zustand und wird für alles erreichbar, wofür Status ==
+	// TenantActive Voraussetzung ist (allen voran die Anmeldung).
+	if t, err := s.store.GetTenant(ctx, sys, res.TenantID); err == nil {
+		t.Status = endStatus
+		if err := s.store.UpdateTenant(ctx, sys, t); err != nil {
+			res.Warnings = append(res.Warnings, "mandantenstatus: "+err.Error())
+		}
+	} else {
+		res.Warnings = append(res.Warnings, "mandantenstatus: "+err.Error())
+	}
 
 	return res, nil
 }
@@ -260,8 +291,14 @@ type idMap struct {
 func (s *ExportService) importTenantRow(ctx context.Context, sys store.Scope,
 	b *TenantBundle, res *ImportResult) error {
 
+	// Status kommt hier absichtlich nicht aus dem Bündel: der Mandant beginnt
+	// als "importing" und wird erst am Ende von ImportTenant, nach
+	// applySystem, auf den im Bündel hinterlegten Zustand gesetzt. Bricht der
+	// Import irgendwo dazwischen ab, bleibt er als unvollständig erkennbar
+	// stehen, statt sofort so auszusehen wie ein fertig importierter
+	// Mandant.
 	t := &store.Tenant{
-		Name: b.Tenant.Name, Slug: b.Tenant.Slug, Status: b.Tenant.Status,
+		Name: b.Tenant.Name, Slug: b.Tenant.Slug, Status: store.TenantImporting,
 	}
 	// Die Anmeldedomain kommt nicht mit: sie zeigt auf den alten Server, und
 	// bis der DNS-Eintrag umgestellt ist, wäre sie eine Adresse, unter der

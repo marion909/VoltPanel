@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- ImportTenant legte den Mandanten sofort mit dem endgültigen Status an
+  — brach der Import mittendrin ab, blockierte der Konflikt-Check jeden
+  erneuten Versuch mit demselben Bündel dauerhaft, und die API
+  verweigerte auch das Löschen. Neuer Zwischenzustand "importing": ein
+  hängen gebliebener Import blockiert weder einen Neuversuch noch das
+  Löschen mehr
 
 ## v0.4.81 — 2026-09-07
 

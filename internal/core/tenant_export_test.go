@@ -255,6 +255,68 @@ func TestImportLegtDenMandantenNeuAn(t *testing.T) {
 	}
 }
 
+// TestImportEndetAktivUndUeberstehtEinenAbgebrochenenVorgaenger deckt den
+// Fund ab, dass ImportTenant den Mandanten sofort mit dem im Bündel
+// hinterlegten Status anlegte — brach der Prozess mitten in
+// importSites/importDatabases/applySystem ab, blockierte der
+// Konflikt-Check am Anfang jeden erneuten Importversuch mit demselben
+// Bündel dauerhaft ("den mandanten … gibt es auf diesem server schon").
+//
+// Der Mandant durchläuft jetzt den Zustand "importing" und wechselt erst
+// nach applySystem auf den endgültigen Status. Ein hängen gebliebener
+// Mandant in genau diesem Zwischenzustand blockiert einen erneuten Versuch
+// nicht mehr, sondern wird vor dem Neuversuch automatisch aufgeräumt.
+func TestImportEndetAktivUndUeberstehtEinenAbgebrochenenVorgaenger(t *testing.T) {
+	quelle := newTestEnv(t)
+	alice := seedExportTenant(t, quelle, "alice")
+	res, err := exportService(quelle).ExportTenant(t.Context(), store.SystemScope(),
+		alice.ID, "eine-lange-passphrase")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ziel := newTestEnv(t)
+	ctx, sys := t.Context(), store.SystemScope()
+
+	// Simuliert einen Server, auf dem ein früherer Importversuch für
+	// denselben Mandanten mittendrin abgebrochen ist: die Zeile existiert
+	// bereits, mit demselben Slug, aber noch im "importing"-Zustand.
+	haengt := &store.Tenant{Name: "alice", Slug: "alice", Status: store.TenantImporting}
+	if err := ziel.store.CreateTenant(ctx, sys, haengt); err != nil {
+		t.Fatal(err)
+	}
+
+	imported, err := exportService(ziel).ImportTenant(t.Context(), res.Path, "eine-lange-passphrase")
+	if err != nil {
+		t.Fatalf("import trotz hängen gebliebenem Vorgänger abgelehnt: %v", err)
+	}
+
+	tenant, err := ziel.store.GetTenant(ctx, sys, imported.TenantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tenant.Status != store.TenantActive {
+		t.Errorf("Status nach vollständigem Import ist %q, erwartet %q",
+			tenant.Status, store.TenantActive)
+	}
+
+	// Die alte, hängen gebliebene Zeile ist weg — nicht als zweiter Mandant
+	// mit demselben Slug liegen geblieben.
+	alle, err := ziel.store.ListTenants(ctx, sys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var treffer int
+	for _, tn := range alle {
+		if tn.Slug == "alice" {
+			treffer++
+		}
+	}
+	if treffer != 1 {
+		t.Errorf("%d mandanten mit slug 'alice', erwartet 1", treffer)
+	}
+}
+
 // TestImportUeberschreibtNichts: ein halb überschriebener Mandant wäre
 // schlimmer als gar keiner, und welche Hälfte gälte, wüsste danach niemand.
 func TestImportUeberschreibtNichts(t *testing.T) {

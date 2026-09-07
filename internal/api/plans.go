@@ -223,15 +223,23 @@ func (s *Server) handleDeleteTenant(c echo.Context) error {
 	// Nur ein leerer Tenant lässt sich entfernen. Sonst würde der
 	// Datenbankeintrag verschwinden, während Vhosts, Linux-Benutzer und
 	// Datenbanken auf dem Server zurückbleiben.
-	usage, err := s.store.UsageForTenant(ctx, sc, id)
-	if err != nil {
-		return storeError(err)
-	}
-	if usage.Sites > 0 || usage.Databases > 0 || usage.Cronjobs > 0 ||
-		usage.MailDomains > 0 || usage.Certs > 0 || usage.BackupTargets > 0 {
-		return echo.NewHTTPError(http.StatusConflict,
-			"tenant hat noch websites, datenbanken, cronjobs, maildomänen, "+
-				"zertifikate oder backup-ziele — diese zuerst entfernen")
+	//
+	// Ausnahme: ein Mandant, dessen Import nie bis zum Ende kam (Prozess
+	// beendet, Absturz — Status bleibt dann auf "importing" stehen statt auf
+	// den im Bündel hinterlegten Zustand zu wechseln). Was der auch an Sites/
+	// Datenbanken/… hat, ist nie fertig geworden — der Sinn der Prüfung
+	// (echten Kundeninhalt nicht versehentlich mitreißen) greift hier nicht.
+	if tenant.Status != store.TenantImporting {
+		usage, err := s.store.UsageForTenant(ctx, sc, id)
+		if err != nil {
+			return storeError(err)
+		}
+		if usage.Sites > 0 || usage.Databases > 0 || usage.Cronjobs > 0 ||
+			usage.MailDomains > 0 || usage.Certs > 0 || usage.BackupTargets > 0 {
+			return echo.NewHTTPError(http.StatusConflict,
+				"tenant hat noch websites, datenbanken, cronjobs, maildomänen, "+
+					"zertifikate oder backup-ziele — diese zuerst entfernen")
+		}
 	}
 
 	if err := s.store.DeleteTenant(ctx, sc, id); err != nil {

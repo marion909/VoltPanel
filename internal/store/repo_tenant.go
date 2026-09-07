@@ -19,6 +19,18 @@ var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$`)
 const (
 	TenantActive    = "active"
 	TenantSuspended = "suspended"
+
+	// TenantImporting steht kurzzeitig, während ExportService.ImportTenant
+	// läuft — vom Anlegen der Mandantenzeile bis zum letzten Schritt
+	// (applySystem). Bricht der Import irgendwo dazwischen ab (Prozess
+	// beendet, Absturz), bleibt der Mandant in genau diesem Zustand stehen:
+	// erkennbar als unvollständig statt als vermeintlich fertiger, aber
+	// halb leerer Mandant, und gezielt löschbar, ohne dass die
+	// Ressourcenzahlen (Sites, Datenbanken, …) das verweigern. tenant.Status
+	// != TenantActive sperrt außerdem die Anmeldung (auth.go) — niemand
+	// kann sich währenddessen in einen halb importierten Mandanten
+	// einloggen.
+	TenantImporting = "importing"
 )
 
 func (s *Store) CreateTenant(ctx context.Context, sc Scope, t *Tenant) error {

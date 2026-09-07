@@ -509,6 +509,30 @@ func TestPlanAndTenantRoutes(t *testing.T) {
 		}
 	})
 
+	// TestPlanAndTenantRoutes deckt hier den Fund ab, dass ein Mandant, dessen
+	// Import nie bis zum Ende kam (Status bleibt dann auf "importing" stehen,
+	// siehe ExportService.ImportTenant), sich über denselben Weg wie ein
+	// Mandant mit echtem Kundeninhalt nicht löschen ließ — die
+	// Ressourcen-Prüfung griff unabhängig vom Status. Was ein hängen
+	// gebliebener Import an Sites/Datenbanken/… hinterlässt, ist aber nie
+	// fertig geworden; die Prüfung soll dafür nicht greifen.
+	t.Run("mandant mit haengendem import laesst sich trotz inhalt loeschen", func(t *testing.T) {
+		tenant := &store.Tenant{Name: "dora", Slug: "dora", Status: store.TenantImporting}
+		if err := ts.store.CreateTenant(context.Background(), store.SystemScope(), tenant); err != nil {
+			t.Fatal(err)
+		}
+		if err := ts.store.CreateMailDomain(context.Background(), store.SystemScope(), &store.MailDomain{
+			TenantID: tenant.ID, Domain: "dora.at", Active: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		rec := ts.do(http.MethodDelete, "/api/v1/tenants/"+strconv.FormatInt(tenant.ID, 10), nil)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("Status %d, erwartet 204 — %s", rec.Code, rec.Body.String())
+		}
+	})
+
 	t.Run("eigener mandant ist geschuetzt", func(t *testing.T) {
 		rec := ts.do(http.MethodDelete, "/api/v1/tenants/1", nil)
 		if rec.Code != http.StatusBadRequest {
