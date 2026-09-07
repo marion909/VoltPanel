@@ -81,6 +81,66 @@ func TestJailBlocksEscapes(t *testing.T) {
 	}
 }
 
+// TestJailErlaubtWurzelUebergreifendeSymlinks deckt die Testlücke ab, dass
+// TestJailBlocksEscapes jail() nur mit einer einzelnen Wurzel aufruft. In
+// Produktion läuft jail() immer mit der vollen s.roots-Liste (SitesDir,
+// NginxDir, PHPDir, CertDir, LogDir, BackupDir zusammen) — kein bestehender
+// Test prüft einen Symlink, der von einer Wurzel in eine *andere* Wurzel
+// oder in eine Nachbar-Site derselben Wurzel führt.
+//
+// Das ist kein Bug, sondern dokumentiertes Verhalten: jail() prüft "liegt
+// der aufgelöste Pfad unter irgendeiner der übergebenen Wurzeln", nicht
+// "unter der für diese Operation vorgesehenen engeren Wurzel" — genau die
+// Lücke, die internal/core/files.go (joinInside) mit einer zusätzlichen,
+// engeren Prüfung pro Site schließt. Dieser Test hält das Verhalten von
+// jail() selbst fest, damit eine künftige Änderung daran auffällt.
+func TestJailErlaubtWurzelUebergreifendeSymlinks(t *testing.T) {
+	sitesRoot := t.TempDir()
+	certRoot := t.TempDir()
+	roots := []string{sitesRoot, certRoot}
+
+	mandantA := filepath.Join(sitesRoot, "mandant-a")
+	mandantB := filepath.Join(sitesRoot, "mandant-b")
+	if err := os.MkdirAll(mandantA, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(mandantB, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ein Symlink aus Mandant A in eine andere Wurzel (certRoot) — die Ziel-
+	// wurzel ist selbst erlaubt, jail() lässt das durch.
+	nachAndererWurzel := filepath.Join(mandantA, "zu-cert-root")
+	if err := os.Symlink(certRoot, nachAndererWurzel); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := jail(nachAndererWurzel, roots); err != nil {
+		t.Fatalf("jail() lehnte einen Symlink in eine andere erlaubte Wurzel ab: %v", err)
+	} else {
+		realCertRoot, _ := filepath.EvalSymlinks(certRoot)
+		if got != realCertRoot {
+			t.Fatalf("jail() = %q, erwartet %q", got, realCertRoot)
+		}
+	}
+
+	// Ein Symlink aus Mandant A zu Mandant B, derselben Wurzel — auch das
+	// lässt jail() durch, weil beide unter sitesRoot liegen. Die
+	// mandantenscharfe Trennung ist nicht Aufgabe von jail(), sondern der
+	// engeren Prüfung in internal/core/files.go.
+	nachNachbarSite := filepath.Join(mandantA, "zu-mandant-b")
+	if err := os.Symlink(mandantB, nachNachbarSite); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := jail(nachNachbarSite, roots); err != nil {
+		t.Fatalf("jail() lehnte einen Symlink zu einer Nachbar-Site derselben Wurzel ab: %v", err)
+	} else {
+		realMandantB, _ := filepath.EvalSymlinks(mandantB)
+		if got != realMandantB {
+			t.Fatalf("jail() = %q, erwartet %q", got, realMandantB)
+		}
+	}
+}
+
 func TestCheckServiceWhitelist(t *testing.T) {
 	ok := []string{"nginx", "mariadb", "php8.3-fpm", "php7.4-fpm", "nginx.service", "docker"}
 	for _, n := range ok {

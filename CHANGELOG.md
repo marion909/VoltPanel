@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Testlücke geschlossen: jail() lief bisher nur mit einer einzelnen
+  Wurzel getestet, obwohl es in Produktion immer mit der vollen
+  Wurzel-Liste läuft — neuer Test hält fest, dass ein Symlink über
+  Wurzelgrenzen hinweg (und zu einer Nachbar-Site derselben Wurzel)
+  absichtlich erlaubt bleibt, damit eine künftige Änderung daran auffällt
 
 ## v0.4.84 — 2026-09-07
 
