@@ -38,9 +38,19 @@ func (s *Server) handleSetLoginDomain(c echo.Context) error {
 			"das ist die domain des panels — sie kann keinem mandanten gehören")
 	}
 
-	ctx := c.Request().Context()
-	if err := s.store.SetTenantLoginDomain(ctx, currentScope(c), id, domain); err != nil {
+	ctx, sc := c.Request().Context(), currentScope(c)
+	// Vorher lesen, nicht danach: der alte Wert steht sonst nirgends mehr,
+	// sobald SetTenantLoginDomain ihn überschrieben hat — und genau der alte
+	// Name muss aus dem SNI-Zertifikats-Cache raus, nicht der neue.
+	vorher, err := s.store.GetTenant(ctx, sc, id)
+	if err != nil {
 		return storeError(err)
+	}
+	if err := s.store.SetTenantLoginDomain(ctx, sc, id, domain); err != nil {
+		return storeError(err)
+	}
+	if vorher.LoginDomain != "" && !strings.EqualFold(vorher.LoginDomain, domain) {
+		s.evictLoginCert(vorher.LoginDomain)
 	}
 	// Ohne das dauerte es bis zu einer halben Minute, bis die Domain wirkt, und
 	// der Betreiber hielte sie für kaputt.

@@ -27,14 +27,18 @@ import (
 // Das Panel terminiert selbst, statt sich hinter nginx zu stellen. Der Grund
 // ist der Notfall: wer eine kaputte nginx-Konfiguration reparieren will,
 // braucht das Panel gerade dann, wenn nginx nicht mehr ausliefert.
-func panelTLS(cfg *config.Config, log *slog.Logger, isLoginDomain func(string) bool) (*tls.Config, error) {
+// panelTLS gibt neben der TLS-Config auch den SNI-Zertifikats-Cache zurück:
+// der Aufrufer hält ihn fest, um einen Eintrag zu entfernen, wenn die
+// zugehörige Anmeldedomain später gelöscht oder geändert wird — sonst bliebe
+// der *certReloader dafür für die Prozesslaufzeit im Speicher.
+func panelTLS(cfg *config.Config, log *slog.Logger, isLoginDomain func(string) bool) (*tls.Config, *sniCerts, error) {
 	if err := ensureSelfSigned(cfg, log); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	r := &certReloader{chain: cfg.PanelTLSChain, label: "panel", log: log}
 	if _, err := r.load(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	sni := &sniCerts{cfg: cfg, log: log, known: isLoginDomain, by: map[string]*certReloader{}}
@@ -52,7 +56,16 @@ func panelTLS(cfg *config.Config, log *slog.Logger, isLoginDomain func(string) b
 			}
 			return r.load()
 		},
-	}, nil
+	}, sni, nil
+}
+
+// evictLoginCert entfernt einen zwischengespeicherten SNI-Zertifikats-Eintrag
+// für eine Anmeldedomain, die gerade gelöscht oder geändert wurde. TLS kann
+// abgeschaltet sein — dann ist s.sni nil, und es gibt nichts zu tun.
+func (s *Server) evictLoginCert(domain string) {
+	if s.sni != nil {
+		s.sni.evict(domain)
+	}
 }
 
 // sniCerts wählt das Zertifikat anhand des Namens, den der Browser im
@@ -106,6 +119,20 @@ func (s *sniCerts) certFor(name string) *tls.Certificate {
 		return nil
 	}
 	return cert
+}
+
+// evict entfernt einen zwischengespeicherten Eintrag — aufgerufen, wenn die
+// zugehörige Anmeldedomain gelöscht oder auf eine andere geändert wird.
+// Ohne das bliebe der *certReloader für die Prozesslaufzeit im Speicher,
+// auch wenn known(name) danach schon false liefert.
+func (s *sniCerts) evict(name string) {
+	name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
+	if name == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.by, name)
+	s.mu.Unlock()
 }
 
 // certReloader liest das Zertifikat bei jedem Handshake neu, solange sich die

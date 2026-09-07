@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Der SNI-Zertifikats-Cache bekam bei jedem erstmaligen TLS-Handshake
+  für eine Anmeldedomain einen neuen Eintrag, aber nichts entfernte ihn
+  wieder, wenn die Domain später gelöscht oder geändert wurde — der
+  Eintrag blieb für die Prozesslaufzeit im Speicher; wird jetzt beim
+  Ändern/Löschen der Anmeldedomain mitentfernt
 
 ## v0.4.83 — 2026-09-07
 

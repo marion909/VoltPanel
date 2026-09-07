@@ -53,6 +53,11 @@ type Server struct {
 	// logins hält die Zuordnung Anmeldedomain → Mandant im Speicher.
 	logins    *loginDomains
 	devOrigin string
+	// sni ist der SNI-Zertifikats-Cache aus panelTLS — nil, solange TLS
+	// abgeschaltet ist oder Start() noch nicht gelaufen ist. Gehalten, damit
+	// login_domain.go einen Eintrag entfernen kann, wenn die zugehörige
+	// Anmeldedomain gelöscht oder geändert wird.
+	sni *sniCerts
 }
 
 type Options struct {
@@ -596,11 +601,12 @@ func (s *Server) Start(ctx context.Context) error {
 
 	scheme := "http"
 	if s.cfg.TLSEnabled {
-		tlsCfg, err := panelTLS(s.cfg, s.log, s.isLoginDomain)
+		tlsCfg, sni, err := panelTLS(s.cfg, s.log, s.isLoginDomain)
 		if err != nil {
 			return fmt.Errorf("panel-tls: %w", err)
 		}
 		srv.TLSConfig = tlsCfg
+		s.sni = sni
 		scheme = "https"
 	}
 
