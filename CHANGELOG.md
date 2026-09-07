@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.90 — 2026-09-07
+
 - Deploys.vue: zurueck() (Rollback) rief die als reinen Toggle
   implementierte staendeLaden(d) zweimal hintereinander auf und
   funktionierte nur zufällig, weil offen[d.id] vor dem Klick immer true
