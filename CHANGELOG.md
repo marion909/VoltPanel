@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.78 — 2026-09-07
+
 - opMySQLCreateUser nahm ein gerade angelegtes Konto nicht zurück, wenn
   ALTER USER oder das Setzen der Rechte danach fehlschlug — ein Konto
   ohne (oder mit veraltetem) Passwort und ohne die vorgesehenen Rechte
