@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.88 — 2026-09-07
+
 - GetApp/AppForSite/GetDeploy/DeployForSite luden die Zeile bisher ohne
   tenant_id im SQL und prüften erst danach per sc.owns() — funktional
   korrekt, aber abweichend vom sonst im Paket verwendeten
