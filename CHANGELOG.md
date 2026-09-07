@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.89 — 2026-09-07
+
 - FirewallPanel.vue: der Regler für die Portscan-Empfindlichkeit wurde
   beim Laden nie mit dem Server-Wert synchronisiert — stand der Server
   z. B. auf "streng", zeigte das Dropdown weiterhin "Normal", und "Stufe
