@@ -167,6 +167,23 @@ func (s *Server) opNginxRemoveVhost(ctx context.Context, raw json.RawMessage) (a
 	return TextResult{Text: "vhost " + p.Domain + " entfernt"}, nil
 }
 
+// checkNginxOnStartup testet die aktuell aktive nginx-Config einmal beim
+// Start des Agents und loggt eine Warnung, wenn sie nicht besteht.
+//
+// opNginxWriteVhost/opNginxWriteShared schreiben eine neue Config direkt an
+// die Stelle, die nginx bei einem Reload einliest, und testen erst danach —
+// stirbt der Agent genau dazwischen, bleibt eine ungeprüfte Datei live
+// liegen, unbemerkt, bis irgendein externes Ereignis (Reboot, ein fremder
+// Reload) sie einliest. Der nächste Agent-Start macht das wenigstens
+// sichtbar, statt darauf zu warten.
+func (s *Server) checkNginxOnStartup(ctx context.Context) {
+	if out, err := run(ctx, shortTimeout, "nginx", "-t"); err != nil {
+		s.log.Warn("nginx-config beim agent-start ungültig — vermutlich eine "+
+			"unterbrochene änderung, von hand mit »nginx -t« prüfen",
+			"ausgabe", truncate(out, 500))
+	}
+}
+
 func (s *Server) opNginxTest(ctx context.Context, _ json.RawMessage) (any, error) {
 	out, err := run(ctx, shortTimeout, "nginx", "-t")
 	if err != nil {

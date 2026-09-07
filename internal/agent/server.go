@@ -236,6 +236,13 @@ func (s *Server) Serve(ctx context.Context) error {
 		s.listener.Close()
 	}()
 
+	// Einmal beim Start prüfen, nicht nur beim eigenen Schreiben: opNginxWriteVhost/
+	// opNginxWriteShared testen eine neue Config erst *nach* dem Schreiben — stirbt
+	// der Agent genau dazwischen, bleibt eine ungeprüfte Datei live liegen, bis
+	// irgendein externes Ereignis (Reboot, ein fremder Reload) sie einliest. Der
+	// nächste Start macht das wenigstens sichtbar, statt es unbemerkt zu lassen.
+	go s.checkNginxOnStartup(ctx)
+
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {

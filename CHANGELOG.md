@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Stirbt volt-agent zwischen dem Schreiben einer neuen nginx-Config und
+  ihrem eigenen nginx -t, bleibt eine ungeprüfte Datei live liegen, ohne
+  dass es auffällt — der Agent testet die aktive Config jetzt einmal
+  beim eigenen Start und loggt eine Warnung, wenn sie nicht besteht
 
 ## v0.4.80 — 2026-09-07
 
