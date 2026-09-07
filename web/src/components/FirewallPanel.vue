@@ -30,6 +30,13 @@ async function load() {
   fw.value = a
   f2b.value = b
   scan.value = c
+  // Ohne das zeigt der Regler weiterhin die Voreinstellung "normal", auch
+  // wenn der Server längst auf einer anderen Stufe läuft — ein Klick auf
+  // "Stufe übernehmen" ohne bewusste Auswahl setzte die Sicherheitsstufe
+  // dann stillschweigend zurück.
+  if (c && c.level) {
+    stufe.value = c.level
+  }
 }
 
 // Die Empfindlichkeit ist eine von drei Stufen, kein Zahlenfeld. Die Frage,
