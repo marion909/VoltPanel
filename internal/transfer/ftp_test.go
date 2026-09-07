@@ -97,6 +97,29 @@ func TestKommandoMitZeilenumbruchWirdAbgewiesen(t *testing.T) {
 	}
 }
 
+// TestZeileOhneUmbruchWirdBegrenztGelesen deckt den Fund ab, dass readLine
+// die Größe einer Antwortzeile erst *nach* dem vollständigen Lesen prüfte,
+// nicht während des Lesens — c.r.ReadString('\n') akkumulierte bei
+// fehlendem Zeilenumbruch unbegrenzt weiter. Ein bösartiger oder
+// kompromittierter FTP-Zielserver (vom Kunden als Backup-Ziel konfiguriert)
+// hätte so bis zum Verbindungstimeout beliebig viele Daten ohne
+// Zeilenumbruch senden und dadurch unkontrolliert Speicher des
+// Panel-Prozesses belegen können.
+func TestZeileOhneUmbruchWirdBegrenztGelesen(t *testing.T) {
+	// Deutlich mehr als ftpMaxLine, ohne jeden '\n' — genau der Fall, den
+	// ReadString früher anstandslos akkumuliert hätte.
+	lang := strings.Repeat("x", ftpMaxLine*4)
+	c, _ := gespraech(t, lang)
+
+	_, _, err := c.expect()
+	if err == nil {
+		t.Fatal("eine überlange Zeile ohne Zeilenumbruch wurde angenommen")
+	}
+	if !strings.Contains(err.Error(), "unverhältnismässig lang") {
+		t.Errorf("abgelehnt, aber aus dem falschen Grund: %v", err)
+	}
+}
+
 // TestPassivModusWirdRichtigGelesen: die beiden Antwortformate sind die Stelle,
 // an der ein FTP-Client typischerweise falsch liegt — und ein falscher Port
 // verbindet auf einen anderen Dienst desselben Servers.

@@ -394,15 +394,29 @@ func (c *ftpConn) expect() (int, string, error) {
 	return code, msg, nil
 }
 
+// readLine begrenzt die Größe der Antwortzeile während des Lesens, nicht
+// erst danach: c.r.ReadString('\n') würde ohne eigene Grenze beliebig oft
+// nachfüllen, bis ein Zeilenumbruch auftaucht — ein bösartiger oder
+// kompromittierter FTP-Server (vom Kunden als Backup-Ziel konfiguriert)
+// könnte bis zum Verbindungstimeout beliebig viele Daten ohne Zeilenumbruch
+// senden und so unkontrolliert Speicher des Panel-Prozesses belegen.
 func (c *ftpConn) readLine() (string, error) {
-	line, err := c.r.ReadString('\n')
-	if err != nil {
+	var buf []byte
+	for {
+		frag, err := c.r.ReadSlice('\n')
+		buf = append(buf, frag...)
+		if len(buf) > ftpMaxLine {
+			return "", fmt.Errorf("die antwort des servers ist unverhältnismässig lang")
+		}
+		if err == nil {
+			break
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
 		return "", fmt.Errorf("lesen: %w", err)
 	}
-	if len(line) > ftpMaxLine {
-		return "", fmt.Errorf("die antwort des servers ist unverhältnismässig lang")
-	}
-	return strings.TrimRight(line, "\r\n"), nil
+	return strings.TrimRight(string(buf), "\r\n"), nil
 }
 
 func (c *ftpConn) quit() {
