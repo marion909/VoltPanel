@@ -172,11 +172,15 @@ func (s *SiteService) UpdatePHP(ctx context.Context, sc store.Scope, siteID int6
 
 	// Wechselt die Version, gehört der alte Pool aufgeräumt — sonst liefe die
 	// Site unter zwei Versionen gleichzeitig.
+	//
+	// Der alte Pool wird dafür erst *nach* Rebuild entfernt, nicht davor: der
+	// neue Pool muss zuerst stehen und laufen, bevor der alte verschwindet.
+	// Andersherum bliebe die Site ganz ohne FPM-Pool-Konfiguration zurück,
+	// schlüge UpdateSite, UpdatePHPPool oder Rebuild dazwischen fehl — ein
+	// dauerhaftes 502 bis zum nächsten erfolgreichen Versuch.
 	oldVersion := site.PHPVersion
-	if pool.PHPVersion != oldVersion {
-		if err := s.agent.RemovePHPPool(ctx, oldVersion, pool.PoolName); err != nil {
-			return nil, fmt.Errorf("alten pool entfernen: %w", err)
-		}
+	versionChanged := pool.PHPVersion != oldVersion
+	if versionChanged {
 		site.PHPVersion = pool.PHPVersion
 		if err := s.store.UpdateSite(ctx, sc, site); err != nil {
 			return nil, err
@@ -188,6 +192,14 @@ func (s *SiteService) UpdatePHP(ctx context.Context, sc store.Scope, siteID int6
 	}
 	if err := s.Rebuild(ctx, sc, site.ID); err != nil {
 		return nil, err
+	}
+
+	// Der neue Pool steht und läuft; der alte ist jetzt nur noch verwaister
+	// Ballast. Schlägt das Entfernen fehl, bleibt eine ungenutzte Datei
+	// liegen — harmlos im Vergleich zu der Alternative oben, deshalb kein
+	// Fehler für den Aufrufer: die eigentliche Änderung ist längst geglückt.
+	if versionChanged {
+		_ = s.agent.RemovePHPPool(ctx, oldVersion, pool.PoolName)
 	}
 	return pool, nil
 }

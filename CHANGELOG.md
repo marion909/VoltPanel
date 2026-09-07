@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- UpdatePHP entfernte beim Versionswechsel den alten FPM-Pool, bevor
+  UpdateSite/UpdatePHPPool/Rebuild überhaupt gelaufen waren — schlug
+  einer davon fehl, blieb die Site ganz ohne FPM-Pool zurück (502);
+  der alte Pool wird jetzt erst entfernt, nachdem der neue steht
 
 ## v0.4.73 — 2026-09-07
 
