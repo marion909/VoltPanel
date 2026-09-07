@@ -67,6 +67,54 @@ func TestMailApplySammeltAlleMandanten(t *testing.T) {
 	}
 }
 
+// TestKaputtesPasswortBlockiertNurEinPostfach deckt den Fund ab, dass
+// collect() beim ersten nicht entschlüsselbaren Postfach-Passwort komplett
+// mit Fehler abbrach — CreateDomain/CreateMailbox/CreateAlias/SetDomain
+// rufen alle Apply() auf, also blockierte ein einziger defekter
+// Secret-Eintrag eines Mandanten mail-bezogene Änderungen aller anderen.
+// Ein defektes Postfach darf nur sich selbst aus der Datei nehmen.
+func TestKaputtesPasswortBlockiertNurEinPostfach(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	svc := mailService(env)
+
+	seedMailTenant(t, env, "alice")
+	bob := seedMailTenant(t, env, "bob")
+
+	// Bobs Postfach-Passwort kaputt machen: kein gültiges Chiffrat mehr.
+	scB := store.Scope{TenantID: bob, Role: store.RoleOwner}
+	domB := ersteDomain(t, env, bob)
+	boxenB, err := env.store.ListMailboxes(ctx, scB, domB)
+	if err != nil || len(boxenB) == 0 {
+		t.Fatalf("kein postfach für bob: %v", err)
+	}
+	boxenB[0].PasswordEnc = "kaputt"
+	if err := env.store.UpdateMailbox(ctx, scB, boxenB[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := svc.collect(ctx)
+	if err != nil {
+		t.Fatalf("collect() bricht wegen eines einzigen kaputten Postfachs komplett ab: %v", err)
+	}
+
+	var saheAlice, saheBob bool
+	for _, m := range p.Mailboxes {
+		if m.Address == "info@alice.example.at" {
+			saheAlice = true
+		}
+		if strings.HasSuffix(m.Address, "@bob.example.at") {
+			saheBob = true
+		}
+	}
+	if !saheAlice {
+		t.Error("alices unbeschädigtes Postfach fehlt — wurde mitbetroffen")
+	}
+	if saheBob {
+		t.Error("bobs kaputtes Postfach steht trotzdem in den Ergebnissen")
+	}
+}
+
 // Ein gesperrter Mandant nimmt keine Post mehr an — dieselbe Regel wie beim
 // Anmelden. "Gesperrt" soll nicht nur ein Feld in der Oberfläche sein.
 func TestGesperrterMandantBekommtKeinePost(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/marion909/voltpanel/internal/agent"
@@ -37,6 +38,7 @@ type MailService struct {
 	secrets *authn.SecretBox
 	quota   *QuotaService
 	certs   *CertService
+	log     *slog.Logger
 }
 
 func NewMailService(st *store.Store, ag *agent.Client, cfg *config.Config,
@@ -46,6 +48,7 @@ func NewMailService(st *store.Store, ag *agent.Client, cfg *config.Config,
 		store: st, agent: ag, cfg: cfg, secrets: secrets,
 		quota: NewQuotaService(st, ag, cfg, nil),
 		certs: NewCertService(cfg, st, ag, secrets, nil),
+		log:   slog.Default(),
 	}
 }
 
@@ -339,8 +342,13 @@ func (s *MailService) collect(ctx context.Context) (agent.MailApplyParams, error
 		if err != nil {
 			// Ein Postfach ohne lesbares Passwort wegzulassen wäre die stille
 			// Variante; es mit leerem Passwort zu schreiben die gefährliche.
-			// Also weglassen und es sagen.
-			return p, fmt.Errorf("das passwort von %s ist nicht lesbar: %w", m.Address, err)
+			// Also weglassen und es laut sagen — aber nur für dieses eine
+			// Postfach: den ganzen Lauf abzubrechen träfe die Mail-Änderungen
+			// jedes anderen Mandanten mit, nur weil bei diesem einen Eintrag
+			// etwas kaputt ist.
+			s.log.Warn("postfach übersprungen: passwort nicht lesbar",
+				"adresse", m.Address, "err", err)
+			continue
 		}
 		p.Mailboxes = append(p.Mailboxes, agent.MailboxParams{
 			Address: m.Address, Password: klartext, QuotaMB: m.QuotaMB,
@@ -366,7 +374,11 @@ func (s *MailService) collect(ctx context.Context) (agent.MailApplyParams, error
 		}
 		schluessel, err := s.secrets.Decrypt(d.DKIMPrivate)
 		if err != nil {
-			return p, fmt.Errorf("der dkim-schlüssel von %s ist nicht lesbar: %w", d.Domain, err)
+			// Dieselbe Regel wie beim Postfach-Passwort oben: nur diese eine
+			// Domäne verliert ihre DKIM-Signatur, nicht der ganze Lauf.
+			s.log.Warn("dkim-schlüssel übersprungen: nicht lesbar",
+				"domain", d.Domain, "err", err)
+			continue
 		}
 		p.DKIM = append(p.DKIM, agent.DKIMParams{
 			Domain: d.Domain, Selector: d.DKIMSelector, PrivateKey: schluessel,
