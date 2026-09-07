@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.82 — 2026-09-07
+
 - ImportTenant legte den Mandanten sofort mit dem endgültigen Status an
   — brach der Import mittendrin ab, blockierte der Konflikt-Check jeden
   erneuten Versuch mit demselben Bündel dauerhaft, und die API
