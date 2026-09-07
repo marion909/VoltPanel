@@ -178,6 +178,12 @@ func (s *Server) opPortScanSet(ctx context.Context, raw json.RawMessage) (any, e
 			return nil, opErr(OpPortScanSet, "%s anlegen: %v", dir, err)
 		}
 	}
+	// Vorher sichern, genau wie im Disable-Pfad: war die Erkennung bereits mit
+	// einer anderen Stufe aktiv, soll ein abgelehntes Update dorthin
+	// zurückfallen, statt die Erkennung ganz abzuschalten.
+	vorherFilter, _ := os.ReadFile(portScanFilter)
+	vorherConf, _ := os.ReadFile(portScanConf)
+
 	// Der Filter zuerst: das Jail zeigt auf ihn, und ein Jail ohne seinen
 	// Filter ist genau der Fehler, der fail2ban nicht starten lässt.
 	if err := writeFileAtomic(portScanFilter, []byte(filter), 0o644); err != nil {
@@ -189,8 +195,19 @@ func (s *Server) opPortScanSet(ctx context.Context, raw json.RawMessage) (any, e
 	}
 
 	if out, err := run(ctx, shortTimeout, "fail2ban-client", "reload"); err != nil {
-		_ = os.Remove(portScanConf)
-		_ = os.Remove(portScanFilter)
+		// Zurücklegen statt nur zu löschen: sonst wäre eine zuvor aktive
+		// Erkennung nach einem abgelehnten Wechsel komplett aus, statt auf
+		// dem letzten funktionierenden Stand zu bleiben.
+		if len(vorherFilter) > 0 {
+			_ = writeFileAtomic(portScanFilter, vorherFilter, 0o644)
+		} else {
+			_ = os.Remove(portScanFilter)
+		}
+		if len(vorherConf) > 0 {
+			_ = writeFileAtomic(portScanConf, vorherConf, 0o644)
+		} else {
+			_ = os.Remove(portScanConf)
+		}
 		_, _ = run(ctx, shortTimeout, "fail2ban-client", "reload")
 		return nil, opErr(OpPortScanSet, "fail2ban hat die regel abgelehnt und sie wurde "+
 			"zurückgenommen: %s", truncate(out, 300))
