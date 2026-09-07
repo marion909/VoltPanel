@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.80 — 2026-09-07
+
 - ftpConn.readLine begrenzte die Größe einer Antwortzeile erst nach dem
   vollständigen Lesen, nicht während des Lesens — ein bösartiger oder
   kompromittierter FTP-Zielserver konnte bis zum Verbindungstimeout
