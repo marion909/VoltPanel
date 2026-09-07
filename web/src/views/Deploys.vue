@@ -109,6 +109,12 @@ async function starten(d) {
 async function staendeLaden(d) {
   offen.value = { ...offen.value, [d.id]: !offen.value[d.id] }
   if (!offen.value[d.id]) return
+  await ladeStaende(d)
+}
+
+// Reines Nachladen ohne den Toggle-Nebeneffekt von staendeLaden — für Stellen
+// wie zurueck(), die den bereits offenen Stand einfach nur auffrischen wollen.
+async function ladeStaende(d) {
   try {
     const [rel, key] = await Promise.all([
       api.get(`/deploys/${d.id}/releases`),
@@ -127,8 +133,7 @@ async function zurueck(d, release) {
   try {
     await api.post(`/deploys/${d.id}/rollback`, { release })
     await load()
-    await staendeLaden(d)
-    await staendeLaden(d)
+    await ladeStaende(d)
   } catch (err) {
     error.value = err.message
   } finally {
