@@ -255,12 +255,27 @@ func (s *Server) opMySQLCreateUser(ctx context.Context, raw json.RawMessage) (an
 	// Operation nur halb idempotent.
 	if _, err := db.ExecContext(ctx,
 		fmt.Sprintf("ALTER USER %s IDENTIFIED BY '%s'", account, p.Password)); err != nil {
+		// Ohne Rücknahme bliebe ein Konto ohne (oder mit veraltetem) Passwort
+		// und ohne die vorgesehenen Rechte auf dem Server stehen — der
+		// Aufrufer sieht die Erstellung als vollständig gescheitert, ohne zu
+		// wissen, dass trotzdem ein Konto existiert.
+		rollbackMySQLUser(ctx, db, account)
 		return nil, opErr(OpMySQLCreateUser, "%v", err)
 	}
 	if err := applyGrants(ctx, db, p); err != nil {
+		rollbackMySQLUser(ctx, db, account)
 		return nil, err
 	}
 	return TextResult{Text: "benutzer " + p.Username + " angelegt"}, nil
+}
+
+// rollbackMySQLUser nimmt ein gerade per CREATE USER IF NOT EXISTS
+// angelegtes Konto zurück, wenn ein Schritt danach (Passwort, Rechte)
+// scheitert. Best-effort: schlägt auch das fehl, bleibt zumindest der
+// ursprüngliche Fehler die Antwort an den Aufrufer, nicht ein zweiter über
+// das Aufräumen.
+func rollbackMySQLUser(ctx context.Context, db *sql.DB, account string) {
+	_, _ = db.ExecContext(ctx, "DROP USER IF EXISTS "+account)
 }
 
 func (s *Server) opMySQLGrant(ctx context.Context, raw json.RawMessage) (any, error) {
