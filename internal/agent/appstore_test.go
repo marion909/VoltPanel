@@ -179,6 +179,58 @@ func TestInstallWordPressFilesRundgang(t *testing.T) {
 	}
 }
 
+// TestInstallWordPressFilesUeberstehtEinenAbgebrochenenVersuch deckt den
+// Fund ab, dass die Verschiebe-Schleife os.Rename(von, nach) ohne
+// vorheriges Aufräumen von nach aufrief, im Gegensatz zu
+// installRoundcubeFiles im selben Package. Bricht der Prozess mitten in der
+// Installationsschleife ab, bleibt dest mit einem Gemisch aus verschobenen
+// und fehlenden Einträgen zurück — ein Retry trifft dann auf ein bereits
+// vorhandenes, nicht leeres Zielverzeichnis, und os.Rename scheitert mit
+// "directory not empty".
+func TestInstallWordPressFilesUeberstehtEinenAbgebrochenenVersuch(t *testing.T) {
+	archiv := wordpressTarGz(t, map[string]string{
+		"index.php":            "<?php // wordpress",
+		"wp-admin/install.php": "<?php // installer",
+	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/latest.tar.gz", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(archiv)
+	})
+	mux.HandleFunc("/latest.tar.gz.sha1", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(sha1Hex(archiv) + "\n"))
+	})
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	altURL, altSum := wordpressURL, wordpressChecksumURL
+	wordpressURL = ts.URL + "/latest.tar.gz"
+	wordpressChecksumURL = ts.URL + "/latest.tar.gz.sha1"
+	t.Cleanup(func() { wordpressURL, wordpressChecksumURL = altURL, altSum })
+
+	dest := t.TempDir()
+	// wp-admin/ steht bereits da, mit einer alten Datei drin — genau der
+	// Zustand, den ein mittendrin abgebrochener erster Versuch hinterlässt.
+	if err := os.MkdirAll(filepath.Join(dest, "wp-admin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "wp-admin", "rest-vom-ersten-versuch.php"),
+		[]byte("<?php // alt"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := installWordPressFiles(context.Background(), dest); err != nil {
+		t.Fatalf("installWordPressFiles nach abgebrochenem Vorversuch: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dest, "wp-admin", "install.php")); err != nil {
+		t.Errorf("wp-admin/install.php fehlt nach dem Retry: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "wp-admin", "rest-vom-ersten-versuch.php")); err == nil {
+		t.Error("die Reste des ersten Versuchs stehen noch da, statt ersetzt worden zu sein")
+	}
+}
+
 // Stimmt die Prüfsumme nicht, landet nichts in dest — weder der halb
 // ausgepackte Stand noch der Platzhalter wird angefasst.
 func TestInstallWordPressFilesLehntFalscheSummeAb(t *testing.T) {

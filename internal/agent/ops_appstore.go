@@ -133,6 +133,14 @@ func installWordPressFiles(ctx context.Context, dest string) (string, error) {
 	for _, e := range entries {
 		von := filepath.Join(tmp, e.Name())
 		nach := filepath.Join(dest, e.Name())
+		// Ein zweiter Versuch nach einem Abbruch mitten in dieser Schleife
+		// träfe hier auf die Reste des ersten — os.Rename schlüge dann mit
+		// "directory not empty" an genau der Stelle fehl, an der der erste
+		// Versuch stehengeblieben ist. Erst aufräumen, dann einsetzen, wie
+		// installRoundcubeFiles es für denselben Fall bereits tut.
+		if err := os.RemoveAll(nach); err != nil {
+			return "", fmt.Errorf("%s vor dem einsetzen entfernen: %w", e.Name(), err)
+		}
 		if err := os.Rename(von, nach); err != nil {
 			return "", fmt.Errorf("%s einsetzen: %w", e.Name(), err)
 		}
