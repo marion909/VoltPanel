@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.120 — 2026-09-08
+
 - volt tenant set-plan <tenant> 0 hob wie plan remove alle
   Ressourcengrenzen eines Mandanten auf, lief aber ohne Rückfrage
   durch — jetzt dieselbe confirm()/--yes-Logik wie plan remove;
