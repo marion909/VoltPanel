@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.97 — 2026-09-08
+
 - Route /services trug anders als /plugins/tenants kein meta: {
   minRole: 'admin' }, obwohl der zugehörige Navigationspunkt in
   App.vue bereits mit minRole: "admin" versehen ist — ein
