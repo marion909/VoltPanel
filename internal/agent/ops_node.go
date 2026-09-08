@@ -289,6 +289,50 @@ func fetchAndExtract(ctx context.Context, url, dest string, timeout time.Duratio
 	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
+// installArchiveInto lädt ein Archiv in ein Temp-Verzeichnis unter dest,
+// prüft seine Summe und setzt seinen Inhalt danach nach dest um.
+//
+// Ein Unterverzeichnis von dest, nicht dest direkt: erst nach der Prüfsumme
+// wird sichtbar gemacht, was ausgepackt wurde. Ein Abbruch mittendrin —
+// abgebrochener Download, falsche Prüfsumme — lässt das Ziel so stehen, wie
+// es vor diesem Aufruf war. Ein zweiter Versuch nach einem Abbruch beim
+// Umsetzen selbst träfe sonst auf die Reste des ersten — os.Rename schlüge
+// dann mit "directory not empty" an genau der Stelle fehl, an der der erste
+// Versuch stehengeblieben ist, deshalb erst aufräumen, dann einsetzen.
+func installArchiveInto(ctx context.Context, dest, url string, timeout time.Duration,
+	maxBytes int64, sum hash.Hash, wantSum string) (string, error) {
+
+	tmp, err := os.MkdirTemp(dest, ".volt-install-*")
+	if err != nil {
+		return "", fmt.Errorf("arbeitsverzeichnis: %w", err)
+	}
+	defer os.RemoveAll(tmp)
+
+	got, err := fetchAndExtract(ctx, url, tmp, timeout, maxBytes, sum)
+	if err != nil {
+		return "", err
+	}
+	if got != wantSum {
+		return "", fmt.Errorf("die prüfsumme stimmt nicht: erwartet %s, bekommen %s", wantSum, got)
+	}
+
+	entries, err := os.ReadDir(tmp)
+	if err != nil {
+		return "", fmt.Errorf("ausgepacktes verzeichnis lesen: %w", err)
+	}
+	for _, e := range entries {
+		von := filepath.Join(tmp, e.Name())
+		nach := filepath.Join(dest, e.Name())
+		if err := os.RemoveAll(nach); err != nil {
+			return "", fmt.Errorf("%s vor dem einsetzen entfernen: %w", e.Name(), err)
+		}
+		if err := os.Rename(von, nach); err != nil {
+			return "", fmt.Errorf("%s einsetzen: %w", e.Name(), err)
+		}
+	}
+	return got, nil
+}
+
 // extractOne schreibt einen einzelnen Eintrag.
 //
 // Das Archiv von Node hat ein Wurzelverzeichnis (node-v22.12.0-linux-x64/); das

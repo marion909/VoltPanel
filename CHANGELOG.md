@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- installWordPressFiles und installRoundcubeFiles bauten je einzeln
+  "Temp-Verzeichnis anlegen, laden, Summe prüfen, per os.Rename
+  einsetzen" nach — neuer gemeinsamer Helfer installArchiveInto in
+  ops_node.go, beide Aufrufer nutzen ihn jetzt; die Platzhalterseite
+  von WordPress-Installationen wird weiterhin nur bei erfolgreicher
+  Prüfsumme entfernt
 
 ## v0.4.103 — 2026-09-08
 

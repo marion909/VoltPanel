@@ -103,48 +103,18 @@ func installWordPressFiles(ctx context.Context, dest string) (string, error) {
 		return "", err
 	}
 
-	// In einem Unterverzeichnis von dest auspacken, nicht direkt hinein: erst
-	// nach der Prüfsumme wird sichtbar gemacht, was ausgepackt wurde. Ein
-	// Abbruch mittendrin — abgebrochener Download, falsche Prüfsumme — lässt
-	// die Site so stehen, wie sie vor diesem Aufruf war.
-	tmp, err := os.MkdirTemp(dest, ".volt-wp-*")
-	if err != nil {
-		return "", fmt.Errorf("arbeitsverzeichnis: %w", err)
-	}
-	defer os.RemoveAll(tmp)
-
-	got, err := fetchAndExtract(ctx, wordpressURL, tmp, wordpressTimeout, wordpressDownloadMax, sha1.New()) //nolint:gosec
+	got, err := installArchiveInto(ctx, dest, wordpressURL, wordpressTimeout, wordpressDownloadMax,
+		sha1.New(), want) //nolint:gosec
 	if err != nil {
 		return "", err
-	}
-	if got != want {
-		return "", fmt.Errorf("die prüfsumme des wordpress-kerns stimmt nicht: erwartet %s, bekommen %s",
-			want, got)
 	}
 
 	// Die Platzhalterseite von CreateSite weg — sonst liefert Nginx sie
 	// weiterhin aus: die site.conf.tmpl versucht index.html vor index.php.
+	// Erst nach installArchiveInto, damit eine falsche Prüfsumme oder ein
+	// abgebrochener Download den Platzhalter nicht anfasst.
 	_ = os.Remove(filepath.Join(dest, "index.html"))
 
-	entries, err := os.ReadDir(tmp)
-	if err != nil {
-		return "", fmt.Errorf("ausgepacktes verzeichnis lesen: %w", err)
-	}
-	for _, e := range entries {
-		von := filepath.Join(tmp, e.Name())
-		nach := filepath.Join(dest, e.Name())
-		// Ein zweiter Versuch nach einem Abbruch mitten in dieser Schleife
-		// träfe hier auf die Reste des ersten — os.Rename schlüge dann mit
-		// "directory not empty" an genau der Stelle fehl, an der der erste
-		// Versuch stehengeblieben ist. Erst aufräumen, dann einsetzen, wie
-		// installRoundcubeFiles es für denselben Fall bereits tut.
-		if err := os.RemoveAll(nach); err != nil {
-			return "", fmt.Errorf("%s vor dem einsetzen entfernen: %w", e.Name(), err)
-		}
-		if err := os.Rename(von, nach); err != nil {
-			return "", fmt.Errorf("%s einsetzen: %w", e.Name(), err)
-		}
-	}
 	return got, nil
 }
 

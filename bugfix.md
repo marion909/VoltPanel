@@ -76,13 +76,6 @@ gesamten `web/src`, Token-Handling über Cookie + CSRF-Header statt
 
 ## Wiederverwendung, Vereinfachung, Effizienz
 
-`internal/agent/ops_appstore.go:100` (`installWordPressFiles`) vs.
-`ops_webmail.go:166` (`installRoundcubeFiles`) — Beide legen ein
-Temp-Verzeichnis an, laden per `fetchAndExtract`, prüfen die Summe und
-verschieben per `os.Rename` — mit dem oben genannten Unterschied bei
-`os.RemoveAll`. — Design — Gemeinsamer Helfer `installArchiveInto(ctx, dest,
-url, timeout, maxBytes, hash, wantSum, overwrite bool) (string, error)`.
-
 `internal/agent/ops_files_ext.go:267,324,380,448`
 (`writeTarGz`/`writeZip`/`extractTarGz`/`extractZip`) — Zwei Paare
 paralleler, pro Format eigens nachgebauter Walk-/Entry-Schleifen. Der

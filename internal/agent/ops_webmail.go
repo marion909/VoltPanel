@@ -163,42 +163,13 @@ func resetWebmailDatabase(ctx context.Context, name string) error {
 // Netzwerkaufruf sich unabhängig von einer echten Datenbank oder einem
 // echten Systembenutzer prüfen lässt — derselbe Schnitt wie bei
 // installWordPressFiles.
+// Install schreibt seine Zeile in die webmail-Tabelle erst ganz am Ende —
+// ein zweiter Versuch nach einem Fehlschlag weiter unten (Datenbank,
+// Zertifikat, Vhost) findet also noch keine, die ihn verböte. Idempotent
+// heißt hier: installArchiveInto ersetzt die Reste des ersten Versuchs,
+// statt an ihnen zu scheitern.
 func installRoundcubeFiles(ctx context.Context, dest string) error {
-	tmp, err := os.MkdirTemp(dest, ".volt-webmail-*")
-	if err != nil {
-		return fmt.Errorf("arbeitsverzeichnis: %w", err)
-	}
-	defer os.RemoveAll(tmp)
-
-	got, err := fetchAndExtract(ctx, roundcubeURL, tmp, roundcubeTimeout, roundcubeDownloadMax, sha256.New())
-	if err != nil {
-		return err
-	}
-	if got != roundcubeSHA256 {
-		return fmt.Errorf("die prüfsumme des roundcube-kerns stimmt nicht: erwartet %s, bekommen %s",
-			roundcubeSHA256, got)
-	}
-
-	entries, err := os.ReadDir(tmp)
-	if err != nil {
-		return fmt.Errorf("ausgepacktes verzeichnis lesen: %w", err)
-	}
-	for _, e := range entries {
-		von := filepath.Join(tmp, e.Name())
-		nach := filepath.Join(dest, e.Name())
-		// Ein zweiter Versuch nach einem Fehlschlag weiter unten (Datenbank,
-		// Zertifikat, Vhost) trifft hier auf die Reste des ersten — Install
-		// schreibt seine Zeile in die webmail-Tabelle erst ganz am Ende, also
-		// gibt es beim Wiederholen noch keine, die einen Neuversuch verböte.
-		// os.Rename schlüge sonst an genau der Stelle fehl, an der der erste
-		// Versuch stehengeblieben ist. Idempotent heißt hier: die frisch
-		// geprüften Dateien ersetzen die Reste, statt an ihnen zu scheitern.
-		if err := os.RemoveAll(nach); err != nil {
-			return fmt.Errorf("%s vor dem einsetzen entfernen: %w", e.Name(), err)
-		}
-		if err := os.Rename(von, nach); err != nil {
-			return fmt.Errorf("%s einsetzen: %w", e.Name(), err)
-		}
-	}
-	return nil
+	_, err := installArchiveInto(ctx, dest, roundcubeURL, roundcubeTimeout, roundcubeDownloadMax,
+		sha256.New(), roundcubeSHA256)
+	return err
 }
