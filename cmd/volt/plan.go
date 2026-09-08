@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -116,19 +117,15 @@ func (a *app) planRemoveCmd() *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
-		Use:   "remove <id>",
+		Use:   "remove <id|name>",
 		Short: "Entfernt ein Hosting-Paket",
 		Args:  cobra.ExactArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			ctx, sys := cmd.Context(), store.SystemScope()
 
-			id, err := parseID(args[0])
+			plan, err := a.findPlan(ctx, args[0])
 			if err != nil {
 				return err
-			}
-			plan, err := a.store.GetPlan(ctx, sys, id)
-			if err != nil {
-				return fmt.Errorf("paket %d: %w", id, err)
 			}
 
 			// Das ist eine stille Lockerung, keine Verschärfung — darauf muss
@@ -139,7 +136,7 @@ func (a *app) planRemoveCmd() *cobra.Command {
 				return nil
 			}
 
-			if err := a.store.DeletePlan(ctx, sys, id); err != nil {
+			if err := a.store.DeletePlan(ctx, sys, plan.ID); err != nil {
 				return err
 			}
 			fmt.Printf("Paket %s entfernt.\n", plan.Name)
@@ -148,4 +145,26 @@ func (a *app) planRemoveCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "Nicht nachfragen")
 	return cmd
+}
+
+// findPlan sucht ein Paket über die numerische ID oder den (UNIQUE) Namen —
+// analog zu findDatabase (db.go). Anders als bei Cronjobs ist der
+// Paketname eindeutig, ein Namenstreffer kann also nie mehrdeutig sein.
+func (a *app) findPlan(ctx context.Context, ref string) (*store.Plan, error) {
+	sys := store.SystemScope()
+	if id, err := parseID(ref); err == nil {
+		if plan, err := a.store.GetPlan(ctx, sys, id); err == nil {
+			return plan, nil
+		}
+	}
+	plans, err := a.store.ListPlans(ctx, sys)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range plans {
+		if p.Name == ref {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("paket %q nicht gefunden", ref)
 }

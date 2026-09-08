@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -109,26 +111,22 @@ func (a *app) cronRemoveCmd() *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
-		Use:   "remove <id>",
+		Use:   "remove <id|name>",
 		Short: "Entfernt einen Cronjob",
 		Args:  cobra.ExactArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			ctx, sys := cmd.Context(), store.SystemScope()
 
-			id, err := parseID(args[0])
+			job, err := a.findCronjob(ctx, args[0])
 			if err != nil {
 				return err
-			}
-			job, err := a.store.GetCronjob(ctx, sys, id)
-			if err != nil {
-				return fmt.Errorf("cronjob %d: %w", id, err)
 			}
 			if !yes && !confirm(fmt.Sprintf("Cronjob %q entfernen?", job.Name)) {
 				fmt.Println("Abgebrochen.")
 				return nil
 			}
 
-			if err := a.cronService().DeleteCronjob(ctx, sys, id); err != nil {
+			if err := a.cronService().DeleteCronjob(ctx, sys, job.ID); err != nil {
 				return err
 			}
 			fmt.Printf("Cronjob %s entfernt.\n", job.Name)
@@ -143,15 +141,16 @@ func (a *app) cronLogCmd() *cobra.Command {
 	var lines int
 
 	cmd := &cobra.Command{
-		Use:   "log <id>",
+		Use:   "log <id|name>",
 		Short: "Zeigt die Ausgabe der letzten Läufe",
 		Args:  cobra.ExactArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
-			id, err := parseID(args[0])
+			ctx := cmd.Context()
+			job, err := a.findCronjob(ctx, args[0])
 			if err != nil {
 				return err
 			}
-			text, err := a.cronService().Log(cmd.Context(), store.SystemScope(), id, lines)
+			text, err := a.cronService().Log(ctx, store.SystemScope(), job.ID, lines)
 			if err != nil {
 				return err
 			}
@@ -183,5 +182,42 @@ func (a *app) cronSyncCmd() *cobra.Command {
 			}
 			return nil
 		}),
+	}
+}
+
+// findCronjob sucht einen Cronjob über die numerische ID oder den Namen —
+// analog zu findDatabase (db.go). Anders als bei Datenbanken oder Paketen
+// ist der Name hier nicht eindeutig (kein UNIQUE-Index): passt er auf mehr
+// als einen Job, verlangt der Fehler die ID statt stillschweigend einen
+// davon zu wählen.
+func (a *app) findCronjob(ctx context.Context, ref string) (*store.Cronjob, error) {
+	sys := store.SystemScope()
+	if id, err := parseID(ref); err == nil {
+		if job, err := a.store.GetCronjob(ctx, sys, id); err == nil {
+			return job, nil
+		}
+	}
+	jobs, err := a.store.ListCronjobs(ctx, sys)
+	if err != nil {
+		return nil, err
+	}
+	var matches []*store.Cronjob
+	for _, j := range jobs {
+		if j.Name == ref {
+			matches = append(matches, j)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, fmt.Errorf("cronjob %q nicht gefunden", ref)
+	case 1:
+		return matches[0], nil
+	default:
+		ids := make([]string, len(matches))
+		for i, j := range matches {
+			ids[i] = fmt.Sprint(j.ID)
+		}
+		return nil, fmt.Errorf("mehrere cronjobs heißen %q (id %s) — die id angeben",
+			ref, strings.Join(ids, ", "))
 	}
 }

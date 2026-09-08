@@ -126,10 +126,13 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/cron.go:62,112`, `plan.go:80,119` — Cronjobs/Pakete werden mit
-sprechendem Namen angelegt, aber nur über die numerische ID entfernt/
-abgefragt. — Design — `cron remove`/`cron log`/`plan remove` zusätzlich per
-Name auflösen lassen, wie `db.go:222` es für Datenbanken vormacht.
+**Erledigt:** `findCronjob`/`findPlan` (analog zu `findDatabase`) — `cron
+remove`, `cron log` und `plan remove` akzeptieren jetzt zusätzlich zur ID
+den Namen. Pakete haben einen `UNIQUE`-Namen, ein Treffer ist dort immer
+eindeutig; Cronjob-Namen sind es nicht (kein `UNIQUE`-Index) — passt der
+Name auf mehrere Jobs, verlangt der Fehler die ID statt stillschweigend
+einen davon zu wählen. Damit ist dieser Abschnitt der Bugfix-Liste
+vollständig abgearbeitet (v0.4.116–v0.4.125, siehe CHANGELOG.md).
 
 ## packaging/, scripts/
 

@@ -13,7 +13,14 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- cron remove/cron log/plan remove akzeptierten nur die numerische
+  ID, obwohl Cronjobs/Pakete mit sprechendem Namen angelegt werden —
+  neue Helfer findCronjob/findPlan (analog zu findDatabase)
+  akzeptieren jetzt beides. Cronjob-Namen sind (anders als
+  Paketnamen) nicht eindeutig: passt ein Name auf mehrere Jobs,
+  verlangt der Fehler die ID statt stillschweigend einen zu wählen;
+  damit ist der gesamte CLI-Usability-Abschnitt der Bugfix-Liste
+  abgearbeitet
 
 ## v0.4.124 — 2026-09-08
 
