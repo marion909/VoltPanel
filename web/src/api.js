@@ -22,7 +22,7 @@ export class ApiError extends Error {
 // Präfix nicht, der erst bei der Installation entsteht.
 const base = document.baseURI.replace(/\/$/, '')
 
-async function request(method, path, body) {
+async function request(method, path, body, opts) {
   const headers = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') headers['X-CSRF-Token'] = csrfToken()
@@ -32,6 +32,7 @@ async function request(method, path, body) {
     headers,
     credentials: 'same-origin',
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: opts?.signal,
   })
 
   if (res.status === 204) return null
@@ -49,7 +50,7 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  get: (path) => request('GET', path),
+  get: (path, opts) => request('GET', path, undefined, opts),
   post: (path, body) => request('POST', path, body ?? {}),
   put: (path, body) => request('PUT', path, body ?? {}),
   patch: (path, body) => request('PATCH', path, body ?? {}),

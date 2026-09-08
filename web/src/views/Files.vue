@@ -53,18 +53,31 @@ async function loadSites() {
   }
 }
 
+// Der Site-Wechsel setzt path zurück und ruft load() zusätzlich selbst auf —
+// das löst denselben Verzeichnisinhalt zweimal aus. Ohne Abbruch könnte die
+// ältere, noch laufende Anfrage nach der neueren auflösen und entries.value
+// mit dem Inhalt der vorherigen Site überschreiben.
+let loadController = null
+
 async function load() {
   if (!siteId.value) return
+  loadController?.abort()
+  const controller = new AbortController()
+  loadController = controller
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get(`/sites/${siteId.value}/files?path=${encodeURIComponent(path.value)}`)
+    const res = await api.get(
+      `/sites/${siteId.value}/files?path=${encodeURIComponent(path.value)}`,
+      { signal: controller.signal },
+    )
     entries.value = res.entries
   } catch (err) {
+    if (err.name === 'AbortError') return
     error.value = err.message
     entries.value = []
   } finally {
-    loading.value = false
+    if (loadController === controller) loading.value = false
   }
 }
 

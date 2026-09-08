@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Files.vue: der Site-Wechsel löste denselben Verzeichnisinhalt
+  zweimal aus (watch(siteId) setzt path zurück und ruft zusätzlich
+  selbst load() auf) — ohne Abbruch konnte eine noch laufende, ältere
+  Anfrage nach der neueren auflösen und entries.value mit dem Inhalt
+  der vorherigen Site überschreiben; load() bricht jetzt eine noch
+  laufende Anfrage per AbortController ab, bevor es neu lädt
 
 ## v0.4.92 — 2026-09-08
 

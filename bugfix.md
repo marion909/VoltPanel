@@ -82,16 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/views/Files.vue:221-226` — `watch(siteId, …)` setzt `path.value =
-''` und ruft zusätzlich selbst `load()` auf; das Zurücksetzen von `path`
-löst aber den separaten `watch(path, load)` ein zweites Mal aus — bei jedem
-Site-Wechsel wird derselbe Verzeichnisinhalt doppelt abgefragt. — Bug — Da
-keine der beiden Anfragen per `AbortController` abgebrochen wird, kann eine
-noch laufende, langsame Anfrage für die alte Site nach dem Wechsel auflösen
-und `entries.value` mit dem Inhalt der vorherigen Site überschreiben. Fix:
-`load()`-Aufruf aus dem `siteId`-Watcher entfernen und/oder Anfragen mit
-`AbortController` verwerfen.
-
 `web/src/components/SiteTerminal.vue:20-53` — `onMounted` ist komplett ohne
 `try/catch`. — Bug — Schlägt der dynamische Import von
 `@xterm/xterm`/`@xterm/addon-fit` fehl, bleibt ein leerer Rahmen ohne jeden
