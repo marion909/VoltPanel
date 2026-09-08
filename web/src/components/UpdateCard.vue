@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { api } from "../api";
 import { t } from "../i18n";
 import { hasRole } from "../stores/session";
@@ -18,6 +18,14 @@ const isAdmin = computed(() => hasRole("admin"));
 
 onMounted(() => {
   if (!update.loaded) checkUpdate();
+});
+
+// Verlässt ein Administrator die Seite während waitForPanel() noch pollt,
+// feuerte reload() sonst trotzdem noch — und riss die inzwischen ganz
+// andere, aktuell besuchte Seite unerwartet weg.
+let cancelled = false;
+onUnmounted(() => {
+  cancelled = true;
 });
 
 async function start() {
@@ -48,6 +56,7 @@ async function waitForPanel(expected) {
   const until = Date.now() + 180000;
   while (Date.now() < until) {
     await new Promise((r) => setTimeout(r, 2000));
+    if (cancelled) return;
     try {
       await checkUpdate(true);
       if (!update.available) {
@@ -60,6 +69,7 @@ async function waitForPanel(expected) {
       // Panel noch nicht wieder da — weiter warten.
     }
   }
+  if (cancelled) return;
   waiting.value = false;
   error.value = t("update.waiting");
 }
@@ -75,7 +85,9 @@ async function waitForPanel(expected) {
 function reload() {
   reloading.value = true;
   // Kurz genug, dass niemand wartet, lang genug, dass die Meldung ankommt.
-  setTimeout(() => window.location.reload(), 1200);
+  setTimeout(() => {
+    if (!cancelled) window.location.reload();
+  }, 1200);
 }
 </script>
 

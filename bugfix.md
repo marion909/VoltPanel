@@ -82,15 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/components/UpdateCard.vue:47-78` — `waitForPanel` pollt bis zu drei
-Minuten per `while`-Schleife/`setTimeout`; die Datei importiert
-`onUnmounted` nicht, es gibt keinen Abbruch-Mechanismus. — Bug — Verlässt
-ein Administrator die Einstellungsseite während eines laufenden Updates,
-feuert die Schleife trotzdem `window.location.reload()` und reißt die
-inzwischen ganz andere, aktuell besuchte Seite unerwartet weg. Fix:
-`cancelled`-Flag über `onUnmounted` setzen und Schleife/Reload bei gesetzter
-Flag abbrechen.
-
 `web/src/format.js:5-16` (`formatBytes`) — Prüft nur `Number(bytes) || 0`,
 lässt negative Zahlen aber unverändert durch. — Bug — Ergibt z. B. `"-5 B"`
 bzw. „-53.2 KiB/s" statt 0. Fix: `Math.max(Number(bytes) || 0, 0)`
