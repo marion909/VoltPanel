@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.129 — 2026-09-08
+
 - build-pages.sh nutzte feste, vorhersagbare Pfade
   (/tmp/other-latest.json, /tmp/other-latest.sig) statt mktemp, obwohl
   andere Skripte im Projekt korrekt mktemp/mktemp -d verwenden — in
