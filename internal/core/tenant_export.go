@@ -2,10 +2,8 @@ package core
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -142,16 +140,12 @@ func (s *ExportService) ExportTenant(ctx context.Context, sc store.Scope,
 	res.Path = filepath.Join(s.cfg.BackupDir,
 		fmt.Sprintf("mandant-%s-%s.tar.gz", bundle.Tenant.Slug, stamp))
 
-	// 0600: darin stehen Datenbankauszüge und die Dateien der Kunden.
-	f, err := os.OpenFile(res.Path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	aw, err := newArchiveWriter(res.Path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-
-	hasher := sha256.New()
-	gz := gzip.NewWriter(io.MultiWriter(f, hasher))
-	tw := tar.NewWriter(gz)
+	defer aw.Abort()
+	tw := aw.tw
 
 	raw, err := json.MarshalIndent(bundle, "", "  ")
 	if err != nil {
@@ -192,22 +186,12 @@ func (s *ExportService) ExportTenant(ctx context.Context, sc store.Scope,
 
 	s.addDatabases(ctx, tw, bundle, res)
 
-	// Reihenfolge zählt: tar schließen, dann gzip.
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	if err := f.Sync(); err != nil {
-		return nil, err
-	}
-	info, err := f.Stat()
+	size, checksum, err := aw.Close()
 	if err != nil {
 		return nil, err
 	}
-	res.SizeBytes = info.Size()
-	res.Checksum = hex.EncodeToString(hasher.Sum(nil))
+	res.SizeBytes = size
+	res.Checksum = checksum
 	return res, nil
 }
 

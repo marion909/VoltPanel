@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,6 +15,51 @@ import (
 	"github.com/marion909/voltpanel/internal/config"
 	"github.com/marion909/voltpanel/internal/store"
 )
+
+// TestCreateLiefertGroesseUndPruefsummeDesTatsaechlichenArchivs: Create und
+// ExportTenant teilen sich seit dieser Umstellung den archiveWriter-Helfer
+// (Datei + sha256-Hasher + gzip.Writer + tar.Writer). Dieser Test sichert
+// ab, dass Result.SizeBytes/Checksum weiterhin zur tatsächlich geschriebenen
+// Datei passen, nicht nur zu irgendeinem Wert.
+func TestCreateLiefertGroesseUndPruefsummeDesTatsaechlichenArchivs(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "volt.db")
+	ctx := context.Background()
+	sys := store.SystemScope()
+
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.CreateTenant(ctx, sys, &store.Tenant{Name: "pruefsumme", Slug: "pruefsumme"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.BackupDir, cfg.DBPath = filepath.Join(dir, "backups"), dbPath
+	svc := NewBackupService(cfg, st, slog.New(slog.DiscardHandler), nil)
+
+	res, err := svc.Create(ctx, CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	raw, err := os.ReadFile(res.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int64(len(raw)) != res.SizeBytes {
+		t.Errorf("SizeBytes = %d, tatsächliche Dateigröße = %d", res.SizeBytes, len(raw))
+	}
+	sum := sha256.Sum256(raw)
+	if want := hex.EncodeToString(sum[:]); res.Checksum != want {
+		t.Errorf("Checksum = %s, tatsächliche Prüfsumme = %s", res.Checksum, want)
+	}
+}
 
 // TestRestoreErsetztDenVorherigenStand deckt zweierlei ab: dass Restore
 // tatsächlich auf den Stand zum Zeitpunkt von Create zurückspielt (nicht bloß

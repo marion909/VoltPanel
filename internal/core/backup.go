@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"log/slog"
 	"os"
@@ -75,16 +76,12 @@ func (s *BackupService) Create(ctx context.Context, opts CreateOptions) (*Result
 	}
 	defer os.Remove(tmpDB)
 
-	// 0600: ein Backup enthält Passwort-Hashes und verschlüsselte Secrets.
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	aw, err := newArchiveWriter(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-
-	hasher := sha256.New()
-	gz := gzip.NewWriter(io.MultiWriter(f, hasher))
-	tw := tar.NewWriter(gz)
+	defer aw.Abort()
+	tw := aw.tw
 
 	if err := addFile(tw, tmpDB, "volt.db"); err != nil {
 		return nil, fmt.Errorf("datenbank sichern: %w", err)
@@ -104,26 +101,11 @@ func (s *BackupService) Create(ctx context.Context, opts CreateOptions) (*Result
 		}
 	}
 
-	// Reihenfolge zählt: tar schließen, dann gzip — sonst fehlt der Abschluss
-	// im Archiv und es ist beim Entpacken beschädigt.
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	if err := f.Sync(); err != nil {
-		return nil, err
-	}
-
-	info, err := f.Stat()
+	size, checksum, err := aw.Close()
 	if err != nil {
 		return nil, err
 	}
-	res := &Result{
-		Path: path, SizeBytes: info.Size(),
-		Checksum: hex.EncodeToString(hasher.Sum(nil)), Duration: time.Since(start),
-	}
+	res := &Result{Path: path, SizeBytes: size, Checksum: checksum, Duration: time.Since(start)}
 
 	// Der Eintrag macht das Backup im Panel sichtbar.
 	finished := time.Now().Unix()
@@ -209,6 +191,65 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 	}
 	s.log.Info("datenbank zurückgespielt", "aus", archivePath)
 	return nil
+}
+
+// archiveWriter bündelt das wiederkehrende "Datei mit 0600 öffnen,
+// sha256-Hasher + gzip.Writer + tar.Writer davorschalten" von Create
+// (hier) und ExportTenant (tenant_export.go).
+//
+// Der Aufrufer befüllt tw, ruft am Ende Close() für Größe und Prüfsumme —
+// und defer Abort() direkt nach newArchiveWriter, damit ein früher
+// Rückgabefehler die Datei trotzdem schließt. Abort ist nach einem
+// erfolgreichen Close ein No-op.
+type archiveWriter struct {
+	tw *tar.Writer
+
+	f      *os.File
+	gz     *gzip.Writer
+	hasher hash.Hash
+	closed bool
+}
+
+// newArchiveWriter öffnet path. 0600, weil ein Backup oder ein
+// Mandanten-Export Passwort-Hashes, Secrets oder Datenbankauszüge enthält.
+func newArchiveWriter(path string) (*archiveWriter, error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	hasher := sha256.New()
+	gz := gzip.NewWriter(io.MultiWriter(f, hasher))
+	return &archiveWriter{tw: tar.NewWriter(gz), f: f, gz: gz, hasher: hasher}, nil
+}
+
+// Abort schließt die Datei, falls Close() nie erfolgreich durchlief — für
+// den defer direkt nach newArchiveWriter.
+func (a *archiveWriter) Abort() {
+	if !a.closed {
+		a.f.Close()
+	}
+}
+
+// Close schreibt tar und gzip fertig, synchronisiert und liefert Größe und
+// Prüfsumme des Archivs. Reihenfolge zählt: tar vor gzip, sonst fehlt der
+// Abschluss im Archiv und es ist beim Entpacken beschädigt.
+func (a *archiveWriter) Close() (size int64, checksum string, err error) {
+	a.closed = true
+	defer a.f.Close()
+	if err := a.tw.Close(); err != nil {
+		return 0, "", err
+	}
+	if err := a.gz.Close(); err != nil {
+		return 0, "", err
+	}
+	if err := a.f.Sync(); err != nil {
+		return 0, "", err
+	}
+	info, err := a.f.Stat()
+	if err != nil {
+		return 0, "", err
+	}
+	return info.Size(), hex.EncodeToString(a.hasher.Sum(nil)), nil
 }
 
 func addFile(tw *tar.Writer, src, name string) error {

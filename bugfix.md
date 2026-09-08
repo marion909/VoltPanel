@@ -101,13 +101,6 @@ Sammelabfrage über `site_id IN (...)`/`db_user_id IN (...)` bräuchte neue,
 größere API-Erweiterung des `store`-Pakets für einen Pfad, der in der Praxis
 kaum ins Gewicht fällt.
 
-`internal/core/backup.go:79-126` (`Create`) und
-`internal/core/tenant_export.go:146-212` (`ExportTenant`) — Beide bauen
-denselben ca. 20-zeiligen Block (Datei mit 0600 öffnen, `sha256`-Hasher +
-`gzip.Writer` + `tar.Writer`, Schließreihenfolge, Größe/Prüfsumme) nach. —
-Design — Ein gemeinsamer Hilfstyp, der Datei+Hasher+gzip+tar öffnet und beim
-Schließen Größe/Prüfsumme zurückgibt.
-
 `internal/core/databases.go:210-226,260-273,298-306,322-333`
 (`SetGrants`/`SetPassword`/`DeleteUser`/`DeleteDatabase`) — Vier fast
 identische Schleifen über die Herkunftsliste eines DB-Benutzers, nur die

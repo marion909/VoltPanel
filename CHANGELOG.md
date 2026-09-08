@@ -13,7 +13,14 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Create (backup.go) und ExportTenant (tenant_export.go) bauten je
+  denselben ~20-zeiligen Block nach (Datei mit 0600 öffnen,
+  sha256-Hasher + gzip.Writer + tar.Writer, Schließreihenfolge,
+  Größe/Prüfsumme) — neuer gemeinsamer Hilfstyp archiveWriter in
+  backup.go übernimmt das für beide; neuer Test
+  TestCreateLiefertGroesseUndPruefsummeDesTatsaechlichenArchivs
+  sichert ab, dass Größe und Prüfsumme weiterhin zur tatsächlich
+  geschriebenen Datei passen
 
 ## v0.4.109 — 2026-09-08
 
