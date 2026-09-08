@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.113 — 2026-09-08
+
 - boolToInt hatte keine Umkehrfunktion — 13 scanX-Funktionen in 10
   Dateien rekonstruierten die Rückrichtung von Hand und uneinheitlich
   (mal != 0, mal == 1). Neues symmetrisches intToBool(i int) bool in
