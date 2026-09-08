@@ -126,14 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/site.go:57-63` (`siteAddCmd`) — `if phpVer != "" &&
-!cmd.Flags().Changed("type") { siteType = store.SitePHP }` gefolgt direkt
-von derselben Prüfung für `proxyTo` — sind beide Flags ohne explizites
-`--type` gesetzt, überschreibt die zweite Prüfung `siteType` stillschweigend
-auf `proxy`. — Design — Bei gleichzeitig gesetztem `phpVer` und `proxyTo`
-ohne explizites `--type` einen Fehler ausgeben, der die Mehrdeutigkeit
-benennt.
-
 `cmd/volt/tenant_move.go:113-127` (`tenantImportCmd`) — Gibt Warnungen bei
 `res.Rebuilt < res.Sites` nur auf stderr aus und liefert danach unbedingt
 `return nil` — Exitcode 0 selbst bei einem nur teilweise geglückten Import.

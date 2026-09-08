@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- volt site add: --php und --proxy-to gleichzeitig ohne --type ließ
+  die zweite Prüfung siteType stillschweigend auf "proxy" setzen und
+  den PHP-Wunsch verwerfen — jetzt eine klare Fehlermeldung statt der
+  stillen Mehrdeutigkeit
 
 ## v0.4.115 — 2026-09-08
 

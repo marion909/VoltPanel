@@ -55,10 +55,15 @@ func (a *app) siteAddCmd() *cobra.Command {
 			"  volt site add app.example.at --type proxy --proxy-to http://127.0.0.1:3000",
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			// PHP-Version angegeben, Typ nicht: der Wunsch ist eindeutig.
-			if phpVer != "" && !cmd.Flags().Changed("type") {
+			// Beides ohne --type ist es nicht — sonst gewönne stillschweigend
+			// --proxy-to, weil diese Prüfung als zweite läuft.
+			switch {
+			case phpVer != "" && proxyTo != "" && !cmd.Flags().Changed("type"):
+				return fmt.Errorf("--php und --proxy-to gleichzeitig ohne --type: " +
+					"welcher Site-Typ gemeint ist, ist mehrdeutig — --type php oder --type proxy ergänzen")
+			case phpVer != "" && !cmd.Flags().Changed("type"):
 				siteType = string(store.SitePHP)
-			}
-			if proxyTo != "" && !cmd.Flags().Changed("type") {
+			case proxyTo != "" && !cmd.Flags().Changed("type"):
 				siteType = string(store.SiteProxy)
 			}
 
