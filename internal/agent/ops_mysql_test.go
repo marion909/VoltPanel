@@ -27,6 +27,24 @@ func TestCheckMySQLDBNameErlaubtGewoehnlicheNamen(t *testing.T) {
 	}
 }
 
+// TestCheckMySQLUsernameHostBuendeltBeidePruefungen: opMySQLSetPassword und
+// opMySQLDropUser teilen sich diesen Helfer, der genau die Prüfungen von
+// checkMySQLUser ohne die Datenbank-Prüfung bündelt.
+func TestCheckMySQLUsernameHostBuendeltBeidePruefungen(t *testing.T) {
+	if err := checkMySQLUsernameHost("kunde_app", "localhost"); err != nil {
+		t.Errorf("checkMySQLUsernameHost mit gültigen Werten = %v, erwartet war keine Ablehnung", err)
+	}
+	if err := checkMySQLUsernameHost("kunde_app", "10.0.0.0/255.255.255.0"); err != nil {
+		t.Errorf("checkMySQLUsernameHost mit gültigem Netz = %v, erwartet war keine Ablehnung", err)
+	}
+	if err := checkMySQLUsernameHost("root; DROP TABLE users", "localhost"); err == nil {
+		t.Error("checkMySQLUsernameHost hat einen ungültigen Benutzernamen angenommen")
+	}
+	if err := checkMySQLUsernameHost("kunde_app", "%"); err == nil {
+		t.Error("checkMySQLUsernameHost hat ein ungültiges Herkunftsmuster angenommen")
+	}
+}
+
 // TestAccountCreatedBeforeUnterscheidetFrischVonVerwaist hält die Lücke fest,
 // die dropStaleAccounts vorher hatte: es löschte pauschal jedes Konto mit
 // passendem Präfix, unabhängig vom Alter — ein Konto, das eine parallele

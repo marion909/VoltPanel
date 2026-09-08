@@ -89,13 +89,6 @@ Verarbeitung genug, dass eine erzwungene gemeinsame Abstraktion in dieser
 sicherheitskritischen Datei (Zip-Slip-Schutz, Größendeckel) mehr Risiko für
 eine stille Verhaltensänderung birgt, als die reine Code-Dopplung wert ist.
 
-`internal/agent/ops_mysql.go:300-304` (`opMySQLSetPassword`), `:327-331`
-(`opMySQLDropUser`) — Beide wiederholen exakt die zwei Zeilen
-`checkMySQLName("benutzername", p.Username, reMyUser)` +
-`checkMySQLHost(p.HostPattern)`, die `checkMySQLUser` bereits bündelt. —
-Design — Kleiner Helfer `checkMySQLUsernameHost(username, host string)
-error`.
-
 `internal/agent/ops_docker.go:311,337` (`opDockerEnv`) — `uid, gid, err :=
 siteUserIDs(...)` gefolgt von späterem `_ = uid`. — Design — `_, gid, err :=
 siteUserIDs(...)` direkt an der Aufrufstelle.

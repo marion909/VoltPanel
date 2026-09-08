@@ -339,10 +339,7 @@ func (s *Server) opMySQLSetPassword(ctx context.Context, raw json.RawMessage) (a
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
-		return nil, err
-	}
-	if err := checkMySQLHost(p.HostPattern); err != nil {
+	if err := checkMySQLUsernameHost(p.Username, p.HostPattern); err != nil {
 		return nil, err
 	}
 	if !reMyPassword.MatchString(p.Password) {
@@ -366,10 +363,7 @@ func (s *Server) opMySQLDropUser(ctx context.Context, raw json.RawMessage) (any,
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
-		return nil, err
-	}
-	if err := checkMySQLHost(p.HostPattern); err != nil {
+	if err := checkMySQLUsernameHost(p.Username, p.HostPattern); err != nil {
 		return nil, err
 	}
 
@@ -716,11 +710,18 @@ func randomHex(n int) (string, error) {
 }
 
 func checkMySQLUser(p MySQLUserParams) error {
-	if err := checkMySQLName("benutzername", p.Username, reMyUser); err != nil {
-		return err
-	}
-	if err := checkMySQLHost(p.HostPattern); err != nil {
+	if err := checkMySQLUsernameHost(p.Username, p.HostPattern); err != nil {
 		return err
 	}
 	return checkMySQLDBName(p.Database)
+}
+
+// checkMySQLUsernameHost bündelt die zwei Prüfungen, die opMySQLSetPassword
+// und opMySQLDropUser (ohne die Datenbank-Prüfung von checkMySQLUser) beide
+// brauchen.
+func checkMySQLUsernameHost(username, host string) error {
+	if err := checkMySQLName("benutzername", username, reMyUser); err != nil {
+		return err
+	}
+	return checkMySQLHost(host)
 }
