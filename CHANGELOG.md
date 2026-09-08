@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.91 — 2026-09-08
+
 - Settings.vue/RingGauge.vue/QuotaBar.vue/Dashboard.vue: hartcodierte
   deutsche Texte (Passwort-geändert-Meldung, Feldbezeichnungen
   E-Mail/Rolle/Tenant, aria-label von Ring- und Quota-Anzeigen, die
