@@ -3,7 +3,7 @@
 const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
 
 export function formatBytes(bytes, digits = 1) {
-  const n = Number(bytes) || 0
+  const n = Math.max(Number(bytes) || 0, 0)
   if (n < 1024) return `${n} B`
 
   let value = n

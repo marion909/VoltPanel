@@ -82,11 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/format.js:5-16` (`formatBytes`) — Prüft nur `Number(bytes) || 0`,
-lässt negative Zahlen aber unverändert durch. — Bug — Ergibt z. B. `"-5 B"`
-bzw. „-53.2 KiB/s" statt 0. Fix: `Math.max(Number(bytes) || 0, 0)`
-verwenden.
-
 `web/src/router.js:61` (vgl. `App.vue:23,62-63`) — Die Route `/services`
 trägt anders als die Nachbarrouten `/plugins`/`/tenants` kein `meta: {
 minRole: 'admin' }`, obwohl der zugehörige Navigationspunkt „Dienste" in
