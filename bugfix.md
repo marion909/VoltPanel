@@ -82,12 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/views/Mail.vue:555-561,573` — Der „Anlegen"-Button ist nur an
-`!boxForm.local_part.trim()` gekoppelt; das Passwortfeld hat weder
-`required` noch eine clientseitige Prüfung der Mindestlänge (10 Zeichen). —
-Design — Fix: Button zusätzlich an `boxForm.password.length >= 10` koppeln
-oder `minlength="10" required` ergänzen.
-
 `web/src/views/Cronjobs.vue:147-152` — Das Zeitplan-Feld hat `required`,
 prüft aber nicht das Fünf-Felder-Format. — Design — Fix: einfache
 Client-Prüfung auf fünf durch Leerzeichen getrennte Felder vor dem Absenden.

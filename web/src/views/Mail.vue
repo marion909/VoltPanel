@@ -555,6 +555,8 @@ onMounted(load)
                 <input
                   v-model="boxForm.password"
                   type="password"
+                  minlength="10"
+                  required
                   :placeholder="t('mail.password')"
                   class="w-52 rounded-md border px-2 py-1 text-[12px]"
                   :style="inputStyle"
@@ -570,7 +572,7 @@ onMounted(load)
                 <button
                   class="rounded-md border px-2 py-1 text-[12px]"
                   :style="{ borderColor: 'var(--border-ring)', color: 'var(--ink-secondary)' }"
-                  :disabled="busy || !boxForm.local_part.trim()"
+                  :disabled="busy || !boxForm.local_part.trim() || boxForm.password.length < 10"
                   @click="postfachAnlegen(d)"
                 >
                   {{ t('mail.addMailbox') }}
