@@ -404,11 +404,7 @@ func isMutating(op Op) bool {
 }
 
 func writeJSON(w *bufio.Writer, v any) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	if _, err := w.Write(append(b, '\n')); err != nil {
+	if err := json.NewEncoder(w).Encode(v); err != nil {
 		return err
 	}
 	return w.Flush()

@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- writeJSON (internal/agent/server.go) baute den JSON-Puffer per
+  json.Marshal und hängte den Zeilenumbruch per append(b, '\n') an —
+  letzteres erzwang bei jeder Anfrage/Antwort eine zweite Allokation
+  samt Kopie; json.NewEncoder(w).Encode(v) schreibt jetzt direkt in
+  den bufio.Writer und hängt den Zeilenumbruch selbst an
 
 ## v0.4.101 — 2026-09-08
 

@@ -76,12 +76,6 @@ gesamten `web/src`, Token-Handling über Cookie + CSRF-Header statt
 
 ## Wiederverwendung, Vereinfachung, Effizienz
 
-`internal/agent/server.go:359` (`writeJSON`) — `json.Marshal(v)` liefert
-einen exakt dimensionierten Slice; das anschließende `append(b, '\n')`
-erzwingt eine zweite Allokation samt Kopie bei jeder Anfrage/Antwort. —
-Design (Effizienz) — `json.NewEncoder(w).Encode(v)` schreibt direkt in den
-`bufio.Writer` und hängt den Zeilenumbruch selbst an.
-
 `internal/agent/ops_ftp.go:345` (`openFTPPorts`), `ops_mail.go:471`
 (`openMailPorts`), `ops_mysql_remote.go:195` (`setMySQLPort`) — Dreimal
 dieselbe Logik ("ufw-Status prüfen, bei `active` Regeln setzen, bei Fehler
