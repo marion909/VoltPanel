@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.109 — 2026-09-08
+
 - Restore (backup.go) und OpenBundle (tenant_export.go) rollten von
   Hand "Datei öffnen → gzip.NewReader → tar.NewReader →
   tr.Next()-Schleife" nach — eachEntry ist jetzt eine paketweite
