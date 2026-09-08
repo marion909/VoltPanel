@@ -194,23 +194,20 @@ func (s *Server) opMySQLRemoteSet(ctx context.Context, raw json.RawMessage) (any
 // Auskunft. In ein fremdes Regelwerk schreibt der Agent nicht.
 func (s *Server) setMySQLPort(ctx context.Context, open bool, port int) string {
 	rule := strconv.Itoa(port) + "/tcp"
+	action := "allow"
+	if !open {
+		action = "deny"
+	}
 
-	out, err := run(ctx, shortTimeout, "ufw", "status")
-	if err != nil || !strings.Contains(out, "Status: active") {
+	active, ok := s.ufwApplyRules(ctx, action, []string{rule})
+	if !active {
 		if open {
 			return fmt.Sprintf("Port %d muss in der Firewall offen sein — "+
 				"und nur für die Adressen, die in den Herkunftslisten stehen.", port)
 		}
 		return fmt.Sprintf("Port %d kann in der Firewall wieder zu.", port)
 	}
-
-	action := "allow"
-	if !open {
-		action = "deny"
-	}
-	if out, err := run(ctx, shortTimeout, "ufw", action, rule); err != nil {
-		s.log.Warn("ufw-regel nicht gesetzt", "regel", rule, "aktion", action,
-			"err", err, "out", truncate(out, 200))
+	if !ok {
 		return fmt.Sprintf("Die Firewall-Regel für Port %d konnte nicht gesetzt werden.", port)
 	}
 	if open {

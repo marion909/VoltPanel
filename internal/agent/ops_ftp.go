@@ -343,19 +343,15 @@ func joinPEM(parts ...[]byte) []byte {
 // nftables geschieht bewusst nichts: dort gibt es kein Regelwerk, in das sich
 // eine Zeile gefahrlos einfügen ließe.
 func (s *Server) openFTPPorts(ctx context.Context) string {
-	out, err := run(ctx, shortTimeout, "ufw", "status")
-	if err != nil || !strings.Contains(out, "Status: active") {
+	rules := []string{"21/tcp", fmt.Sprintf("%d:%d/tcp", ftpPassiveFrom, ftpPassiveTo)}
+	active, ok := s.ufwApplyRules(ctx, "allow", rules)
+	if !active {
 		return fmt.Sprintf("Port 21 und %d–%d müssen in der Firewall offen sein.",
 			ftpPassiveFrom, ftpPassiveTo)
 	}
-
-	rules := []string{"21/tcp", fmt.Sprintf("%d:%d/tcp", ftpPassiveFrom, ftpPassiveTo)}
-	for _, rule := range rules {
-		if out, err := run(ctx, shortTimeout, "ufw", "allow", rule); err != nil {
-			s.log.Warn("ufw-regel nicht gesetzt", "regel", rule, "err", err, "out", truncate(out, 200))
-			return "Die Firewall-Regeln konnten nicht gesetzt werden — bitte Port 21 und " +
-				fmt.Sprintf("%d–%d selbst freigeben.", ftpPassiveFrom, ftpPassiveTo)
-		}
+	if !ok {
+		return "Die Firewall-Regeln konnten nicht gesetzt werden — bitte Port 21 und " +
+			fmt.Sprintf("%d–%d selbst freigeben.", ftpPassiveFrom, ftpPassiveTo)
 	}
 	return fmt.Sprintf("ufw: Port 21 und %d–%d sind freigegeben.", ftpPassiveFrom, ftpPassiveTo)
 }

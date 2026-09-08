@@ -58,6 +58,29 @@ type FirewallRule struct {
 	From   string `json:"from,omitempty"`
 }
 
+// ufwApplyRules prüft, ob ufw aktiv ist, und wendet bei aktivem ufw die
+// angegebene Aktion ("allow"/"deny") auf jede der Regeln an. active ist
+// false, wenn ufw gar nicht läuft — dann wurde nichts versucht. ok ist nur
+// aussagekräftig, wenn active true ist, und wird false, sobald eine einzelne
+// Regel fehlschlägt.
+//
+// Die drei Aufrufer (FTP-, Mail- und MySQL-Fernzugriff-Ports) unterscheiden
+// sich nur in Regeln und Hinweistexten, nicht in diesem Ablauf.
+func (s *Server) ufwApplyRules(ctx context.Context, action string, rules []string) (active, ok bool) {
+	out, err := run(ctx, shortTimeout, "ufw", "status")
+	if err != nil || !strings.Contains(out, "Status: active") {
+		return false, false
+	}
+	for _, rule := range rules {
+		if out, err := run(ctx, shortTimeout, "ufw", action, rule); err != nil {
+			s.log.Warn("ufw-regel nicht gesetzt", "regel", rule, "aktion", action,
+				"err", err, "out", truncate(out, 200))
+			return true, false
+		}
+	}
+	return true, true
+}
+
 // opFirewallStatus sagt, was läuft und was offen ist.
 func (s *Server) opFirewallStatus(ctx context.Context, _ json.RawMessage) (any, error) {
 	if fileExists(allowedBinaries["ufw"]) {

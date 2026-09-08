@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- openFTPPorts, openMailPorts und setMySQLPort bauten dreimal dieselbe
+  Logik nach (ufw-Status prüfen, bei aktivem ufw Regeln setzen, bei
+  Fehler feste Ersatzmeldung) — neuer gemeinsamer Helfer
+  ufwApplyRules(ctx, action, rules) (active, ok bool) im bestehenden
+  ops_firewall.go, alle drei Aufrufer nutzen ihn jetzt
 
 ## v0.4.102 — 2026-09-08
 

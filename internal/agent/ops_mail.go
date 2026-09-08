@@ -491,17 +491,13 @@ var mailPorts = []string{"25/tcp", "587/tcp", "993/tcp"}
 // Feste Argumente, wie bei FTP. Für nftables geschieht bewusst nichts: dort
 // gibt es kein Regelwerk, in das sich eine Zeile gefahrlos einfügen ließe.
 func (s *Server) openMailPorts(ctx context.Context) string {
-	out, err := run(ctx, shortTimeout, "ufw", "status")
-	if err != nil || !strings.Contains(out, "Status: active") {
+	active, ok := s.ufwApplyRules(ctx, "allow", mailPorts)
+	if !active {
 		return "Die Ports 25, 587 und 993 müssen in der Firewall offen sein."
 	}
-	for _, regel := range mailPorts {
-		if out, err := run(ctx, shortTimeout, "ufw", "allow", regel); err != nil {
-			s.log.Warn("ufw-regel nicht gesetzt", "regel", regel, "err", err,
-				"out", truncate(out, 200))
-			return "Die Firewall-Regeln konnten nicht gesetzt werden — bitte 25, 587 " +
-				"und 993 selbst freigeben."
-		}
+	if !ok {
+		return "Die Firewall-Regeln konnten nicht gesetzt werden — bitte 25, 587 " +
+			"und 993 selbst freigeben."
 	}
 	return "ufw: 25, 587 und 993 sind freigegeben."
 }

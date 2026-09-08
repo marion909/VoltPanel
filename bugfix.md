@@ -76,12 +76,6 @@ gesamten `web/src`, Token-Handling über Cookie + CSRF-Header statt
 
 ## Wiederverwendung, Vereinfachung, Effizienz
 
-`internal/agent/ops_ftp.go:345` (`openFTPPorts`), `ops_mail.go:471`
-(`openMailPorts`), `ops_mysql_remote.go:195` (`setMySQLPort`) — Dreimal
-dieselbe Logik ("ufw-Status prüfen, bei `active` Regeln setzen, bei Fehler
-feste Ersatzmeldung"). — Design — Gemeinsamer Helfer `ufwApplyRules(ctx,
-action string, rules []string) (ok bool, hinweis string)`.
-
 `internal/agent/ops_appstore.go:100` (`installWordPressFiles`) vs.
 `ops_webmail.go:166` (`installRoundcubeFiles`) — Beide legen ein
 Temp-Verzeichnis an, laden per `fetchAndExtract`, prüfen die Summe und

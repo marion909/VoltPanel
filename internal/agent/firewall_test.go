@@ -1,12 +1,28 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/marion909/voltpanel/internal/templates"
 )
+
+// TestUfwApplyRulesOhneUfwMeldetInaktiv: funktioniert, weil auf diesem
+// Entwicklungsrechner kein ufw installiert ist — derselbe deterministische
+// Fehlschlagspfad wie bei checkNginxOnStartup in ops_web_test.go.
+func TestUfwApplyRulesOhneUfwMeldetInaktiv(t *testing.T) {
+	srv, _ := testServer(t)
+
+	active, ok := srv.ufwApplyRules(context.Background(), "allow", []string{"21/tcp"})
+	if active {
+		t.Fatal("active sollte false sein, wenn ufw fehlt oder nicht läuft")
+	}
+	if ok {
+		t.Fatal("ok sollte false sein, wenn active bereits false ist")
+	}
+}
 
 // TestFirewallRegelWirdGebautNichtDurchgereicht ist der Kern.
 //
