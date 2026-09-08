@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.93 — 2026-09-08
+
 - Files.vue: der Site-Wechsel löste denselben Verzeichnisinhalt
   zweimal aus (watch(siteId) setzt path zurück und ruft zusätzlich
   selbst load() auf) — ohne Abbruch konnte eine noch laufende, ältere
