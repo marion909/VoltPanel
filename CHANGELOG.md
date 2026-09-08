@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.106 — 2026-09-08
+
 - opMySQLSetPassword und opMySQLDropUser wiederholten je die beiden
   Prüfzeilen, die checkMySQLUser bereits bündelt — neuer Helfer
   checkMySQLUsernameHost(username, host) für beide, mit eigenem Test
