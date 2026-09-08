@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.115 — 2026-09-08
+
 - DatabaseService.tenantPrefix und FTPService.buildName leiteten aus
   demselben Tenant-Slug Zeile für Zeile dieselbe Präfix-Form ab,
   einmal als Methode, einmal inline — neue gemeinsame Hilfsfunktion
