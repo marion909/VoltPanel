@@ -82,10 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/views/Cronjobs.vue:147-152` — Das Zeitplan-Feld hat `required`,
-prüft aber nicht das Fünf-Felder-Format. — Design — Fix: einfache
-Client-Prüfung auf fünf durch Leerzeichen getrennte Felder vor dem Absenden.
-
 ## Wiederverwendung, Vereinfachung, Effizienz
 
 `internal/agent/server.go:359` (`writeJSON`) — `json.Marshal(v)` liefert

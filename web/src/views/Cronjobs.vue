@@ -145,6 +145,7 @@ onMounted(load)
           {{ t('cron.schedule') }}
         </span>
         <input v-model="form.schedule" required placeholder="*/5 * * * *"
+               pattern="\S+\s+\S+\s+\S+\s+\S+\s+\S+" :title="t('cron.scheduleHint')"
                class="tabular w-full rounded-md border px-3 py-2 font-mono text-[13px]" :style="inputStyle" />
         <span class="mt-1 block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
           {{ t('cron.scheduleHint') }}

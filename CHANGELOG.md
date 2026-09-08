@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Cronjobs.vue: das Zeitplan-Feld hatte required, prüfte aber nicht
+  das Fünf-Felder-Format — ein unvollständiger Ausdruck fiel erst als
+  Serverfehler auf; ein pattern für "fünf durch Leerraum getrennte
+  Felder" prüft das jetzt schon im Browser
 
 ## v0.4.99 — 2026-09-08
 
