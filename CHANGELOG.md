@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- UsageForTenant fragte die Site-Summen ab, gefolgt von sieben
+  Einzelabfragen (eine je Zähltabelle) — 8 Round-Trips statt 1. Jetzt
+  ein einzelnes Statement mit sieben Subselects; neuer Test
+  TestUsageForTenantZaehltAlleTabellen mit unterschiedlichen
+  Zählständen je Tabelle sichert die Spaltenzuordnung ab
 
 ## v0.4.107 — 2026-09-08
 

@@ -89,13 +89,6 @@ Verarbeitung genug, dass eine erzwungene gemeinsame Abstraktion in dieser
 sicherheitskritischen Datei (Zip-Slip-Schutz, Größendeckel) mehr Risiko für
 eine stille Verhaltensänderung birgt, als die reine Code-Dopplung wert ist.
 
-`internal/store/repo_site.go:210-238` (`UsageForTenant`) — Setzt eine
-Abfrage für die Site-Summen ab, gefolgt von einer Schleife über drei
-Tabellennamen mit je einem eigenen `SELECT COUNT(*)` — 4 Round-Trips statt
-1. — Design (Effizienz) — Ein einzelnes Statement mit drei Subselects.
-Passt zusammen mit dem oben dokumentierten Fund, dass hier auch
-`Mailboxes` als Zähler fehlt — beide Fixes in einem Aufwasch erledigen.
-
 `internal/core/tenant_bundle.go:125-155` (`CollectTenant`) — Für jede Site
 ein eigener `ListFTPAccounts`-/`PHPPoolBySite`-Aufruf, für jede Datenbank ein
 `ListDBUsers`-Aufruf, für jeden Datenbankbenutzer ein

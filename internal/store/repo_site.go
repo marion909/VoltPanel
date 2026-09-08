@@ -226,31 +226,27 @@ func (s *Store) UsageForTenant(ctx context.Context, sc Scope, tenantID int64) (*
 		return nil, err
 	}
 
+	// Ein einzelnes Statement mit Subselects statt eines Round-Trips je
+	// Tabelle. Kein Join über die Zähltabellen: der läge über verschiedene
+	// Fremdschlüssel und würde Kreuzprodukte liefern statt Zählstände.
 	usage := &TenantUsage{TenantID: tenantID}
 	err := s.db.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(disk_bytes), 0), COALESCE(SUM(disk_files), 0),
-		       COALESCE(SUM(traffic_bytes), 0), COUNT(*)
-		FROM sites WHERE tenant_id = ?`, tenantID).
-		Scan(&usage.DiskBytes, &usage.DiskFiles, &usage.TrafficBytes, &usage.Sites)
+		       COALESCE(SUM(traffic_bytes), 0), COUNT(*),
+		       (SELECT COUNT(*) FROM databases WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM cronjobs WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM ftp_accounts WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM mailboxes WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM mail_domains WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM certs WHERE tenant_id = ?),
+		       (SELECT COUNT(*) FROM backup_targets WHERE tenant_id = ?)
+		FROM sites WHERE tenant_id = ?`,
+		tenantID, tenantID, tenantID, tenantID, tenantID, tenantID, tenantID, tenantID).
+		Scan(&usage.DiskBytes, &usage.DiskFiles, &usage.TrafficBytes, &usage.Sites,
+			&usage.Databases, &usage.Cronjobs, &usage.FTPAccounts, &usage.Mailboxes,
+			&usage.MailDomains, &usage.Certs, &usage.BackupTargets)
 	if err != nil {
 		return nil, err
-	}
-
-	// Die übrigen Zähler einzeln — ein Join über vier Tabellen mit COUNT
-	// liefert Kreuzprodukte statt Zählständen.
-	for table, target := range map[string]*int{
-		"databases":      &usage.Databases,
-		"cronjobs":       &usage.Cronjobs,
-		"ftp_accounts":   &usage.FTPAccounts,
-		"mailboxes":      &usage.Mailboxes,
-		"mail_domains":   &usage.MailDomains,
-		"certs":          &usage.Certs,
-		"backup_targets": &usage.BackupTargets,
-	} {
-		if err := s.db.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM `+table+` WHERE tenant_id = ?`, tenantID).Scan(target); err != nil {
-			return nil, err
-		}
 	}
 	return usage, nil
 }
