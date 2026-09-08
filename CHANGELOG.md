@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- SetGrants, SetPassword und DeleteDatabase wiederholten je eine
+  fast identische Schleife über die Herkunftsliste eines
+  DB-Benutzers — neue Hilfsfunktion applyAcrossHosts bündelt die
+  Continue-on-Failure-Iteration für alle drei (DeleteUser bewusst
+  unverändert gelassen, siehe bugfix.md)
 
 ## v0.4.110 — 2026-09-08
 

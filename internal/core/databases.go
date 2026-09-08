@@ -200,6 +200,21 @@ func (s *DatabaseService) createUser(ctx context.Context, sc store.Scope, db *st
 	return user, password, nil
 }
 
+// applyAcrossHosts ruft fn für jeden Host auf und läuft dabei weiter, auch
+// wenn einzelne fehlschlagen — ein Konto, das auf einer Herkunft noch die
+// alten Rechte oder das alte Passwort trägt, ist schlimmer als eine Meldung,
+// die alle betroffenen Herkünfte nennt. Das Ergebnis sind die
+// "host: fehler"-Zeilen der Fehlschläge, leer wenn alles gelang.
+func applyAcrossHosts(hosts []string, fn func(host string) error) []string {
+	var failed []string
+	for _, host := range hosts {
+		if err := fn(host); err != nil {
+			failed = append(failed, host+": "+err.Error())
+		}
+	}
+	return failed
+}
+
 // SetGrants ändert die Berechtigungsstufe eines Benutzers.
 func (s *DatabaseService) SetGrants(ctx context.Context, sc store.Scope, userID int64, grants string) error {
 	user, err := s.store.GetDBUser(ctx, sc, userID)
@@ -239,15 +254,12 @@ func (s *DatabaseService) SetGrants(ctx context.Context, sc store.Scope, userID 
 	if err != nil {
 		return err
 	}
-	var failed []string
-	for _, host := range hosts {
-		if err := s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
+	failed := applyAcrossHosts(hosts, func(host string) error {
+		return s.agent.GrantDBUser(ctx, agent.MySQLUserParams{
 			Username: user.Username, HostPattern: host,
 			Database: db.Name, Grants: user.Grants,
-		}); err != nil {
-			failed = append(failed, host+": "+err.Error())
-		}
-	}
+		})
+	})
 	if len(failed) > 0 {
 		return fmt.Errorf("die rechte gelten nicht für alle herkünfte: %s",
 			strings.Join(failed, "; "))
@@ -289,12 +301,9 @@ func (s *DatabaseService) SetPassword(ctx context.Context, sc store.Scope, userI
 	if err != nil {
 		return "", err
 	}
-	var failed []string
-	for _, host := range hosts {
-		if err := s.agent.SetDBUserPassword(ctx, user.Username, host, password); err != nil {
-			failed = append(failed, host+": "+err.Error())
-		}
-	}
+	failed := applyAcrossHosts(hosts, func(host string) error {
+		return s.agent.SetDBUserPassword(ctx, user.Username, host, password)
+	})
 	if len(failed) > 0 {
 		return "", fmt.Errorf("das passwort gilt für %s, aber nicht für alle herkünfte: %s. "+
 			"das neue passwort ist gespeichert und lässt sich anzeigen; ein zweiter versuch "+
@@ -353,10 +362,11 @@ func (s *DatabaseService) DeleteDatabase(ctx context.Context, sc store.Scope, da
 		if err != nil {
 			return err
 		}
-		for _, host := range append(hosts, user.HostPattern) {
-			if err := s.agent.DropDBUser(ctx, user.Username, host); err != nil {
-				problems = append(problems, user.Username+"@"+host+": "+err.Error())
-			}
+		failed := applyAcrossHosts(append(hosts, user.HostPattern), func(host string) error {
+			return s.agent.DropDBUser(ctx, user.Username, host)
+		})
+		for _, f := range failed {
+			problems = append(problems, user.Username+"@"+f)
 		}
 	}
 

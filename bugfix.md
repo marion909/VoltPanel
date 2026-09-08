@@ -101,12 +101,21 @@ Sammelabfrage über `site_id IN (...)`/`db_user_id IN (...)` bräuchte neue,
 größere API-Erweiterung des `store`-Pakets für einen Pfad, der in der Praxis
 kaum ins Gewicht fällt.
 
-`internal/core/databases.go:210-226,260-273,298-306,322-333`
-(`SetGrants`/`SetPassword`/`DeleteUser`/`DeleteDatabase`) — Vier fast
-identische Schleifen über die Herkunftsliste eines DB-Benutzers, nur die
-Fehlerbehandlung variiert unmotiviert zwischen den vier Kopien. — Design —
-Gemeinsame Hilfsfunktion `applyAcrossHosts(hosts []string, fn func(host
-string) error) []string`.
+**Teilweise erledigt:** `applyAcrossHosts(hosts []string, fn func(host
+string) error) []string` gebündelt und in `SetGrants`, `SetPassword` und der
+inneren Schleife von `DeleteDatabase` eingesetzt — dieselbe
+Continue-on-Failure-Semantik, dieselben Fehlermeldungen, rein mechanisch.
+**Bewusst nicht umgesetzt:** `DeleteUser` bricht bei der ersten
+fehlgeschlagenen Herkunft sofort ab (`return`) und löscht die Store-Zeile
+dann gar nicht — anders als die drei anderen, die weiterlaufen und die
+Store-Änderung trotz einzelner Fehlschläge übernehmen. Das auf dieselbe
+Semantik umzustellen wäre eine echte Verhaltensänderung (das Panel würde
+einen Benutzer als gelöscht führen, auch wenn ein MySQL-Konto auf einer
+Herkunft stehen bleibt) — und `DatabaseService.agent` ist ein konkreter
+`*agent.Client`, kein Interface wie `SiteService.agent` (`siteAgent`), es
+gibt also keinen Fake, um das an einem echten Test zu verifizieren. Eine
+Umstellung ohne Testabsicherung für eine Verhaltensänderung an einem
+Lösch-Pfad wäre das falsche Risiko für diesen Fund.
 
 `internal/core/quota.go:140-156,172-186` (`CheckCount`/`countFor`) — Zwei
 parallele `switch`-Anweisungen über dieselbe `Resource`-Aufzählung — eine
