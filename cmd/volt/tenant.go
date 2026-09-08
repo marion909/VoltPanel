@@ -166,7 +166,7 @@ func (a *app) tenantSetPlanCmd() *cobra.Command {
 }
 
 func (a *app) tenantSuspendCmd() *cobra.Command {
-	var resume bool
+	var resume, yes bool
 
 	cmd := &cobra.Command{
 		Use:   "suspend <tenant-id|slug>",
@@ -178,6 +178,19 @@ func (a *app) tenantSuspendCmd() *cobra.Command {
 			tenant, err := a.findTenant(ctx, args[0])
 			if err != nil {
 				return err
+			}
+
+			// Nur das Sperren fragt nach — ähnlich folgenreich wie db
+			// remove/site remove/cron remove/plan remove: keiner seiner
+			// Benutzer kommt danach noch ins Panel hinein (siehe auth.go,
+			// tenant.Status != TenantActive). Die gehosteten Websites laufen
+			// unabhängig davon weiter. Das Aufheben ist unbedenklich und
+			// braucht keine Rückfrage.
+			if !resume && !yes && !confirm(fmt.Sprintf(
+				"Mandanten %s (%s) sperren? Seine Benutzer kommen danach nicht mehr ins Panel.",
+				tenant.Name, tenant.Slug)) {
+				fmt.Println("Abgebrochen.")
+				return nil
 			}
 
 			tenant.Status = "suspended"
@@ -193,6 +206,7 @@ func (a *app) tenantSuspendCmd() *cobra.Command {
 		}),
 	}
 	cmd.Flags().BoolVar(&resume, "resume", false, "Sperre aufheben")
+	cmd.Flags().BoolVar(&yes, "yes", false, "Nicht nachfragen")
 	return cmd
 }
 

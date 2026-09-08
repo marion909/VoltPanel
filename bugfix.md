@@ -126,11 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/tenant.go:171` (`tenantSuspendCmd`) — Keine Rückfrage
-(`confirm()`/`--yes`), obwohl das Sperren eines Mandanten ähnlich folgenreich
-ist wie `db remove`/`site remove`/`cron remove`/`plan remove`. — Design —
-`confirm()`-Abfrage plus `--yes`-Flag ergänzen (nicht bei `--resume`).
-
 `cmd/volt/tenant.go:145-156` (`set-plan ... 0`) — Hebt wie `plan remove`
 alle Ressourcengrenzen eines Mandanten auf, läuft aber ohne Rückfrage durch.
 — Design — Für `args[1] == "0"` dieselbe Warn-/Bestätigungslogik wie bei

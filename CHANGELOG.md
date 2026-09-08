@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- volt tenant suspend fragte vor dem Sperren nie nach, obwohl das
+  ähnlich folgenreich ist wie db/site/cron/plan remove (kein Benutzer
+  des Mandanten kommt danach mehr ins Panel) — jetzt confirm() plus
+  --yes-Flag wie bei den anderen Befehlen; --resume fragt weiterhin
+  nicht nach, es ist unbedenklich
 
 ## v0.4.118 — 2026-09-08
 
