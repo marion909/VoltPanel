@@ -82,13 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/components/AppStoreDialog.vue:22-29,31-42` —
-`loadCatalog`/`loadPHPVersions` fangen jeden Fehler mit leerem `catch {}` ab,
-ohne `error.value` zu setzen. — Design — Schlägt `/appstore` oder
-`/system/info` fehl, öffnet sich die Klappe mit leerem Katalog bzw.
-geratener PHP-Version „8.3", ohne Hinweis auf einen Serverfehler. Fix: bei
-`loadCatalog` einen sichtbaren Hinweis setzen.
-
 `web/src/views/Mail.vue:555-561,573` — Der „Anlegen"-Button ist nur an
 `!boxForm.local_part.trim()` gekoppelt; das Passwortfeld hat weder
 `required` noch eine clientseitige Prüfung der Mindestlänge (10 Zeichen). —

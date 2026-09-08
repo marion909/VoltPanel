@@ -22,9 +22,10 @@ const form = ref({ domain: "", php_version: "8.3" });
 async function loadCatalog() {
   try {
     catalog.value = await api.get("/appstore");
-  } catch {
-    // Ohne Katalog bleibt die Klappe leer statt kaputt — dieselbe Vorsicht
-    // wie beim PHP-Versionen-Laden nebenan.
+  } catch (err) {
+    // Anders als bei den PHP-Versionen gibt es hier keinen sinnvollen
+    // Rückfall — ohne Katalog vom Server bleibt der Fehler sonst unsichtbar.
+    error.value = err.message;
   }
 }
 

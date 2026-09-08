@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- AppStoreDialog.vue: loadCatalog() fing jeden Fehler mit leerem
+  catch {} ab, ohne error.value zu setzen — schlug /appstore fehl,
+  öffnete sich die Klappe ohne jeden Hinweis auf einen Serverfehler;
+  der Fehler wird jetzt sichtbar gemacht
 
 ## v0.4.97 — 2026-09-08
 
