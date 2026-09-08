@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.108 — 2026-09-08
+
 - UsageForTenant fragte die Site-Summen ab, gefolgt von sieben
   Einzelabfragen (eine je Zähltabelle) — 8 Round-Trips statt 1. Jetzt
   ein einzelnes Statement mit sieben Subselects; neuer Test
