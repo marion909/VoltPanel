@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.111 — 2026-09-08
+
 - SetGrants, SetPassword und DeleteDatabase wiederholten je eine
   fast identische Schleife über die Herkunftsliste eines
   DB-Benutzers — neue Hilfsfunktion applyAcrossHosts bündelt die
