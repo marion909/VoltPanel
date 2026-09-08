@@ -126,13 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/site.go:106` u. a. (auch tenant.go:140/185/221, plan.go:128,
-cron.go:122, user.go:110/159) — Store-Fehler (`store.ErrNotFound`) wird
-unverändert durchgereicht; ein Admin sieht bei einem Tippfehler nur "fehler:
-nicht gefunden" ohne Hinweis, wonach gesucht wurde. — Design — Alle
-betroffenen Stellen nach dem Muster von `cron.go:76` (`fmt.Errorf("site %q:
-%w", site, err)`) umschreiben.
-
 `cmd/volt/site.go:85` — `--type` wird als roher String ungeprüft an
 `store.SiteType(siteType)` weitergereicht, ohne eigene Validierung — anders
 als `user add --role`. — Design — `Valid()`-Prüfung für die drei Site-Typen

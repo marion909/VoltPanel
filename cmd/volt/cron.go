@@ -121,7 +121,7 @@ func (a *app) cronRemoveCmd() *cobra.Command {
 			}
 			job, err := a.store.GetCronjob(ctx, sys, id)
 			if err != nil {
-				return err
+				return fmt.Errorf("cronjob %d: %w", id, err)
 			}
 			if !yes && !confirm(fmt.Sprintf("Cronjob %q entfernen?", job.Name)) {
 				fmt.Println("Abgebrochen.")

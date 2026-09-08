@@ -110,7 +110,7 @@ func (a *app) siteRemoveCmd() *cobra.Command {
 			ctx, sys := cmd.Context(), store.SystemScope()
 			site, err := a.store.SiteByDomain(ctx, sys, args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("site %q: %w", args[0], err)
 			}
 
 			question := fmt.Sprintf("Site %s entfernen?", site.Domain)
@@ -171,7 +171,7 @@ func (a *app) siteRebuildCmd() *cobra.Command {
 			case len(args) == 1:
 				site, err := a.store.SiteByDomain(ctx, sys, args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("site %q: %w", args[0], err)
 				}
 				sites = []*store.Site{site}
 			default:

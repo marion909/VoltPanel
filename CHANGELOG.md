@@ -13,7 +13,13 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Store-Fehler (store.ErrNotFound) liefen in site remove/rebuild,
+  plan remove, cron remove und user passwd/2fa-reset unverändert
+  durch — ein Admin sah bei einem Tippfehler nur "fehler: nicht
+  gefunden" ohne Hinweis, wonach gesucht wurde. Alle Stellen nach dem
+  bereits bestehenden Muster von cron add (fmt.Errorf("site %q: %w",
+  ...)) umgeschrieben; die drei Stellen in tenant.go waren durch den
+  findTenant-Helfer (v0.4.118) bereits mitbehoben
 
 ## v0.4.121 — 2026-09-08
 

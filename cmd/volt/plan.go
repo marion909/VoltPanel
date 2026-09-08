@@ -128,7 +128,7 @@ func (a *app) planRemoveCmd() *cobra.Command {
 			}
 			plan, err := a.store.GetPlan(ctx, sys, id)
 			if err != nil {
-				return err
+				return fmt.Errorf("paket %d: %w", id, err)
 			}
 
 			// Das ist eine stille Lockerung, keine Verschärfung — darauf muss

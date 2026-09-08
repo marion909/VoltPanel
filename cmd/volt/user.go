@@ -109,7 +109,7 @@ func (a *app) userPasswdCmd() *cobra.Command {
 			ctx := cmd.Context()
 			user, err := a.store.UserByEmail(ctx, args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("benutzer %q: %w", args[0], err)
 			}
 
 			generated := false
@@ -160,7 +160,7 @@ func (a *app) user2FAResetCmd() *cobra.Command {
 			ctx := cmd.Context()
 			user, err := a.store.UserByEmail(ctx, args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("benutzer %q: %w", args[0], err)
 			}
 			if !user.TOTPEnabled {
 				fmt.Printf("2FA war für %s nicht aktiv.\n", user.Email)
