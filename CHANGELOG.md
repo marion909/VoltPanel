@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.127 — 2026-09-08
+
 - install.sh verschluckte jeden Startfehler von MariaDB
   (systemctl enable --now ... || true), anders als bei
   volt-agent/volt-web gab es keine spätere is-active-Prüfung — ein
