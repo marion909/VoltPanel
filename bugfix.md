@@ -126,10 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/user.go:167` (`user2FAResetCmd`) — Ruft `confirm()` auf, definiert
-aber kein `--yes`-Flag. — Design — `--yes`-Flag nach demselben Muster
-ergänzen.
-
 `cmd/volt/site.go:106` u. a. (auch tenant.go:140/185/221, plan.go:128,
 cron.go:122, user.go:110/159) — Store-Fehler (`store.ErrNotFound`) wird
 unverändert durchgereicht; ein Admin sieht bei einem Tippfehler nur "fehler:

@@ -150,7 +150,9 @@ func (a *app) userPasswdCmd() *cobra.Command {
 // user2FAResetCmd ist der Notausgang, wenn jemand sein Authenticator-Gerät
 // verloren hat. Nur lokal auf dem Server auslösbar.
 func (a *app) user2FAResetCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+
+	cmd := &cobra.Command{
 		Use:   "2fa-reset <email>",
 		Short: "Schaltet die Zwei-Faktor-Anmeldung eines Benutzers ab",
 		Args:  cobra.ExactArgs(1),
@@ -164,7 +166,7 @@ func (a *app) user2FAResetCmd() *cobra.Command {
 				fmt.Printf("2FA war für %s nicht aktiv.\n", user.Email)
 				return nil
 			}
-			if !confirm(fmt.Sprintf("2FA für %s wirklich abschalten?", user.Email)) {
+			if !yes && !confirm(fmt.Sprintf("2FA für %s wirklich abschalten?", user.Email)) {
 				fmt.Println("Abgebrochen.")
 				return nil
 			}
@@ -185,4 +187,6 @@ func (a *app) user2FAResetCmd() *cobra.Command {
 			return nil
 		}),
 	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "Nicht nachfragen")
+	return cmd
 }
