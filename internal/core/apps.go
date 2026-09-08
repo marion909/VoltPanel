@@ -300,6 +300,18 @@ func (s *AppService) workingDir(ctx context.Context, site *store.Site) string {
 	return site.RootPath
 }
 
+// domainsByID bildet site_id auf die Domain ab — dreimal wortgleich
+// gebraucht (hier zweimal, dazu in deploys.go), um zu einer Site-ID aus
+// einer anderen Liste (Apps, Deploys) die Domain für die Anzeige
+// nachzuschlagen.
+func domainsByID(sites []*store.Site) map[int64]string {
+	domain := make(map[int64]string, len(sites))
+	for _, site := range sites {
+		domain[site.ID] = site.Domain
+	}
+	return domain
+}
+
 // ListApps liefert die Apps eines Mandanten samt Zustand vom Agent.
 func (s *AppService) ListApps(ctx context.Context, sc store.Scope) ([]AppView, error) {
 	apps, err := s.store.ListApps(ctx, sc)
@@ -310,10 +322,7 @@ func (s *AppService) ListApps(ctx context.Context, sc store.Scope) ([]AppView, e
 	if err != nil {
 		return nil, err
 	}
-	domain := make(map[int64]string, len(sites))
-	for _, site := range sites {
-		domain[site.ID] = site.Domain
-	}
+	domain := domainsByID(sites)
 
 	out := make([]AppView, 0, len(apps))
 	for _, app := range apps {
@@ -408,10 +417,7 @@ func (s *AppService) ContainerStats(ctx context.Context, sc store.Scope) ([]AppS
 	if err != nil {
 		return nil, err
 	}
-	domain := make(map[int64]string, len(sites))
-	for _, site := range sites {
-		domain[site.ID] = site.Domain
-	}
+	domain := domainsByID(sites)
 
 	roh, err := s.agent.ContainerStatsOf(ctx)
 	if err != nil {

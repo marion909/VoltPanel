@@ -117,10 +117,6 @@ gibt also keinen Fake, um das an einem echten Test zu verifizieren. Eine
 Umstellung ohne Testabsicherung für eine Verhaltensänderung an einem
 Lösch-Pfad wäre das falsche Risiko für diesen Fund.
 
-`internal/core/apps.go:313-316,411-414`, `deploys.go:332-335` — Der Aufbau
-einer `site_id → domain`-Map steht dreimal wortgleich in zwei Dateien. —
-Design — Hilfsfunktion `domainsByID(sites []*store.Site) map[int64]string`.
-
 `internal/core/databases.go:507-514` (`tenantPrefix`) und `ftp.go:283-288`
 (Teil von `buildName`) — Beide leiten aus demselben Tenant dieselbe
 Präfix-Form ab — Zeile für Zeile identisch, einmal als Methode, einmal

@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Der Aufbau einer site_id → domain-Map stand dreimal wortgleich in
+  apps.go und deploys.go — neue Hilfsfunktion domainsByID(sites)
+  für alle drei Stellen
 
 ## v0.4.113 — 2026-09-08
 

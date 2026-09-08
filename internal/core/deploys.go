@@ -350,10 +350,7 @@ func (s *DeployService) List(ctx context.Context, sc store.Scope) ([]DeployView,
 	if err != nil {
 		return nil, err
 	}
-	domain := make(map[int64]string, len(sites))
-	for _, site := range sites {
-		domain[site.ID] = site.Domain
-	}
+	domain := domainsByID(sites)
 
 	out := make([]DeployView, 0, len(deploys))
 	for _, d := range deploys {
