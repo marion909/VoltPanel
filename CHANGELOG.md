@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.95 — 2026-09-08
+
 - UpdateCard.vue: waitForPanel() pollte bis zu drei Minuten ohne
   Abbruch-Mechanismus — verließ ein Administrator die
   Einstellungsseite während eines laufenden Updates, feuerte die
