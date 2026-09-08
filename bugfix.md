@@ -126,11 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/tenant.go:145-156` (`set-plan ... 0`) — Hebt wie `plan remove`
-alle Ressourcengrenzen eines Mandanten auf, läuft aber ohne Rückfrage durch.
-— Design — Für `args[1] == "0"` dieselbe Warn-/Bestätigungslogik wie bei
-`plan remove` einbauen.
-
 `cmd/volt/user.go:167` (`user2FAResetCmd`) — Ruft `confirm()` auf, definiert
 aber kein `--yes`-Flag. — Design — `--yes`-Flag nach demselben Muster
 ergänzen.

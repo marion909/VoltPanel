@@ -127,7 +127,9 @@ func (a *app) tenantAddCmd() *cobra.Command {
 }
 
 func (a *app) tenantSetPlanCmd() *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+
+	cmd := &cobra.Command{
 		Use:   "set-plan <tenant-id|slug> <plan-id>",
 		Short: "Ordnet einem Mandanten ein Paket zu (0 = keines)",
 		Args:  cobra.ExactArgs(2),
@@ -140,6 +142,13 @@ func (a *app) tenantSetPlanCmd() *cobra.Command {
 			}
 
 			if args[1] == "0" {
+				// Dieselbe stille Lockerung wie plan remove, nur pro Mandant
+				// statt pro Paket — darauf muss ebenso hingewiesen werden.
+				if !yes && !confirm(fmt.Sprintf(
+					"Mandant %s: Paket entfernen? Für ihn gelten danach keine Grenzen mehr.", tenant.Name)) {
+					fmt.Println("Abgebrochen.")
+					return nil
+				}
 				tenant.PlanID = nil
 			} else {
 				planID, err := parseID(args[1])
@@ -163,6 +172,8 @@ func (a *app) tenantSetPlanCmd() *cobra.Command {
 			return nil
 		}),
 	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "Nicht nachfragen")
+	return cmd
 }
 
 func (a *app) tenantSuspendCmd() *cobra.Command {
