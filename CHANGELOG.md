@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Der Agent-Socket entstand kurz mit den ererbten Prozessrechten,
+  bevor os.Chmod(0o660) sie verengte — Listen() setzt die Umask
+  jetzt nur um den net.Listen-Aufruf herum eng und direkt danach
+  zurück (nicht dauerhaft, das würde spätere Dateien wie
+  nginx-Configs unbemerkt auf 0600 kappen). Neuer Test
+  TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus
 
 ## v0.4.125 — 2026-09-08
 

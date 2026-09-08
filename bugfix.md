@@ -148,11 +148,19 @@ per `curl` geladen und ohne Fingerprint-/Prüfsummenabgleich sofort als
 vertrauenswürdig eingebunden. — Sicherheit — Einen bekannten Fingerprint des
 Sury-Schlüssels im Skript hinterlegen und nach dem Download gegenprüfen.
 
-`cmd/volt-agent/main.go:43-52` — Kein restriktiver Prozess-`umask` vor
-`srv.Listen()`; der Unix-Socket wird per `net.Listen` erzeugt und die Rechte
-erst danach per `os.Chmod(0o660)` gesetzt — dazwischen ein kurzes Zeitfenster
-mit der ererbten Prozess-umask. — Sicherheit (geringes Zeitfenster) — Früh
-`syscall.Umask(0o177)` setzen (oder `UMask=0177` in der systemd-Unit).
+**Erledigt, abweichend vom Vorschlag:** Der Unix-Socket entstand per
+`net.Listen` mit den ererbten Prozessrechten, bevor `os.Chmod(0o660)` sie
+gleich danach verengte — ein kurzes Zeitfenster mit weiteren Rechten. Der
+vorgeschlagene Fix (dauerhaft `syscall.Umask(0o177)` bzw. `UMask=0177` in
+der systemd-Unit) hätte aber den ganzen Prozess betroffen: der Agent
+schreibt später Dateien mit `0o644` (u. a. nginx-Configs), die bewusst
+world-readable sein müssen, und eine dauerhaft verengte Umask hätte sie
+unbemerkt auf `0600` gekappt. Stattdessen verengt `Listen()` in
+`internal/agent/server.go` die Umask nur um den einen `net.Listen`-Aufruf
+herum und stellt sie sofort danach zurück — schließt dasselbe Zeitfenster,
+ohne die übrigen Dateien des Agents zu beeinflussen. Test
+`TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus` sichert ab, dass
+nichts von der Umask-Änderung nach außen dringt.
 
 `packaging/systemd/volt-backup.service`, `packaging/systemd/volt-renew.service`
 — Laufen zwar unprivilegiert als `User=volt`, verzichten aber komplett auf

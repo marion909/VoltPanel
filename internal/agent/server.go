@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -195,7 +196,15 @@ func (s *Server) Listen() error {
 		return fmt.Errorf("alten socket entfernen: %w", err)
 	}
 
+	// Ohne die verengte Umask entstünde der Socket kurz mit den ererbten,
+	// meist weiteren Rechten des Prozesses — das Zeitfenster bis zum
+	// os.Chmod gleich danach. Nur um genau diesen einen Aufruf herum, nicht
+	// für den ganzen Prozess: der Agent schreibt später Dateien (z. B.
+	// nginx-Configs), die bewusst world-readable sein müssen, und eine
+	// dauerhaft verengte Umask würde die unbemerkt auf 0600 kappen.
+	old := syscall.Umask(0o177)
 	ln, err := net.Listen("unix", s.socketPath)
+	syscall.Umask(old)
 	if err != nil {
 		return fmt.Errorf("socket %s: %w", s.socketPath, err)
 	}

@@ -70,6 +70,53 @@ func TestSocketCarriesPeerGroup(t *testing.T) {
 	}
 }
 
+// TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus: Listen() verengt die
+// Prozess-Umask kurz, damit der Socket nicht mit den ererbten, meist
+// weiteren Rechten entsteht, bevor os.Chmod ihn auf 0660 setzt. Dieser Test
+// hält fest, dass die Umask danach wieder ihren ursprünglichen Wert trägt —
+// eine dauerhaft verengte Umask würde spätere Dateien des Agents (etwa
+// nginx-Configs, die world-readable sein müssen) unbemerkt auf 0600 kappen.
+func TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus(t *testing.T) {
+	me, err := user.Current()
+	if err != nil {
+		t.Skip("aktueller Benutzer nicht ermittelbar")
+	}
+
+	dir, err := os.MkdirTemp("/tmp", "volt-sock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	srv, err := NewServer(ServerOptions{
+		SocketPath: filepath.Join(dir, "a.sock"),
+		PeerUser:   me.Username,
+		Logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		NginxDir:   dir, PHPDir: dir, CertDir: dir, SitesDir: dir, LogDir: dir,
+	})
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	// syscall.Umask setzt UND liefert den vorherigen Wert — der einzige Weg,
+	// den aktuellen Stand zu lesen, ist ihn testweise zu setzen und sofort
+	// wieder zurückzusetzen.
+	before := syscall.Umask(0o022)
+	syscall.Umask(before)
+
+	if err := srv.Listen(); err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { srv.listener.Close() })
+
+	after := syscall.Umask(0o022)
+	syscall.Umask(after)
+
+	if before != after {
+		t.Errorf("Listen() hat die Prozess-Umask verändert: vorher %o, nachher %o", before, after)
+	}
+}
+
 // TestPeerLookupResolvesBothIDs hält fest, dass beide Nummern nachgeschlagen
 // werden — nicht nur die des Benutzers.
 func TestPeerLookupResolvesBothIDs(t *testing.T) {
