@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.112 — 2026-09-08
+
 - CheckCount/countFor liefen über zwei parallele switch-Anweisungen
   über dieselbe Resource-Aufzählung — eine neue Ressource musste an
   zwei Stellen ergänzt werden. Jetzt eine Lookup-Tabelle
