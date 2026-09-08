@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.92 — 2026-09-08
+
 - SiteDetail.vue: siteId (aus route.params.id) hatte keinen eigenen
   watch() — da /frontend/sites/:id dieselbe Komponenteninstanz für
   jede Site wiederverwendet, blieben site/settings/php/certs/
