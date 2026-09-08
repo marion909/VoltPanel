@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.110 — 2026-09-08
+
 - Create (backup.go) und ExportTenant (tenant_export.go) bauten je
   denselben ~20-zeiligen Block nach (Datei mit 0600 öffnen,
   sha256-Hasher + gzip.Writer + tar.Writer, Schließreihenfolge,
