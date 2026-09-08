@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.128 — 2026-09-08
+
 - volt-backup.service und volt-renew.service liefen unprivilegiert
   als User=volt, verzichteten aber komplett auf die
   Sandboxing-Direktiven, die volt-web.service bereits nutzt — jetzt
