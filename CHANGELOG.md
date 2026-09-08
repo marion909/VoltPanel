@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.119 — 2026-09-08
+
 - volt tenant suspend fragte vor dem Sperren nie nach, obwohl das
   ähnlich folgenreich ist wie db/site/cron/plan remove (kein Benutzer
   des Mandanten kommt danach mehr ins Panel) — jetzt confirm() plus
