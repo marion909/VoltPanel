@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.103 — 2026-09-08
+
 - openFTPPorts, openMailPorts und setMySQLPort bauten dreimal dieselbe
   Logik nach (ufw-Status prüfen, bei aktivem ufw Regeln setzen, bei
   Fehler feste Ersatzmeldung) — neuer gemeinsamer Helfer
