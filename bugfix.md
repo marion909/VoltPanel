@@ -82,14 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/router.js:61` (vgl. `App.vue:23,62-63`) — Die Route `/services`
-trägt anders als die Nachbarrouten `/plugins`/`/tenants` kein `meta: {
-minRole: 'admin' }`, obwohl der zugehörige Navigationspunkt „Dienste" in
-`App.vue` mit `minRole: "admin"` versehen ist. — Design — Ruft ein
-Nicht-Administrator die URL direkt auf, sieht er eine rohe Fehlermeldung
-plus die voll bedienbare `ProcessList`-Komponente. Fix: `meta: { minRole:
-'admin' }` ergänzen, oder den `minRole`-Eintrag aus der Navigation entfernen.
-
 `web/src/components/AppStoreDialog.vue:22-29,31-42` —
 `loadCatalog`/`loadPHPVersions` fangen jeden Fehler mit leerem `catch {}` ab,
 ohne `error.value` zu setzen. — Design — Schlägt `/appstore` oder

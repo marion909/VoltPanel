@@ -58,7 +58,7 @@ const routes = [
   { path: '/mail', name: 'mail', component: Mail },
   { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/backups', name: 'backups', component: Backups },
-  { path: '/services', name: 'services', component: Services },
+  { path: '/services', name: 'services', component: Services, meta: { minRole: 'admin' } },
   { path: '/plugins', name: 'plugins', component: Plugins, meta: { minRole: 'admin' } },
   { path: '/tenants', name: 'tenants', component: Tenants, meta: { minRole: 'admin' } },
   { path: '/audit', name: 'audit', component: Audit },
