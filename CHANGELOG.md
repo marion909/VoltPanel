@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.126 — 2026-09-08
+
 - Der Agent-Socket entstand kurz mit den ererbten Prozessrechten,
   bevor os.Chmod(0o660) sie verengte — Listen() setzt die Umask
   jetzt nur um den net.Listen-Aufruf herum eng und direkt danach
