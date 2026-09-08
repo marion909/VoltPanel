@@ -167,9 +167,16 @@ ohne die übrigen Dateien des Agents zu beeinflussen. Test
 `TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus` sichert ab, dass
 nichts von der Umask-Änderung nach außen dringt.
 
-`scripts/build-pages.sh:53,55` — Nutzt feste, vorhersagbare Pfade
-`/tmp/other-latest.json`/`/tmp/other-latest.sig` statt `mktemp`, obwohl
-andere Skripte im selben Projekt korrekt `mktemp`/`mktemp -d` verwenden. —
-Sicherheit (CI-Kontext) — In einer geteilten CI-Umgebung ließe sich über
-einen vorab angelegten Symlink das Ziel der `mv`-Operation beeinflussen.
-Fix: auf `mktemp` umstellen.
+**Erledigt:** `scripts/build-pages.sh` nutzte feste, vorhersagbare Pfade
+(`/tmp/other-latest.json`/`/tmp/other-latest.sig`) statt `mktemp`, obwohl
+andere Skripte im selben Projekt korrekt `mktemp`/`mktemp -d` verwenden —
+in einer geteilten CI-Umgebung ließe sich über einen vorab angelegten
+Symlink das Ziel der `mv`-Operation beeinflussen. Auf `mktemp` umgestellt,
+mit `trap ... EXIT` für den Abbruchfall. Damit ist auch dieser Abschnitt
+und die gesamte Bugfix-Liste vollständig abgearbeitet (v0.4.126–v0.4.129,
+siehe CHANGELOG.md).
+
+---
+
+Alle Funde aus dieser Datei sind umgesetzt oder — mit begründeter
+Abwägung, siehe oben — bewusst nicht umgesetzt. Nichts steht mehr offen.

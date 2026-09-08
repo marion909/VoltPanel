@@ -48,16 +48,24 @@ mkdir -p "$OUT/$CHANNEL/systemd"
 # Pages ersetzt bei jedem Deploy die ganze Seite. Ohne diesen Schritt würde
 # ein Beta-Release den stabilen Kanal von der Seite putzen — und jedes
 # installierte Panel liefe in einen 404.
+# Feste Pfade liessen sich in einer geteilten CI-Umgebung durch einen vorab
+# angelegten Symlink kapern: mv folgte ihm, und das Ziel waere nicht mehr das
+# gemeinte. mktemp gibt jedem Lauf einen unvorhersehbaren Namen; der Trap
+# raeumt auf, auch wenn das Skript dazwischen abbricht (set -e).
+other_json="$(mktemp)"
+other_sig="$(mktemp)"
+trap 'rm -f "$other_json" "$other_sig"' EXIT
+
 for other in stable beta; do
     [ "$other" = "$CHANNEL" ] && continue
-    if curl -fsSL "$BASE/$other/latest.json" -o /tmp/other-latest.json 2>/dev/null; then
+    if curl -fsSL "$BASE/$other/latest.json" -o "$other_json" 2>/dev/null; then
         mkdir -p "$OUT/$other"
-        mv /tmp/other-latest.json "$OUT/$other/latest.json"
+        mv "$other_json" "$OUT/$other/latest.json"
         # Die Signatur gehoert dazu. Ohne sie stuende der Kanal da, waere aber
         # fuer jedes Panel unbrauchbar, das seine Signatur prueft — und die
         # Meldung lautete "keine Signatur", obwohl es eine gibt.
-        if curl -fsSL "$BASE/$other/latest.json.sig" -o /tmp/other-latest.sig 2>/dev/null; then
-            mv /tmp/other-latest.sig "$OUT/$other/latest.json.sig"
+        if curl -fsSL "$BASE/$other/latest.json.sig" -o "$other_sig" 2>/dev/null; then
+            mv "$other_sig" "$OUT/$other/latest.json.sig"
         fi
         echo "Kanal $other unverändert übernommen"
     fi

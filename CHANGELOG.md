@@ -13,7 +13,13 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- build-pages.sh nutzte feste, vorhersagbare Pfade
+  (/tmp/other-latest.json, /tmp/other-latest.sig) statt mktemp, obwohl
+  andere Skripte im Projekt korrekt mktemp/mktemp -d verwenden — in
+  einer geteilten CI-Umgebung ließe sich über einen vorab angelegten
+  Symlink das Ziel der mv-Operation beeinflussen. Auf mktemp
+  umgestellt, mit trap ... EXIT für den Abbruchfall. Damit ist die
+  gesamte bugfix.md-Liste abgearbeitet
 
 ## v0.4.128 — 2026-09-08
 
