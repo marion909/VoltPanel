@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.105 — 2026-09-08
+
 - extractZip zählte die entpackte Größe als uint64, extractTarGz als
   int64 — uneinheitlich typisiert. Jetzt beide int64, mit neuem
   addArchiveSize-Helfer, der eine als riesig deklarierte
