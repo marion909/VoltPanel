@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.121 — 2026-09-08
+
 - volt user 2fa-reset rief confirm() auf, definierte aber kein
   --yes-Flag wie vergleichbare Befehle — jetzt ergänzt
 
