@@ -126,12 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/tenant.go:130,171,175,208` — Mandanten werden bei `set-plan`,
-`suspend` und `usage` ausschließlich über die numerische ID angesprochen,
-obwohl `tenant add` einen sprechenden `--slug` vergibt. — Design —
-`findTenant`-Helfer analog zu `findDatabase` (db.go:222) einführen, der Slug
-oder ID akzeptiert.
-
 `cmd/volt/tenant.go:171` (`tenantSuspendCmd`) — Keine Rückfrage
 (`confirm()`/`--yes`), obwohl das Sperren eines Mandanten ähnlich folgenreich
 ist wie `db remove`/`site remove`/`cron remove`/`plan remove`. — Design —

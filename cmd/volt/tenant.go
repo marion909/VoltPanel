@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -127,17 +128,13 @@ func (a *app) tenantAddCmd() *cobra.Command {
 
 func (a *app) tenantSetPlanCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "set-plan <tenant-id> <plan-id>",
+		Use:   "set-plan <tenant-id|slug> <plan-id>",
 		Short: "Ordnet einem Mandanten ein Paket zu (0 = keines)",
 		Args:  cobra.ExactArgs(2),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			ctx, sys := cmd.Context(), store.SystemScope()
 
-			tenantID, err := parseID(args[0])
-			if err != nil {
-				return err
-			}
-			tenant, err := a.store.GetTenant(ctx, sys, tenantID)
+			tenant, err := a.findTenant(ctx, args[0])
 			if err != nil {
 				return err
 			}
@@ -172,17 +169,13 @@ func (a *app) tenantSuspendCmd() *cobra.Command {
 	var resume bool
 
 	cmd := &cobra.Command{
-		Use:   "suspend <tenant-id>",
+		Use:   "suspend <tenant-id|slug>",
 		Short: "Sperrt einen Mandanten (oder hebt die Sperre mit --resume auf)",
 		Args:  cobra.ExactArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
 			ctx, sys := cmd.Context(), store.SystemScope()
 
-			id, err := parseID(args[0])
-			if err != nil {
-				return err
-			}
-			tenant, err := a.store.GetTenant(ctx, sys, id)
+			tenant, err := a.findTenant(ctx, args[0])
 			if err != nil {
 				return err
 			}
@@ -205,7 +198,7 @@ func (a *app) tenantSuspendCmd() *cobra.Command {
 
 func (a *app) tenantUsageCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "usage [tenant-id]",
+		Use:   "usage [tenant-id|slug]",
 		Short: "Zeigt Verbrauch und Grenzen; ohne Argument für alle Mandanten",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: a.withApp(false, func(cmd *cobra.Command, args []string) error {
@@ -214,11 +207,7 @@ func (a *app) tenantUsageCmd() *cobra.Command {
 
 			var tenants []*store.Tenant
 			if len(args) == 1 {
-				id, err := parseID(args[0])
-				if err != nil {
-					return err
-				}
-				tenant, err := a.store.GetTenant(ctx, sys, id)
+				tenant, err := a.findTenant(ctx, args[0])
 				if err != nil {
 					return err
 				}
@@ -259,6 +248,29 @@ func (a *app) tenantUsageCmd() *cobra.Command {
 			return nil
 		}),
 	}
+}
+
+// findTenant sucht einen Mandanten über die numerische ID oder den Slug, den
+// `tenant add` vergibt — dieselbe Bequemlichkeit wie findDatabase (db.go),
+// nur mit ID-Fallback zuerst: bestehende Aufrufe mit der ID funktionieren
+// unverändert weiter.
+func (a *app) findTenant(ctx context.Context, ref string) (*store.Tenant, error) {
+	sys := store.SystemScope()
+	if id, err := parseID(ref); err == nil {
+		if tenant, err := a.store.GetTenant(ctx, sys, id); err == nil {
+			return tenant, nil
+		}
+	}
+	tenants, err := a.store.ListTenants(ctx, sys)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range tenants {
+		if t.Slug == ref {
+			return t, nil
+		}
+	}
+	return nil, fmt.Errorf("mandant %q nicht gefunden", ref)
 }
 
 // slugify bildet aus einem Namen einen Kurznamen.

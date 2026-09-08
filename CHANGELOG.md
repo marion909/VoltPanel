@@ -13,7 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- volt tenant set-plan/suspend/usage akzeptierten nur die numerische
+  ID, obwohl tenant add einen sprechenden Slug vergibt — neuer
+  findTenant-Helfer (analog zu findDatabase) akzeptiert jetzt beides;
+  bestehende Aufrufe mit der ID funktionieren unverändert weiter
 
 ## v0.4.117 — 2026-09-08
 
