@@ -135,9 +135,20 @@ if [ -z "${VOLT_SKIP_MARIADB:-}" ] \
     apt-get install -y -qq --no-install-recommends \
         mariadb-server mariadb-client >/dev/null
     systemctl enable --now mariadb >/dev/null 2>&1 || true
-    # root meldet sich auf Debian über den Socket an — genau der Weg, den der
-    # Agent nimmt. Es gibt damit kein Datenbankpasswort, das irgendwo liegt.
-    info "MariaDB installiert, root über Socket-Auth"
+    # Nachsehen, statt es zu behaupten — dasselbe Muster wie bei volt-agent/
+    # volt-web weiter unten. "enable --now" meldet auch dann Erfolg, wenn
+    # mysqld sofort wieder abstürzt; ohne diese Prüfung fiele ein kaputtes
+    # MariaDB erst beim ersten `volt db add` auf.
+    if ! systemctl is-active --quiet mariadb; then
+        warn "MariaDB läuft nicht. Die letzten Zeilen aus dem Journal:"
+        journalctl -u mariadb -n 15 --no-pager 2>/dev/null | sed 's/^/    /' >&2
+        warn "volt db add schlägt fehl, bis der Dienst läuft."
+    else
+        # root meldet sich auf Debian über den Socket an — genau der Weg, den
+        # der Agent nimmt. Es gibt damit kein Datenbankpasswort, das
+        # irgendwo liegt.
+        info "MariaDB installiert, root über Socket-Auth"
+    fi
 fi
 
 # --- Benutzer und Verzeichnisse -------------------------------------------

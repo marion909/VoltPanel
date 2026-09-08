@@ -136,13 +136,6 @@ vollständig abgearbeitet (v0.4.116–v0.4.125, siehe CHANGELOG.md).
 
 ## packaging/, scripts/
 
-`packaging/install.sh:137` — `systemctl enable --now mariadb >/dev/null
-2>&1 || true` verschluckt jeden Startfehler von MariaDB; anders als bei
-volt-agent/volt-web gibt es keine spätere `is-active`-Prüfung. — Bug — Ein
-kaputtes MariaDB fällt so erst bei `volt db add` auf. Fix: nach demselben
-Muster den Dienststatus prüfen und bei Fehlschlag warnen (`journalctl -u
-mariadb -n 15`).
-
 `packaging/install.sh:111-112` — Der GPG-Schlüssel des Sury-PHP-Repos wird
 per `curl` geladen und ohne Fingerprint-/Prüfsummenabgleich sofort als
 vertrauenswürdig eingebunden. — Sicherheit — Einen bekannten Fingerprint des
