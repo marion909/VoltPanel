@@ -308,7 +308,7 @@ func (s *Server) opDockerEnv(_ context.Context, raw json.RawMessage) (any, error
 	if !templates.ValidAppName(p.Name) {
 		return nil, opInputErr(OpDockerEnv, "%q ist kein gültiger name", p.Name)
 	}
-	uid, gid, err := siteUserIDs(OpDockerEnv, p.SystemUser)
+	_, gid, err := siteUserIDs(OpDockerEnv, p.SystemUser)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,6 @@ func (s *Server) opDockerEnv(_ context.Context, raw json.RawMessage) (any, error
 	if err := os.Lchown(path, 0, gid); err != nil {
 		return nil, opErr(OpDockerEnv, "umgebung übereignen: %v", err)
 	}
-	_ = uid
 	return TextResult{Text: path}, nil
 }
 

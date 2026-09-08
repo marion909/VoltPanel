@@ -89,10 +89,6 @@ Verarbeitung genug, dass eine erzwungene gemeinsame Abstraktion in dieser
 sicherheitskritischen Datei (Zip-Slip-Schutz, Größendeckel) mehr Risiko für
 eine stille Verhaltensänderung birgt, als die reine Code-Dopplung wert ist.
 
-`internal/agent/ops_docker.go:311,337` (`opDockerEnv`) — `uid, gid, err :=
-siteUserIDs(...)` gefolgt von späterem `_ = uid`. — Design — `_, gid, err :=
-siteUserIDs(...)` direkt an der Aufrufstelle.
-
 `internal/store/repo_site.go:210-238` (`UsageForTenant`) — Setzt eine
 Abfrage für die Site-Summen ab, gefolgt von einer Schleife über drei
 Tabellennamen mit je einem eigenen `SELECT COUNT(*)` — 4 Round-Trips statt

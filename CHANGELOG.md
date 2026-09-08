@@ -13,7 +13,8 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- opDockerEnv holte uid von siteUserIDs, verwarf es aber nur mit
+  `_ = uid` — jetzt direkt `_, gid, err := siteUserIDs(...)`
 
 ## v0.4.106 — 2026-09-08
 
