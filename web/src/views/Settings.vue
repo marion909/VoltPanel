@@ -35,8 +35,7 @@ async function changePassword() {
     setUser(res.user);
     currentPassword.value = "";
     newPassword.value = "";
-    pwMessage.value =
-      "Passwort geändert. Alle anderen Sitzungen wurden beendet.";
+    pwMessage.value = t("settings.passwordChanged");
   } catch (err) {
     pwError.value = err.message;
   }
@@ -97,11 +96,11 @@ async function disableTOTP() {
     >
       <h2 class="mb-3 text-[14px] font-medium">{{ t("settings.account") }}</h2>
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-[13px]">
-        <dt :style="{ color: 'var(--ink-muted)' }">E-Mail</dt>
+        <dt :style="{ color: 'var(--ink-muted)' }">{{ t("settings.email") }}</dt>
         <dd>{{ session.user.email }}</dd>
-        <dt :style="{ color: 'var(--ink-muted)' }">Rolle</dt>
+        <dt :style="{ color: 'var(--ink-muted)' }">{{ t("settings.role") }}</dt>
         <dd>{{ session.user.role }}</dd>
-        <dt :style="{ color: 'var(--ink-muted)' }">Tenant</dt>
+        <dt :style="{ color: 'var(--ink-muted)' }">{{ t("settings.tenant") }}</dt>
         <dd>{{ session.tenant?.name }}</dd>
       </dl>
     </section>

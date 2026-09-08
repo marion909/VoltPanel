@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatBytes } from '../format'
+import { t } from '../i18n'
 
 const props = defineProps({
   label: { type: String, required: true },
@@ -44,7 +45,7 @@ const color = computed(() => {
       :aria-valuenow="unlimited ? undefined : Math.round(percent)"
       :aria-valuemin="0"
       :aria-valuemax="100"
-      :aria-label="`${label}: ${usedText}${unlimited ? '' : ' von ' + limitText}`"
+      :aria-label="`${label}: ${usedText}${unlimited ? '' : ' ' + t('quota.of') + ' ' + limitText}`"
     >
       <!-- Ohne Grenze bleibt der Balken leer statt bei 0 % zu suggerieren,
            es sei etwas knapp. -->

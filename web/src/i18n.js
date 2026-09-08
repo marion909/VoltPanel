@@ -509,6 +509,13 @@ const messages = {
     'dash.table': 'Als Tabelle anzeigen',
     'dash.hideTable': 'Tabelle ausblenden',
     'dash.time': 'Zeit',
+    'dash.cores': '{n} Kerne',
+
+    'gauge.percent': 'Prozent',
+    'gauge.status.kritisch': 'kritisch',
+    'gauge.status.hoch': 'hoch',
+    'gauge.status.normal': 'normal',
+    'quota.of': 'von',
 
     'sites.title': 'Websites',
     'sites.new': 'Neue Website',
@@ -538,6 +545,10 @@ const messages = {
 
     'settings.title': 'Einstellungen',
     'settings.account': 'Konto',
+    'settings.email': 'E-Mail',
+    'settings.role': 'Rolle',
+    'settings.tenant': 'Tenant',
+    'settings.passwordChanged': 'Passwort geändert. Alle anderen Sitzungen wurden beendet.',
     'php.title': 'PHP-Erweiterungen',
     'php.systemwide': 'Erweiterungen gelten für alle Sites derselben PHP-Version, nicht für eine einzelne.',
     'php.install': 'Installieren',
@@ -1101,6 +1112,13 @@ const messages = {
     'dash.table': 'Show as table',
     'dash.hideTable': 'Hide table',
     'dash.time': 'Time',
+    'dash.cores': '{n} cores',
+
+    'gauge.percent': 'percent',
+    'gauge.status.kritisch': 'critical',
+    'gauge.status.hoch': 'high',
+    'gauge.status.normal': 'normal',
+    'quota.of': 'of',
 
     'sites.title': 'Websites',
     'sites.new': 'New website',
@@ -1130,6 +1148,10 @@ const messages = {
 
     'settings.title': 'Settings',
     'settings.account': 'Account',
+    'settings.email': 'Email',
+    'settings.role': 'Role',
+    'settings.tenant': 'Tenant',
+    'settings.passwordChanged': 'Password changed. All other sessions were signed out.',
     'php.title': 'PHP extensions',
     'php.systemwide': 'Extensions apply to every site on the same PHP version, not to a single one.',
     'php.install': 'Install',

@@ -98,7 +98,7 @@ const system = computed(() => info.value?.system || {})
       <RingGauge
         :label="t('dash.cpu')"
         :percent="latest.cpu_percent"
-        :caption="latest.cpu_cores ? `${latest.cpu_cores} Kerne` : ''"
+        :caption="latest.cpu_cores ? t('dash.cores', { n: latest.cpu_cores }) : ''"
       />
       <RingGauge
         :label="t('dash.memory')"

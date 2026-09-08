@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { t } from '../i18n'
 
 const props = defineProps({
   label: { type: String, required: true },
@@ -34,7 +35,7 @@ const dash = computed(() => (clamped.value / 100) * circumference.value)
         :height="size"
         :viewBox="`0 0 ${size} ${size}`"
         role="img"
-        :aria-label="`${label}: ${clamped.toFixed(0)} Prozent, ${status.key}`"
+        :aria-label="`${label}: ${clamped.toFixed(0)} ${t('gauge.percent')}, ${t('gauge.status.' + status.key)}`"
       >
         <!-- Ring beginnt oben, nicht rechts -->
         <g :transform="`rotate(-90 ${size / 2} ${size / 2})`">
