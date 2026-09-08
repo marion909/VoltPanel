@@ -222,9 +222,19 @@ async function rebuild() {
   }
 }
 
-onMounted(async () => {
+async function refresh() {
   await load()
   hydrateTextareas()
+}
+
+onMounted(refresh)
+
+// /frontend/sites/:id verwendet für jede Site dieselbe Komponenteninstanz —
+// ohne diesen Watcher blieben site/settings/php/certs/authUsers und der
+// aktive Reiter von der vorherigen Site stehen, bis ein voller Remount kommt.
+watch(siteId, () => {
+  tab.value = 'overview'
+  refresh()
 })
 
 watch(tab, (value) => {

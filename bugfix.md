@@ -82,16 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/views/SiteDetail.vue:12,225,230-233` — `siteId` ist ein `computed`
-aus `route.params.id`; `load()` läuft nur einmal in `onMounted`. Es gibt
-`watch(tab, …)` und `watch(logType, loadLog)`, aber keinen `watch(siteId,
-…)`. — Bug — Da `/frontend/sites/:id` dieselbe Komponenteninstanz für jede
-Site wiederverwendet, bleiben `site`/`settings`/`php`/`certs`/`authUsers`
-und die aktive Tab-Auswahl von Site A bestehen, wenn ohne vollen Remount zu
-Site B navigiert wird. Fix: `watch(siteId, async () => { tab.value =
-'overview'; await load(); })` ergänzen, analog zum bestehenden Muster in
-Files.vue.
-
 `web/src/views/Files.vue:221-226` — `watch(siteId, …)` setzt `path.value =
 ''` und ruft zusätzlich selbst `load()` auf; das Zurücksetzen von `path`
 löst aber den separaten `watch(path, load)` ein zweites Mal aus — bei jedem

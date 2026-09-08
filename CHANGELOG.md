@@ -13,7 +13,12 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- SiteDetail.vue: siteId (aus route.params.id) hatte keinen eigenen
+  watch() — da /frontend/sites/:id dieselbe Komponenteninstanz für
+  jede Site wiederverwendet, blieben site/settings/php/certs/
+  authUsers und der aktive Reiter der vorherigen Site sichtbar, bis
+  ein voller Remount kam; neuer watch(siteId, …) lädt neu und setzt
+  den Reiter zurück
 
 ## v0.4.91 — 2026-09-08
 
