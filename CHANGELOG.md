@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.124 — 2026-09-08
+
 - Erfolgsmeldungen von site add/db add/cert issue nannten nirgends
   den Tenant, obwohl --tenant bei allen dreien still auf 1 fällt,
   falls vergessen — jetzt in allen drei Meldungen ergänzt (bei
