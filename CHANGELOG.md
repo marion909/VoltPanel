@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.99 — 2026-09-08
+
 - Mail.vue: der "Anlegen"-Button für ein neues Postfach war nur an
   !boxForm.local_part.trim() gekoppelt — das Passwortfeld hatte keine
   clientseitige Prüfung der vom Server verlangten Mindestlänge (10
