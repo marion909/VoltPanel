@@ -76,12 +76,18 @@ gesamten `web/src`, Token-Handling über Cookie + CSRF-Header statt
 
 ## Wiederverwendung, Vereinfachung, Effizienz
 
-`internal/agent/ops_files_ext.go:267,324,380,448`
-(`writeTarGz`/`writeZip`/`extractTarGz`/`extractZip`) — Zwei Paare
-paralleler, pro Format eigens nachgebauter Walk-/Entry-Schleifen. Der
-laufende Größenzähler ist in `extractTarGz` als `int64`, in `extractZip`
-aber als `uint64` typisiert. — Design — Gemeinsamer Walker mit
-Format-Callback und ein einheitlicher Zählertyp (`int64`).
+**Teilweise erledigt:** Der Zählertyp-Unterschied zwischen `extractTarGz`
+(`int64`) und `extractZip` (`uint64`) ist behoben (`written` jetzt in beiden
+`int64`, mit neuem `addArchiveSize`-Helfer, der den Vorzeichenüberlauf beim
+Umwandeln einer riesigen `uint64`-Größe explizit abfängt — Test
+`TestAddArchiveSizeUeberspringtVorzeichenUeberlauf`). **Bewusst nicht
+umgesetzt:** ein gemeinsamer Walker mit Format-Callback für
+`writeTarGz`/`writeZip`/`extractTarGz`/`extractZip` — tar (Symlinks per
+Header nachgebildet, `TypeFlag`-Switch, Streaming-API) und zip
+(Symlinks ausgelassen, Datei-Liste statt Stream) unterscheiden sich in der
+Verarbeitung genug, dass eine erzwungene gemeinsame Abstraktion in dieser
+sicherheitskritischen Datei (Zip-Slip-Schutz, Größendeckel) mehr Risiko für
+eine stille Verhaltensänderung birgt, als die reine Code-Dopplung wert ist.
 
 `internal/agent/ops_mysql.go:300-304` (`opMySQLSetPassword`), `:327-331`
 (`opMySQLDropUser`) — Beide wiederholen exakt die zwei Zeilen

@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- extractZip zählte die entpackte Größe als uint64, extractTarGz als
+  int64 — uneinheitlich typisiert. Jetzt beide int64, mit neuem
+  addArchiveSize-Helfer, der eine als riesig deklarierte
+  uint64-Eintragsgröße abfängt, bevor sie beim Umwandeln nach int64
+  negativ umschlagen und den Größendeckel unbemerkt unterlaufen könnte
 
 ## v0.4.104 — 2026-09-08
 

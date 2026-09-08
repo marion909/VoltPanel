@@ -461,7 +461,7 @@ func extractZip(ctx context.Context, archive, dest string) (int, error) {
 	defer zr.Close()
 
 	var count int
-	var written uint64
+	var written int64
 	for _, entry := range zr.File {
 		if ctx.Err() != nil {
 			return count, ctx.Err()
@@ -478,8 +478,9 @@ func extractZip(ctx context.Context, archive, dest string) (int, error) {
 			continue
 		}
 
-		written += entry.UncompressedSize64
-		if written > maxArchiveBytes {
+		var ok bool
+		written, ok = addArchiveSize(written, entry.UncompressedSize64)
+		if !ok {
 			return count, fmt.Errorf("archiv entpackt zu mehr als %d bytes", int64(maxArchiveBytes))
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
@@ -492,6 +493,20 @@ func extractZip(ctx context.Context, archive, dest string) (int, error) {
 		count++
 	}
 	return count, nil
+}
+
+// addArchiveSize addiert add (aus zip.File.UncompressedSize64, also
+// vorzeichenlos und potenziell riesig) zu written und meldet ok=false, wenn
+// das Ergebnis maxArchiveBytes überschreiten würde — geprüft, bevor
+// gerechnet wird, damit eine als riesig deklarierte Eintragsgröße nicht
+// erst beim Umwandeln nach int64 umschlägt und dabei negativ wird und so den
+// Zähler unbemerkt unterläuft. extractTarGz braucht das nicht: header.Size
+// ist dort bereits int64.
+func addArchiveSize(written int64, add uint64) (sum int64, ok bool) {
+	if add > uint64(maxArchiveBytes) || written > maxArchiveBytes-int64(add) {
+		return written, false
+	}
+	return written + int64(add), true
 }
 
 // extractZipEntry ist ausgelagert, damit die Handles per defer geschlossen

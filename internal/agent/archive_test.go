@@ -138,6 +138,32 @@ func TestExtractZipRejectsEscape(t *testing.T) {
 	}
 }
 
+// TestAddArchiveSizeUeberspringtVorzeichenUeberlauf: zip.File.UncompressedSize64
+// kommt unmittelbar aus dem Archiv und ist vorzeichenlos. Eine als riesig
+// deklarierte Größe (nahe am oberen Rand von uint64) darf beim Umwandeln
+// nach int64 nicht negativ werden und so den Größenzähler unbemerkt
+// unterlaufen.
+func TestAddArchiveSizeUeberspringtVorzeichenUeberlauf(t *testing.T) {
+	if sum, ok := addArchiveSize(0, ^uint64(0)); ok || sum < 0 {
+		t.Fatalf("addArchiveSize(0, uint64-max) = (%d, %v), erwartet ok=false und keine negative Summe", sum, ok)
+	}
+	if sum, ok := addArchiveSize(0, maxArchiveBytes+1); ok {
+		t.Fatalf("addArchiveSize hat eine Größe über der Grenze angenommen: %d", sum)
+	}
+	if sum, ok := addArchiveSize(maxArchiveBytes-10, 20); ok {
+		t.Fatalf("addArchiveSize hat eine Summe über der Grenze angenommen: %d", sum)
+	}
+
+	sum, ok := addArchiveSize(0, maxArchiveBytes)
+	if !ok || sum != maxArchiveBytes {
+		t.Fatalf("addArchiveSize(0, maxArchiveBytes) = (%d, %v), erwartet (%d, true)", sum, ok, int64(maxArchiveBytes))
+	}
+	sum, ok = addArchiveSize(100, 200)
+	if !ok || sum != 300 {
+		t.Fatalf("addArchiveSize(100, 200) = (%d, %v), erwartet (300, true)", sum, ok)
+	}
+}
+
 // TestArchiveRoundTrip: packen und entpacken muss den Inhalt erhalten.
 func TestArchiveRoundTrip(t *testing.T) {
 	client, sitesDir := startTestAgent(t)
