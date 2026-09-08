@@ -370,57 +370,47 @@ func bundleSecret(b *TenantBundle, box *authn.SecretBox, key string) (string, bo
 // Getrennt vom Einspielen, weil man ein Bündel ansehen können soll, bevor man
 // es einspielt: was steckt darin, von welchem Server, gegen welches Schema.
 func OpenBundle(path, passphrase string) (*TenantBundle, *authn.SecretBox, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
-
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, nil, fmt.Errorf("archiv lesen: %w", err)
-	}
-	defer gz.Close()
-
-	tr := tar.NewReader(gz)
-	for {
-		h, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, nil, fmt.Errorf("archiv lesen: %w", err)
-		}
+	var (
+		b     TenantBundle
+		found bool
+	)
+	err := eachEntry(path, func(h *tar.Header, tr io.Reader) error {
 		if strings.TrimPrefix(h.Name, "./") != bundleName {
-			continue
+			return nil
 		}
+		found = true
 
 		raw, err := io.ReadAll(io.LimitReader(tr, 64<<20))
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
-		var b TenantBundle
 		if err := json.Unmarshal(raw, &b); err != nil {
-			return nil, nil, fmt.Errorf("%s unlesbar: %w", bundleName, err)
+			return fmt.Errorf("%s unlesbar: %w", bundleName, err)
 		}
-
-		salt, err := hex.DecodeString(b.Secrets["salt"])
-		if err != nil || len(salt) < 16 {
-			return nil, nil, errors.New("dem bündel fehlt das salz — es lässt sich nicht öffnen")
-		}
-		box, err := passphraseBox(passphrase, salt)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Eine Probe: passt die Passphrase nicht, soll das jetzt auffallen und
-		// nicht mitten im Einspielen.
-		if err := probeBundle(&b, box); err != nil {
-			return nil, nil, err
-		}
-		return &b, box, nil
+		return errStopEachEntry
+	})
+	if err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, fmt.Errorf("in %s steckt kein %s", filepath.Base(path), bundleName)
+	if !found {
+		return nil, nil, fmt.Errorf("in %s steckt kein %s", filepath.Base(path), bundleName)
+	}
+
+	salt, err := hex.DecodeString(b.Secrets["salt"])
+	if err != nil || len(salt) < 16 {
+		return nil, nil, errors.New("dem bündel fehlt das salz — es lässt sich nicht öffnen")
+	}
+	box, err := passphraseBox(passphrase, salt)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Eine Probe: passt die Passphrase nicht, soll das jetzt auffallen und
+	// nicht mitten im Einspielen.
+	if err := probeBundle(&b, box); err != nil {
+		return nil, nil, err
+	}
+	return &b, box, nil
 }
 
 // probeBundle prüft die Passphrase an einem beliebigen Geheimnis.

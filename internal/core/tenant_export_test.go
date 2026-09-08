@@ -2,6 +2,7 @@ package core
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"io"
 	"os"
@@ -173,6 +174,38 @@ func TestFalschePassphraseOeffnetNichts(t *testing.T) {
 		if _, _, err := OpenBundle(res.Path, falsch); err == nil {
 			t.Errorf("die Passphrase %q hat das Bündel geöffnet", falsch)
 		}
+	}
+}
+
+// TestOpenBundleLehntArchivOhneBundleAb: OpenBundle lief seit der Umstellung
+// auf eachEntry über dessen Callback statt über eine eigene Schleife — dieser
+// Test hält fest, dass ein Archiv ohne bundle.json weiterhin mit einem
+// Fehler abgelehnt wird, statt mit einem leeren TenantBundle durchzugehen.
+func TestOpenBundleLehntArchivOhneBundleAb(t *testing.T) {
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	payload := []byte("<h1>keine bundle.json hier</h1>")
+	if err := tw.WriteHeader(&tar.Header{
+		Name: "sites/alice.example.at/public/index.html", Mode: 0o644,
+		Size: int64(len(payload)), Typeflag: tar.TypeReg,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	tw.Close()
+	gz.Close()
+
+	archive := filepath.Join(dir, "ohne-bundle.tar.gz")
+	if err := os.WriteFile(archive, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := OpenBundle(archive, "eine-lange-passphrase"); err == nil {
+		t.Fatal("OpenBundle hat ein Archiv ohne bundle.json angenommen")
 	}
 }
 

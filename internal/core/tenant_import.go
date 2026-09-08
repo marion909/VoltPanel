@@ -658,7 +658,7 @@ func (s *ExportService) unpackFiles(ctx context.Context, archive string,
 		}
 	}
 
-	if err := s.eachEntry(archive, func(h *tar.Header, r io.Reader) error {
+	if err := eachEntry(archive, func(h *tar.Header, r io.Reader) error {
 		name := strings.TrimPrefix(filepath.ToSlash(h.Name), "./")
 
 		if rest, ok := strings.CutPrefix(name, exportMailDir+"/"); ok {
@@ -767,7 +767,7 @@ func (s *ExportService) restoreDatabases(ctx context.Context, archive string,
 		}
 	}
 
-	err := s.eachEntry(archive, func(h *tar.Header, r io.Reader) error {
+	err := eachEntry(archive, func(h *tar.Header, r io.Reader) error {
 		name := strings.TrimPrefix(filepath.ToSlash(h.Name), "./")
 		datei, ok := strings.CutPrefix(name, exportDBDir+"/")
 		if !ok || h.Typeflag != tar.TypeReg {
@@ -804,8 +804,18 @@ func (s *ExportService) restoreDatabases(ctx context.Context, archive string,
 	}
 }
 
-// eachEntry läuft einmal durch das Archiv.
-func (s *ExportService) eachEntry(archive string, fn func(*tar.Header, io.Reader) error) error {
+// errStopEachEntry lässt eine eachEntry-Callback-Funktion die Iteration
+// vorzeitig beenden, ohne dass eachEntry das als Fehler nach außen meldet —
+// für den Fall, dass nur ein bestimmter Eintrag gesucht wird (Restore,
+// OpenBundle), statt jeden Eintrag im Archiv zu verarbeiten.
+var errStopEachEntry = errors.New("eachEntry: iteration vorzeitig beendet")
+
+// eachEntry läuft einmal durch das Archiv. Paketweite Funktion statt Methode
+// auf ExportService, damit auch Restore (backup.go) und OpenBundle
+// (tenant_export.go) sie nutzen können, statt "Datei öffnen →
+// gzip.NewReader → tar.NewReader → tr.Next()-Schleife" je für sich
+// nachzubauen.
+func eachEntry(archive string, fn func(*tar.Header, io.Reader) error) error {
 	f, err := os.Open(archive)
 	if err != nil {
 		return err
@@ -828,6 +838,9 @@ func (s *ExportService) eachEntry(archive string, fn func(*tar.Header, io.Reader
 			return err
 		}
 		if err := fn(h, tr); err != nil {
+			if errors.Is(err, errStopEachEntry) {
+				return nil
+			}
 			return err
 		}
 	}

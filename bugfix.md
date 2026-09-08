@@ -89,20 +89,17 @@ Verarbeitung genug, dass eine erzwungene gemeinsame Abstraktion in dieser
 sicherheitskritischen Datei (Zip-Slip-Schutz, Größendeckel) mehr Risiko für
 eine stille Verhaltensänderung birgt, als die reine Code-Dopplung wert ist.
 
-`internal/core/tenant_bundle.go:125-155` (`CollectTenant`) — Für jede Site
-ein eigener `ListFTPAccounts`-/`PHPPoolBySite`-Aufruf, für jede Datenbank ein
-`ListDBUsers`-Aufruf, für jeden Datenbankbenutzer ein
-`ListRemoteHosts`-Aufruf — N+1 über drei verschachtelte Ebenen. — Design
-(Effizienz, geringe praktische Auswirkung) — Sammelabfragen über `site_id IN
-(...)`/`db_user_id IN (...)`.
-
-`internal/core/backup.go:145-177` (`Restore`) und
-`internal/core/tenant_export.go:372-396` (`OpenBundle`) — Beide rollen von
-Hand "Datei öffnen → `gzip.NewReader` → `tar.NewReader` →
-`tr.Next()`-Schleife" nach, obwohl `internal/core/tenant_import.go:765-791`
-mit `eachEntry` bereits eine generische Version bereitstellt. — Design —
-`eachEntry` zu einer paketweiten Funktion machen und auch von
-`Restore`/`OpenBundle` aufrufen lassen.
+**Bewusst nicht umgesetzt:** `internal/core/tenant_bundle.go:125-155`
+(`CollectTenant`) — N+1 über drei verschachtelte Ebenen (Site → FTP/PHP-Pool,
+Datenbank → Benutzer → Herkunftsliste). Der Fund selbst stuft die praktische
+Auswirkung als gering ein: SQLite ist lokales Datei-I/O statt ein
+Netzwerk-Round-Trip, und `CollectTenant` läuft nur beim (seltenen,
+admin-ausgelösten) Export/Import eines Mandanten, nie im Anfragepfad. Eine
+Sammelabfrage über `site_id IN (...)`/`db_user_id IN (...)` bräuchte neue,
+öffentliche Store-Methoden (`ListFTPAccountsForSites`,
+`ListDBUsersForDatabases`, `ListRemoteHostsForUsers` o. ä.) und damit eine
+größere API-Erweiterung des `store`-Pakets für einen Pfad, der in der Praxis
+kaum ins Gewicht fällt.
 
 `internal/core/backup.go:79-126` (`Create`) und
 `internal/core/tenant_export.go:146-212` (`ExportTenant`) — Beide bauen

@@ -143,18 +143,6 @@ func (s *BackupService) Create(ctx context.Context, opts CreateOptions) (*Result
 // Die Site-Dateien werden bewusst nicht automatisch überschrieben — das wäre
 // unumkehrbar. Sie liegen im Archiv und lassen sich gezielt herausholen.
 func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
-	f, err := os.Open(archivePath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return fmt.Errorf("archiv %s ist kein gzip: %w", archivePath, err)
-	}
-	defer gz.Close()
-
 	// Vor dem Überschreiben eine Kopie des aktuellen Stands ziehen: ein
 	// Restore aus dem falschen Archiv soll nicht der letzte Schritt sein.
 	safety := s.cfg.DBPath + ".vor-restore"
@@ -163,18 +151,12 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 	}
 	s.log.Info("sicherheitskopie angelegt", "pfad", safety)
 
-	tr := tar.NewReader(gz)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("archiv lesen: %w", err)
-		}
+	found := false
+	err := eachEntry(archivePath, func(header *tar.Header, tr io.Reader) error {
 		if header.Name != "volt.db" {
-			continue
+			return nil
 		}
+		found = true
 
 		// Eine nicht sauber geschlossene DB (offene WAL-Segmente, hängende
 		// Transaktion) darf nicht überschrieben werden — genau die
@@ -217,11 +199,16 @@ func (s *BackupService) Restore(ctx context.Context, archivePath string) error {
 		for _, suffix := range []string{"-wal", "-shm"} {
 			_ = os.Remove(s.cfg.DBPath + suffix)
 		}
-
-		s.log.Info("datenbank zurückgespielt", "aus", archivePath)
-		return nil
+		return errStopEachEntry
+	})
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("archiv %s enthält keine volt.db", archivePath)
+	if !found {
+		return fmt.Errorf("archiv %s enthält keine volt.db", archivePath)
+	}
+	s.log.Info("datenbank zurückgespielt", "aus", archivePath)
+	return nil
 }
 
 func addFile(tw *tar.Writer, src, name string) error {

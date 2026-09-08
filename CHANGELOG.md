@@ -13,7 +13,15 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Restore (backup.go) und OpenBundle (tenant_export.go) rollten von
+  Hand "Datei öffnen → gzip.NewReader → tar.NewReader →
+  tr.Next()-Schleife" nach — eachEntry ist jetzt eine paketweite
+  Funktion (statt einer Methode auf ExportService) mit einem
+  Abbruchsignal für Callbacks, die nur einen bestimmten Eintrag
+  suchen; Restore und OpenBundle nutzen sie jetzt beide. Neue Tests
+  TestRestoreLehntArchivOhneVoltDBAb und
+  TestOpenBundleLehntArchivOhneBundleAb schließen eine bisherige
+  Testlücke (Archiv ohne den gesuchten Eintrag)
 
 ## v0.4.108 — 2026-09-08
 
