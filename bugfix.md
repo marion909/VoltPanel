@@ -117,12 +117,6 @@ gibt also keinen Fake, um das an einem echten Test zu verifizieren. Eine
 Umstellung ohne Testabsicherung für eine Verhaltensänderung an einem
 Lösch-Pfad wäre das falsche Risiko für diesen Fund.
 
-`internal/core/quota.go:140-156,172-186` (`CheckCount`/`countFor`) — Zwei
-parallele `switch`-Anweisungen über dieselbe `Resource`-Aufzählung — eine
-neue Ressource muss an zwei Stellen ergänzt werden. — Design — Lookup-Tabelle
-`map[Resource]struct{limit func(*store.Plan) int; count func(context.Context,
-store.Scope) (int, error)}`.
-
 `internal/store/helpers.go:62-67` (`boolToInt`, ohne Umkehrfunktion) —
 Betrifft mindestens 12 Stellen in 10 Dateien — jede `scanX`-Funktion
 rekonstruiert die Rückrichtung von Hand und uneinheitlich. — Design —

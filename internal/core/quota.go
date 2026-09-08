@@ -119,6 +119,46 @@ func quotaEntry(res Resource, used, limit int64, bytes bool) QuotaEntry {
 	return e
 }
 
+// resourceCounters bündelt Limit und Zählfunktion je zählbarer Ressource —
+// eine Zeile pro Ressource statt derselben Aufzählung in zwei parallelen
+// switch-Anweisungen, wo eine neue Ressource sich sonst an zwei Stellen
+// eintragen müsste.
+//
+// count ist ein Methodenausdruck ((*store.Store).CountSites hat den Typ
+// func(*store.Store, context.Context, store.Scope) (int, error)), deshalb
+// nimmt er *store.Store als ersten Parameter statt s.store beim Bauen der
+// Map einzufangen. CountMailboxes weicht als einziges auf tenantID statt
+// Scope aus — der kleine Adapter gleicht das an.
+var resourceCounters = map[Resource]struct {
+	limit func(*store.Plan) int
+	count func(*store.Store, context.Context, store.Scope) (int, error)
+}{
+	ResourceSites: {
+		limit: func(p *store.Plan) int { return p.MaxSites },
+		count: (*store.Store).CountSites,
+	},
+	ResourceDatabases: {
+		limit: func(p *store.Plan) int { return p.MaxDatabases },
+		count: (*store.Store).CountDatabases,
+	},
+	ResourceCronjobs: {
+		limit: func(p *store.Plan) int { return p.MaxCronjobs },
+		count: (*store.Store).CountCronjobs,
+	},
+	ResourceFTP: {
+		limit: func(p *store.Plan) int { return p.MaxFTP },
+		count: (*store.Store).CountFTPAccounts,
+	},
+	ResourceMailboxes: {
+		// Die Spalte stand seit 0001 im Schema und wurde von niemandem
+		// gelesen — es gab ja keine Postfächer. Jetzt gibt es sie.
+		limit: func(p *store.Plan) int { return p.MaxMailboxes },
+		count: func(st *store.Store, ctx context.Context, sc store.Scope) (int, error) {
+			return st.CountMailboxes(ctx, sc.TenantID)
+		},
+	},
+}
+
 // CheckCount prüft eine Anzahl-Grenze vor dem Anlegen einer Ressource.
 //
 // Diese eine Funktion ersetzt die zuvor je Dienst kopierte Prüfung — dieselbe
@@ -138,23 +178,11 @@ func (s *QuotaService) CheckCount(ctx context.Context, sc store.Scope, tenantID 
 		return err
 	}
 
-	var limit int
-	switch res {
-	case ResourceSites:
-		limit = plan.MaxSites
-	case ResourceDatabases:
-		limit = plan.MaxDatabases
-	case ResourceCronjobs:
-		limit = plan.MaxCronjobs
-	case ResourceFTP:
-		limit = plan.MaxFTP
-	case ResourceMailboxes:
-		// Die Spalte stand seit 0001 im Schema und wurde von niemandem
-		// gelesen — es gab ja keine Postfächer. Jetzt gibt es sie.
-		limit = plan.MaxMailboxes
-	default:
+	rc, ok := resourceCounters[res]
+	if !ok {
 		return fmt.Errorf("für %q gibt es keine anzahl-grenze", res)
 	}
+	limit := rc.limit(plan)
 	if limit <= 0 {
 		return nil
 	}
@@ -171,19 +199,11 @@ func (s *QuotaService) CheckCount(ctx context.Context, sc store.Scope, tenantID 
 }
 
 func (s *QuotaService) countFor(ctx context.Context, sc store.Scope, res Resource) (int, error) {
-	switch res {
-	case ResourceSites:
-		return s.store.CountSites(ctx, sc)
-	case ResourceDatabases:
-		return s.store.CountDatabases(ctx, sc)
-	case ResourceCronjobs:
-		return s.store.CountCronjobs(ctx, sc)
-	case ResourceFTP:
-		return s.store.CountFTPAccounts(ctx, sc)
-	case ResourceMailboxes:
-		return s.store.CountMailboxes(ctx, sc.TenantID)
+	rc, ok := resourceCounters[res]
+	if !ok {
+		return 0, fmt.Errorf("unbekannte ressource %q", res)
 	}
-	return 0, fmt.Errorf("unbekannte ressource %q", res)
+	return rc.count(s.store, ctx, sc)
 }
 
 // CheckDisk prüft, ob zusätzliche Bytes noch in die Quota passen.

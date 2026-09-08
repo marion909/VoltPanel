@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- CheckCount/countFor liefen über zwei parallele switch-Anweisungen
+  über dieselbe Resource-Aufzählung — eine neue Ressource musste an
+  zwei Stellen ergänzt werden. Jetzt eine Lookup-Tabelle
+  resourceCounters (Limit- und Zählfunktion je Ressource in einer
+  Zeile), Zählfunktionen als Methodenausdrücke auf *store.Store
 
 ## v0.4.111 — 2026-09-08
 
