@@ -126,11 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/site.go:74-81`, `db.go:82-89`, `cert.go:82-85` —
-Erfolgsmeldungen von `site add`/`db add`/`cert issue` nennen nirgends den
-Tenant, obwohl `--tenant` bei allen dreien still auf `1` fällt, falls
-vergessen. — Design — Tenant-ID/-Name auch in den Erfolgsmeldungen ausgeben.
-
 `cmd/volt/cron.go:62,112`, `plan.go:80,119` — Cronjobs/Pakete werden mit
 sprechendem Namen angelegt, aber nur über die numerische ID entfernt/
 abgefragt. — Design — `cron remove`/`cron log`/`plan remove` zusätzlich per

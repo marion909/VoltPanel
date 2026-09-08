@@ -81,7 +81,7 @@ func (a *app) siteAddCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Site %s angelegt.\n", site.Domain)
+			fmt.Printf("Site %s angelegt (Tenant %d).\n", site.Domain, site.TenantID)
 			fmt.Printf("  Verzeichnis:   %s\n", site.WebRoot())
 			fmt.Printf("  Systembenutzer: %s\n", site.SystemUser)
 			if site.Type == store.SitePHP {

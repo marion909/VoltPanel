@@ -79,8 +79,8 @@ func (a *app) certIssueCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Zertifikat ausgestellt, gültig bis %s (%d Tage).\n",
-				time.Unix(*cert.NotAfter, 0).Format("2006-01-02"), cert.DaysLeft())
+			fmt.Printf("Zertifikat ausgestellt (Tenant %d), gültig bis %s (%d Tage).\n",
+				cert.TenantID, time.Unix(*cert.NotAfter, 0).Format("2006-01-02"), cert.DaysLeft())
 			fmt.Printf("  %s\n  %s\n", cert.CertPath, cert.KeyPath)
 			return nil
 		}),

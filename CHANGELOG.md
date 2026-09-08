@@ -13,7 +13,11 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Erfolgsmeldungen von site add/db add/cert issue nannten nirgends
+  den Tenant, obwohl --tenant bei allen dreien still auf 1 fällt,
+  falls vergessen — jetzt in allen drei Meldungen ergänzt (bei
+  cert issue der tatsächlich verwendete Tenant, auch wenn eine
+  gefundene Site ihn gegenüber --tenant überschreibt)
 
 ## v0.4.123 — 2026-09-08
 

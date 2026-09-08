@@ -79,7 +79,7 @@ func (a *app) dbAddCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Datenbank angelegt: %s\n", res.Database.Name)
+			fmt.Printf("Datenbank angelegt: %s (Tenant %d)\n", res.Database.Name, res.Database.TenantID)
 			if res.User != nil {
 				fmt.Printf("  Benutzer: %s@%s\n", res.User.Username, res.User.HostPattern)
 				fmt.Printf("  Passwort: %s\n", res.Password)
