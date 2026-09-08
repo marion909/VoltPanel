@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.94 — 2026-09-08
+
 - SiteTerminal.vue: onMounted lief komplett ohne try/catch — schlug der
   dynamische Import von @xterm/xterm oder @xterm/addon-fit fehl, blieb
   ein leerer Rahmen ohne jeden Hinweis stehen; ein Fehlschlag zeigt
