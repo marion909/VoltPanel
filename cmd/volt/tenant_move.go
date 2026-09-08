@@ -126,6 +126,13 @@ func (a *app) tenantImportCmd() *cobra.Command {
 			}
 			fmt.Println("Zertifikate holt `volt cert issue <domain>`, sobald der DNS-Eintrag")
 			fmt.Println("hierher zeigt — vorher hat ACME nichts, woran es die Domain erkennt.")
+			// Die Daten liegen bereits — deshalb oben nur ein Hinweis, kein
+			// Abbruch. Der Exitcode muss das trotzdem sagen, sonst sieht ein
+			// nur teilweise geglückter Import wie ein voller Erfolg aus.
+			if res.Rebuilt < res.Sites || len(res.Warnings) > 0 {
+				return fmt.Errorf("import unvollständig: %d von %d sites hergestellt, %d hinweis(e) — siehe oben",
+					res.Rebuilt, res.Sites, len(res.Warnings))
+			}
 			return nil
 		}),
 	}

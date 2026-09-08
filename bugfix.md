@@ -126,13 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/tenant_move.go:113-127` (`tenantImportCmd`) — Gibt Warnungen bei
-`res.Rebuilt < res.Sites` nur auf stderr aus und liefert danach unbedingt
-`return nil` — Exitcode 0 selbst bei einem nur teilweise geglückten Import.
-— Design — Fix: bei `res.Rebuilt < res.Sites` (oder vorhandenen
-`res.Warnings`) ebenfalls einen Fehler zurückgeben, wie vergleichbare
-Befehle (`certRenewCmd`, `cronSyncCmd`, `siteRebuildCmd`).
-
 `cmd/volt/tenant.go:130,171,175,208` — Mandanten werden bei `set-plan`,
 `suspend` und `usage` ausschließlich über die numerische ID angesprochen,
 obwohl `tenant add` einen sprechenden `--slug` vergibt. — Design —
