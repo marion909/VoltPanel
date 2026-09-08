@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.104 — 2026-09-08
+
 - installWordPressFiles und installRoundcubeFiles bauten je einzeln
   "Temp-Verzeichnis anlegen, laden, Summe prüfen, per os.Rename
   einsetzen" nach — neuer gemeinsamer Helfer installArchiveInto in
