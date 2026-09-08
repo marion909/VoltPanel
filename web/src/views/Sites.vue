@@ -198,7 +198,7 @@ const inputStyle = {
         <span
           class="mb-1 block text-[12px]"
           :style="{ color: 'var(--ink-secondary)' }"
-          >Proxy-Ziel</span
+          >{{ t("sites.proxyTarget") }}</span
         >
         <input
           v-model="form.proxy_target"

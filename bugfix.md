@@ -69,18 +69,10 @@ die regulären Lösch-Flows durchläuft).
 
 ## web/src — Vue-Frontend (vollständig geprüft, alle 39 Dateien)
 
+**Erledigt:** alle Funde umgesetzt (v0.4.89–v0.4.101, siehe CHANGELOG.md).
 Keine Sicherheitsbefunde: kein einziges `v-html`/`innerHTML`/`outerHTML` im
 gesamten `web/src`, Token-Handling über Cookie + CSRF-Header statt
 `localStorage`.
-
-`web/src/views/Deploys.vue:124-137` — `zurueck()` (Rollback) ruft die als
-reinen Toggle implementierte `staendeLaden(d)` zweimal hintereinander auf.
-— Design — Funktioniert nur zufällig korrekt, weil `offen[d.id]` vor dem
-Klick immer `true` ist. Fix: eigene `ladeStaende(d)`-Funktion ohne
-Toggle-Nebeneffekt.
-
-`web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
-Design.
 
 ## Wiederverwendung, Vereinfachung, Effizienz
 

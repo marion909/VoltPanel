@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- Sites.vue: Label "Proxy-Ziel" war hartcodiertes Deutsch statt t() —
+  neuer Schlüssel sites.proxyTarget in de/en ergänzt; damit ist der
+  gesamte web/src-Abschnitt der Bugfix-Liste abgearbeitet
 
 ## v0.4.100 — 2026-09-08
 
