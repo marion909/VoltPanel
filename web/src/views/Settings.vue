@@ -88,11 +88,7 @@ async function disableTOTP() {
     <PanelCertificate v-if="isAdmin()" />
 
     <section
-      class="mb-4 rounded-lg border p-5"
-      :style="{
-        borderColor: 'var(--border-ring)',
-        background: 'var(--surface-card)',
-      }"
+      class="panel-card mb-4 p-5"
     >
       <h2 class="mb-3 text-[14px] font-medium">{{ t("settings.account") }}</h2>
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-[13px]">
@@ -106,11 +102,7 @@ async function disableTOTP() {
     </section>
 
     <section
-      class="mb-4 rounded-lg border p-5"
-      :style="{
-        borderColor: 'var(--border-ring)',
-        background: 'var(--surface-card)',
-      }"
+      class="panel-card mb-4 p-5"
     >
       <h2 class="mb-3 text-[14px] font-medium">{{ t("settings.password") }}</h2>
       <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="changePassword">
@@ -150,7 +142,7 @@ async function disableTOTP() {
           <button
             type="submit"
             class="rounded-md px-3 py-2 text-[13px] font-medium text-white"
-            :style="{ background: 'var(--series-1)' }"
+            :style="{ background: 'var(--accent)' }"
           >
             {{ t("common.save") }}
           </button>
@@ -173,11 +165,7 @@ async function disableTOTP() {
     </section>
 
     <section
-      class="mb-4 rounded-lg border p-5"
-      :style="{
-        borderColor: 'var(--border-ring)',
-        background: 'var(--surface-card)',
-      }"
+      class="panel-card mb-4 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t("settings.twofa") }}</h2>
       <p class="mb-3 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
@@ -230,7 +218,7 @@ async function disableTOTP() {
             />
             <button
               class="rounded-md px-3 py-2 text-[13px] font-medium text-white"
-              :style="{ background: 'var(--series-1)' }"
+              :style="{ background: 'var(--accent)' }"
               @click="enableTOTP"
             >
               {{ t("settings.twofaEnable") }}
@@ -270,11 +258,7 @@ async function disableTOTP() {
     </section>
 
     <section
-      class="rounded-lg border p-5"
-      :style="{
-        borderColor: 'var(--border-ring)',
-        background: 'var(--surface-card)',
-      }"
+      class="panel-card p-5"
     >
       <h2 class="mb-3 text-[14px] font-medium">{{ t("settings.theme") }}</h2>
       <div class="mb-4 flex gap-2">
@@ -284,9 +268,9 @@ async function disableTOTP() {
           class="rounded-md border px-3 py-1.5 text-[12px]"
           :style="{
             borderColor:
-              theme.mode === mode ? 'var(--series-1)' : 'var(--line-axis)',
+              theme.mode === mode ? 'var(--accent)' : 'var(--line-axis)',
             color:
-              theme.mode === mode ? 'var(--series-1)' : 'var(--ink-secondary)',
+              theme.mode === mode ? 'var(--accent)' : 'var(--ink-secondary)',
           }"
           @click="setTheme(mode)"
         >
@@ -304,10 +288,10 @@ async function disableTOTP() {
           class="rounded-md border px-3 py-1.5 text-[12px] uppercase"
           :style="{
             borderColor:
-              i18n.locale === locale ? 'var(--series-1)' : 'var(--line-axis)',
+              i18n.locale === locale ? 'var(--accent)' : 'var(--line-axis)',
             color:
               i18n.locale === locale
-                ? 'var(--series-1)'
+                ? 'var(--accent)'
                 : 'var(--ink-secondary)',
           }"
           @click="setLocale(locale)"

@@ -30,8 +30,7 @@ onMounted(async () => {
 
     <div
       v-else-if="entries.length"
-      class="overflow-hidden rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
         <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">

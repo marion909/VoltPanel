@@ -141,8 +141,7 @@ onMounted(load)
     <div v-else class="grid gap-5 lg:grid-cols-[220px_1fr]">
       <!-- Tabellen der gewählten Datenbank -->
       <aside
-        class="rounded-lg border p-3"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card p-3"
       >
         <h2 class="mb-2 text-[12px] font-medium" :style="{ color: 'var(--ink-secondary)' }">
           {{ t('sql.tables') }}
@@ -186,7 +185,7 @@ onMounted(load)
               type="submit"
               :disabled="running"
               class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-              :style="{ background: 'var(--series-1)' }"
+              :style="{ background: 'var(--accent)' }"
             >
               {{ running ? t('sql.running') : t('sql.run') }}
             </button>
@@ -223,8 +222,7 @@ onMounted(load)
 
           <div
             v-if="result.has_result_set && result.rows.length"
-            class="overflow-x-auto rounded-lg border"
-            :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+            class="panel-card overflow-x-auto"
           >
             <table class="w-full text-left text-[12px]">
               <thead class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">

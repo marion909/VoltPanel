@@ -38,8 +38,7 @@ onMounted(load)
 <template>
   <section
     v-if="state"
-    class="mb-4 rounded-lg border p-5"
-    :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+    class="panel-card mb-4 p-5"
   >
     <h2 class="mb-1 text-[14px] font-medium">{{ t('panelCert.title') }}</h2>
 
@@ -72,7 +71,7 @@ onMounted(load)
       <button
         :disabled="busy"
         class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="issue"
       >
         {{ busy ? t('panelCert.issuing') : t('panelCert.issue') }}

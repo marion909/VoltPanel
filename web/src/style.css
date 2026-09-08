@@ -10,17 +10,17 @@
 :root {
   color-scheme: light;
 
-  --surface-page: #f9f9f7;
-  --surface-card: #fcfcfb;
-  --surface-sunken: #f0efec;
+  --surface-page: #eef1f6;
+  --surface-card: #ffffff;
+  --surface-sunken: #eef1f5;
 
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
+  --ink-primary: #161a20;
+  --ink-secondary: #5b6472;
+  --ink-muted: #93a0b0;
 
-  --line-hairline: #e1e0d9;
-  --line-axis: #c3c2b7;
-  --border-ring: rgba(11, 11, 11, 0.1);
+  --line-hairline: #e7eaf0;
+  --line-axis: #d3d9e1;
+  --border-ring: rgba(16, 24, 40, 0.08);
 
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -29,46 +29,72 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+
+  /* Markenfarbe: Akzent für aktive Navigation, primäre Buttons, Links —
+     bewusst von --status-good getrennt. Beide sind Grün, aber sie bedeuten
+     verschiedene Dinge (Marke vs. Zustand "in Ordnung") und dürfen künftig
+     unabhängig voneinander verschoben werden. */
+  --accent: #189a4c;
+  --accent-hover: #12813f;
+  --accent-soft: rgba(24, 154, 76, 0.12);
+  --accent-contrast: #ffffff;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 16px rgba(16, 24, 40, 0.05);
+  --radius-card: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --surface-page: #0d0d0d;
-    --surface-card: #1a1a19;
-    --surface-sunken: #232321;
+    --surface-page: #101214;
+    --surface-card: #1b1d21;
+    --surface-sunken: #232629;
 
-    --ink-primary: #ffffff;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #898781;
+    --ink-primary: #f2f3f5;
+    --ink-secondary: #b7bec8;
+    --ink-muted: #7d8590;
 
-    --line-hairline: #2c2c2a;
-    --line-axis: #383835;
-    --border-ring: rgba(255, 255, 255, 0.1);
+    --line-hairline: #2a2d31;
+    --line-axis: #383c41;
+    --border-ring: rgba(255, 255, 255, 0.08);
 
     --series-1: #3987e5;
     --series-2: #d95926;
+
+    --accent: #22c55e;
+    --accent-hover: #2fd66c;
+    --accent-soft: rgba(34, 197, 94, 0.16);
+    --accent-contrast: #06210f;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 16px rgba(0, 0, 0, 0.24);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-page: #0d0d0d;
-  --surface-card: #1a1a19;
-  --surface-sunken: #232321;
+  --surface-page: #101214;
+  --surface-card: #1b1d21;
+  --surface-sunken: #232629;
 
-  --ink-primary: #ffffff;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #898781;
+  --ink-primary: #f2f3f5;
+  --ink-secondary: #b7bec8;
+  --ink-muted: #7d8590;
 
-  --line-hairline: #2c2c2a;
-  --line-axis: #383835;
-  --border-ring: rgba(255, 255, 255, 0.1);
+  --line-hairline: #2a2d31;
+  --line-axis: #383c41;
+  --border-ring: rgba(255, 255, 255, 0.08);
 
   --series-1: #3987e5;
   --series-2: #d95926;
+
+  --accent: #22c55e;
+  --accent-hover: #2fd66c;
+  --accent-soft: rgba(34, 197, 94, 0.16);
+  --accent-contrast: #06210f;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 16px rgba(0, 0, 0, 0.24);
 }
 
 html,
@@ -89,6 +115,15 @@ body {
 /* Achsenticks und Tabellenspalten müssen vertikal fluchten. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Einheitlicher Funktionspanel-Rahmen: weiße/dunkle Karte mit Schatten statt
+   nur einer Haarlinie — sonst verschwimmt jede Karte mit der Seite dahinter. */
+.panel-card {
+  background: var(--surface-card);
+  border: 1px solid var(--line-hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 @keyframes volt-fade-in {

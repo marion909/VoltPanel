@@ -289,7 +289,7 @@ onMounted(load)
       <button
         v-if="freieSites.length"
         class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="showForm = !showForm"
       >
         {{ t('apps.new') }}
@@ -348,10 +348,7 @@ onMounted(load)
       nebeneinander, damit eine alte Anwendung weiterläuft, während eine neue
       schon auf der nächsten baut.
     -->
-    <div
-      class="mb-5 rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
-    >
+    <div class="panel-card mb-5 p-4">
       <button
         class="flex w-full items-center justify-between text-[12px]"
         :style="{ color: 'var(--ink-secondary)' }"
@@ -414,8 +411,7 @@ onMounted(load)
     -->
     <div
       v-if="images.length"
-      class="mb-5 rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 p-4"
     >
       <button
         class="flex w-full items-center justify-between text-[12px]"
@@ -460,8 +456,7 @@ onMounted(load)
 
     <form
       v-if="showForm"
-      class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-3"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-3"
       @submit.prevent="createApp"
     >
       <label class="block">
@@ -562,7 +557,7 @@ onMounted(load)
           type="submit"
           :disabled="busy"
           class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
         >
           {{ busy ? t('common.loading') : t('common.create') }}
         </button>
@@ -584,8 +579,7 @@ onMounted(load)
       <article
         v-for="app in apps"
         :key="app.id"
-        class="rounded-lg border p-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card p-4"
       >
         <header class="mb-3 flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -668,7 +662,7 @@ onMounted(load)
           </p>
           <button
             class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-            :style="{ background: 'var(--series-1)' }"
+            :style="{ background: 'var(--accent)' }"
             :disabled="busy"
             @click="saveEnv(app)"
           >

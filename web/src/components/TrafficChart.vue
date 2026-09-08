@@ -93,10 +93,7 @@ const showTable = ref(false)
 </script>
 
 <template>
-  <section
-    class="rounded-lg border"
-    :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
-  >
+  <section class="panel-card">
     <header class="flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-1">
       <h2 class="text-[13px] font-medium">{{ t('dash.traffic') }}</h2>
 

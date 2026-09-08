@@ -102,7 +102,7 @@ onMounted(load)
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('cron.title') }}</h1>
       <button
         class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="showForm = !showForm"
       >
         {{ showForm ? t('common.cancel') : t('cron.new') }}
@@ -115,8 +115,7 @@ onMounted(load)
 
     <form
       v-if="showForm"
-      class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-2"
       @submit.prevent="create"
     >
       <label class="block">
@@ -163,7 +162,7 @@ onMounted(load)
       <div class="sm:col-span-2">
         <button type="submit" :disabled="busy"
                 class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }">
+                :style="{ background: 'var(--accent)' }">
           {{ busy ? t('common.loading') : t('sites.create') }}
         </button>
       </div>
@@ -175,8 +174,7 @@ onMounted(load)
 
     <div
       v-else-if="jobs.length"
-      class="overflow-hidden rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
         <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">

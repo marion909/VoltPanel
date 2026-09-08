@@ -71,11 +71,7 @@ onMounted(load);
       <div
         v-for="service in services"
         :key="service.name"
-        class="rounded-lg border p-4"
-        :style="{
-          borderColor: 'var(--border-ring)',
-          background: 'var(--surface-card)',
-        }"
+        class="panel-card p-4"
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">

@@ -175,7 +175,7 @@ onUnmounted(stoppeTicker)
       <button
         v-if="freieSites.length"
         class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="showForm = !showForm"
       >
         {{ t('deploy.new') }}
@@ -210,8 +210,7 @@ onUnmounted(stoppeTicker)
 
     <form
       v-if="showForm"
-      class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-2"
       @submit.prevent="speichern"
     >
       <label class="block">
@@ -263,7 +262,7 @@ onUnmounted(stoppeTicker)
       <div class="sm:col-span-2">
         <button type="submit" :disabled="busy"
                 class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }">
+                :style="{ background: 'var(--accent)' }">
           {{ busy ? t('common.loading') : t('common.save') }}
         </button>
       </div>
@@ -282,8 +281,7 @@ onUnmounted(stoppeTicker)
       <article
         v-for="d in deploys"
         :key="d.id"
-        class="rounded-lg border p-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card p-4"
       >
         <header class="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">

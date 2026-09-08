@@ -159,8 +159,7 @@ onMounted(() => {
       <div
         v-for="p in plugins"
         :key="p.id"
-        class="rounded-lg border p-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card p-4"
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
@@ -240,8 +239,7 @@ onMounted(() => {
 
       <div
         v-if="webmail"
-        class="mt-3 max-w-md rounded-lg border p-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card mt-3 max-w-md p-4"
       >
         <template v-if="webmail.installed">
           <div class="text-[13px] font-medium">

@@ -262,7 +262,7 @@ watch(path, load)
 
         <input ref="fileInput" type="file" multiple class="hidden" @change="upload" />
         <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }"
+                :style="{ background: 'var(--accent)' }"
                 :disabled="uploading || !siteId"
                 @click="fileInput.click()">
           {{ uploading ? t('files.uploading') : t('files.upload') }}
@@ -294,15 +294,14 @@ watch(path, load)
     <!-- Editor -->
     <section
       v-if="editor"
-      class="mb-4 rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-4"
     >
       <header class="flex items-center justify-between gap-3 border-b px-4 py-2.5"
               :style="{ borderColor: 'var(--line-hairline)' }">
         <span class="tabular text-[13px] font-medium">{{ editor.path }}</span>
         <div class="flex gap-2">
           <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
-                  :style="{ background: 'var(--series-1)' }" @click="save">
+                  :style="{ background: 'var(--accent)' }" @click="save">
             {{ t('files.save') }}
           </button>
           <button class="rounded-md border px-3 py-1.5 text-[12px]"
@@ -322,8 +321,7 @@ watch(path, load)
 
     <div
       v-if="sorted.length"
-      class="overflow-hidden rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
         <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">

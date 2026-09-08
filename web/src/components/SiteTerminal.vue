@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
       <button
         v-if="status === 'closed'"
         class="rounded-md px-3 py-1 text-[12px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="restart"
       >
         {{ t('term.reconnect') }}

@@ -133,7 +133,7 @@ onMounted(load)
       <button
         v-if="status?.ready"
         class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="showForm = !showForm"
       >
         {{ showForm ? t('common.cancel') : t('ftp.new') }}
@@ -147,8 +147,7 @@ onMounted(load)
     <!-- Nicht eingerichtet: ohne den Dienst hilft eine Liste niemandem. -->
     <div
       v-if="status && !status.ready"
-      class="mb-5 rounded-lg border p-5"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t('ftp.setupTitle') }}</h2>
       <p class="mb-3 text-[12px] whitespace-pre-line" :style="{ color: 'var(--ink-secondary)' }">
@@ -158,7 +157,7 @@ onMounted(load)
         v-if="isAdmin()"
         :disabled="busy"
         class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="setup"
       >
         {{ busy ? t('ftp.settingUp') : t('ftp.setup') }}
@@ -211,8 +210,7 @@ onMounted(load)
 
     <form
       v-if="showForm"
-      class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
       @submit.prevent="create"
     >
       <label class="block">
@@ -252,7 +250,7 @@ onMounted(load)
         </label>
         <button type="submit" :disabled="busy"
                 class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }">
+                :style="{ background: 'var(--accent)' }">
           {{ busy ? t('common.loading') : t('sites.create') }}
         </button>
       </div>
@@ -268,8 +266,7 @@ onMounted(load)
 
     <div
       v-else-if="accounts.length"
-      class="overflow-hidden rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
         <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">

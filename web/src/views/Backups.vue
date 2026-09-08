@@ -168,7 +168,7 @@ onMounted(load)
         </button>
         <button
           class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
           @click="showForm ? (showForm = false) : startNew()"
         >
           {{ showForm ? t('common.cancel') : t('backup.newTarget') }}
@@ -186,8 +186,7 @@ onMounted(load)
 
     <form
       v-if="showForm"
-      class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3"
       @submit.prevent="save"
     >
       <label class="block">
@@ -299,7 +298,7 @@ onMounted(load)
 
         <button type="submit" :disabled="busy === 'save'"
                 class="ml-auto rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }">
+                :style="{ background: 'var(--accent)' }">
           {{ t('common.save') }}
         </button>
       </div>
@@ -317,8 +316,7 @@ onMounted(load)
     <template v-else>
       <!-- Ziele -->
       <h2 class="mb-2 text-[14px] font-medium">{{ t('backup.targets') }}</h2>
-      <div v-if="targets.length" class="mb-6 overflow-hidden rounded-lg border"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div v-if="targets.length" class="panel-card mb-6 overflow-hidden">
         <table class="w-full text-left text-[13px]">
           <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
             <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
@@ -380,8 +378,7 @@ onMounted(load)
       <!-- Lokale Archive -->
       <template v-if="isAdmin()">
         <h2 class="mb-2 text-[14px] font-medium">{{ t('backup.archives') }}</h2>
-        <div v-if="archives.length" class="overflow-hidden rounded-lg border"
-             :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+        <div v-if="archives.length" class="panel-card overflow-hidden">
           <table class="w-full text-left text-[13px]">
             <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
               <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">

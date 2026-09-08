@@ -93,11 +93,7 @@ function reload() {
 
 <template>
   <section
-    class="mb-4 rounded-lg border p-5"
-    :style="{
-      borderColor: 'var(--border-ring)',
-      background: 'var(--surface-card)',
-    }"
+    class="panel-card mb-4 p-5"
   >
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-[14px] font-medium">{{ t("update.title") }}</h2>
@@ -208,7 +204,7 @@ function reload() {
         <button
           v-if="isAdmin"
           class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
           @click="start"
         >
           {{ t("update.start") }}

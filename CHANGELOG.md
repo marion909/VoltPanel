@@ -15,6 +15,20 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.130 — 2026-09-08
+
+- Die Oberfläche folgte keinem erkennbaren visuellen Vorbild — Sidebar,
+  Kopfzeile und alle Funktionspanels jetzt an aaPanels Kartenlayout
+  angelehnt: grüner Markenakzent statt Blau als durchgängige Aktionsfarbe,
+  neue Kopfzeile mit Avatar, Host/Uptime-Chip, Theme-Umschalter und
+  Update-Hinweis, einheitliche panel-card-Optik (weiße/dunkle Karte mit
+  Schatten statt nur Haarlinie zur Seite) in allen ~19 Ansichten und
+  geteilten Komponenten. Dashboard neu strukturiert: Systemstatus +
+  Speicher nebeneinander, eine Übersichtskarte mit vier verlinkten
+  Kennzahlen, Verbrauch neben Netzwerkdurchsatz — anstatt einer losen
+  Kachelfolge. Nebenbei: fehlender Übersetzungsschlüssel quota.mailboxes
+  ergänzt, ungenutzte StatTile-Komponente entfernt
+
 ## v0.4.129 — 2026-09-08
 
 - build-pages.sh nutzte feste, vorhersagbare Pfade

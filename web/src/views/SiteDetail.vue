@@ -273,7 +273,7 @@ watch(logType, loadLog)
         :key="item.key"
         class="-mb-px border-b-2 px-3 py-2 text-[13px]"
         :style="{
-          borderColor: tab === item.key ? 'var(--series-1)' : 'transparent',
+          borderColor: tab === item.key ? 'var(--accent)' : 'transparent',
           color: tab === item.key ? 'var(--ink-primary)' : 'var(--ink-secondary)',
         }"
         @click="tab = item.key"
@@ -293,8 +293,7 @@ watch(logType, loadLog)
     <!-- Übersicht -->
     <section
       v-else-if="tab === 'overview' && site"
-      class="max-w-2xl rounded-lg border p-5"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card max-w-2xl p-5"
     >
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[13px]">
         <dt :style="{ color: 'var(--ink-muted)' }">{{ t('sites.domain') }}</dt>
@@ -319,8 +318,7 @@ watch(logType, loadLog)
 
     <!-- Einstellungen -->
     <section v-else-if="tab === 'settings' && settings" class="max-w-3xl space-y-4">
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <h2 class="mb-3 text-[14px] font-medium">{{ t('site.redirects') }}</h2>
 
         <div v-for="(r, i) in settings.redirects || []" :key="i" class="mb-2 flex flex-wrap gap-2">
@@ -338,14 +336,13 @@ watch(logType, loadLog)
                   @click="removeRedirect(i)">×</button>
         </div>
 
-        <button class="text-[12px] underline" :style="{ color: 'var(--series-1)' }" @click="addRedirect">
+        <button class="text-[12px] underline" :style="{ color: 'var(--accent)' }" @click="addRedirect">
           + {{ t('site.addRedirect') }}
         </button>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
-        <div class="rounded-lg border p-5"
-             :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+        <div class="panel-card p-5">
           <h2 class="mb-1 text-[14px] font-medium">{{ t('site.denyIPs') }}</h2>
           <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.ipHint') }}</p>
           <textarea v-model="settings._denyText" rows="4" spellcheck="false"
@@ -353,8 +350,7 @@ watch(logType, loadLog)
                     :style="inputStyle" placeholder="203.0.113.5&#10;198.51.100.0/24"></textarea>
         </div>
 
-        <div class="rounded-lg border p-5"
-             :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+        <div class="panel-card p-5">
           <h2 class="mb-1 text-[14px] font-medium">{{ t('site.allowIPs') }}</h2>
           <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.allowHint') }}</p>
           <textarea v-model="settings._allowText" rows="4" spellcheck="false"
@@ -363,8 +359,7 @@ watch(logType, loadLog)
         </div>
       </div>
 
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.basicAuth') }}</h2>
         <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.authHint') }}</p>
 
@@ -377,14 +372,13 @@ watch(logType, loadLog)
                   @click="authUsers.splice(i, 1)">×</button>
         </div>
 
-        <button class="text-[12px] underline" :style="{ color: 'var(--series-1)' }"
+        <button class="text-[12px] underline" :style="{ color: 'var(--accent)' }"
                 @click="authUsers.push({ username: '', password: '' })">
           + {{ t('site.addAuthUser') }}
         </button>
       </div>
 
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.extraLines') }}</h2>
         <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.extraHint') }}</p>
         <textarea v-model="settings._extraText" rows="5" spellcheck="false"
@@ -411,15 +405,14 @@ watch(logType, loadLog)
 
       <button :disabled="busy"
               class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-              :style="{ background: 'var(--series-1)' }" @click="saveSettings">
+              :style="{ background: 'var(--accent)' }" @click="saveSettings">
         {{ busy ? t('common.loading') : t('common.save') }}
       </button>
     </section>
 
     <!-- PHP -->
     <section v-else-if="tab === 'php' && php" class="max-w-2xl">
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block">
             <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
@@ -503,7 +496,7 @@ watch(logType, loadLog)
 
         <button :disabled="busy"
                 class="mt-4 rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }" @click="savePHP">
+                :style="{ background: 'var(--accent)' }" @click="savePHP">
           {{ busy ? t('common.loading') : t('common.save') }}
         </button>
       </div>
@@ -511,8 +504,7 @@ watch(logType, loadLog)
 
     <!-- SSL -->
     <section v-else-if="tab === 'ssl'" class="max-w-2xl space-y-4">
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <h2 class="mb-3 text-[14px] font-medium">{{ t('site.httpsBehaviour') }}</h2>
 
         <label class="mb-2 flex items-start gap-2 text-[13px]">
@@ -539,13 +531,12 @@ watch(logType, loadLog)
 
         <button :disabled="busy"
                 class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }" @click="saveHTTPS">
+                :style="{ background: 'var(--accent)' }" @click="saveHTTPS">
           {{ t('common.save') }}
         </button>
       </div>
 
-      <div v-if="certs.length" class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div v-if="certs.length" class="panel-card p-5">
         <h2 class="mb-3 text-[14px] font-medium">{{ t('site.currentCert') }}</h2>
         <dl v-for="cert in certs" :key="cert.id"
             class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-[13px]">
@@ -560,8 +551,7 @@ watch(logType, loadLog)
         </dl>
       </div>
 
-      <div class="rounded-lg border p-5"
-           :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }">
+      <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.issueCert') }}</h2>
         <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.certHint') }}</p>
 
@@ -580,7 +570,7 @@ watch(logType, loadLog)
 
         <button :disabled="busy"
                 class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--series-1)' }" @click="issueCert">
+                :style="{ background: 'var(--accent)' }" @click="issueCert">
           {{ busy ? t('site.issuing') : t('site.issueCert') }}
         </button>
       </div>
@@ -598,8 +588,8 @@ watch(logType, loadLog)
           :key="type"
           class="rounded-md border px-3 py-1.5 text-[12px]"
           :style="{
-            borderColor: logType === type ? 'var(--series-1)' : 'var(--line-axis)',
-            color: logType === type ? 'var(--series-1)' : 'var(--ink-secondary)',
+            borderColor: logType === type ? 'var(--accent)' : 'var(--line-axis)',
+            color: logType === type ? 'var(--accent)' : 'var(--ink-secondary)',
           }"
           @click="logType = type"
         >
@@ -608,12 +598,8 @@ watch(logType, loadLog)
       </div>
 
       <pre
-        class="max-h-[32rem] overflow-auto rounded-lg border p-4 font-mono text-[11px] leading-relaxed"
-        :style="{
-          borderColor: 'var(--border-ring)',
-          background: 'var(--surface-card)',
-          color: 'var(--ink-secondary)',
-        }"
+        class="panel-card max-h-[32rem] overflow-auto p-4 font-mono text-[11px] leading-relaxed"
+        :style="{ color: 'var(--ink-secondary)' }"
       >{{ logText }}</pre>
     </section>
   </div>

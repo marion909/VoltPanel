@@ -1,12 +1,40 @@
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
+import { api } from "./api";
 import { session, logout, hasRole } from "./stores/session";
 import { update, checkUpdate } from "./stores/update";
+import { theme, setTheme } from "./stores/theme";
+import { formatUptime } from "./format";
 import { t, i18n } from "./i18n";
 
 const route = useRoute();
 const router = useRouter();
+
+// Nur für den Hostname/Uptime-Chip in der Kopfzeile — dieselbe Route, die
+// auch das Dashboard ruft, hier aber ohne die Zähler, die niemand außerhalb
+// des Dashboards braucht.
+const system = ref(null);
+onMounted(async () => {
+  try {
+    const info = await api.get("/system/info");
+    system.value = info.system;
+  } catch {
+    /* Kunden ohne Rechte auf Systemdaten sehen die Kopfzeile einfach ohne Chip. */
+  }
+});
+
+const themeCycle = ["system", "light", "dark"];
+const themeIcon = { system: "monitor", light: "sun", dark: "moon" };
+function cycleTheme() {
+  const i = themeCycle.indexOf(theme.mode);
+  setTheme(themeCycle[(i + 1) % themeCycle.length]);
+}
+
+const avatarInitial = computed(() => {
+  const name = session.user?.display_name || session.user?.email || "?";
+  return name.trim().charAt(0).toUpperCase();
+});
 
 // Ein Kunde sieht keine Server-Dienste und keine Mandantenverwaltung. Das ist
 // Aufräumen der Oberfläche, kein Schutz — der steht im Server.
@@ -69,6 +97,12 @@ const paths = {
   // plug: ein Stecker — Plugins sind Zusatzdienste, die sich an den Server
   // "anschließen", nicht Bausteine der Website (dafür steht schon "box").
   plug: "M9 3v5M15 3v5M7 8h10v3a5 5 0 01-5 5 5 5 0 01-5-5V8zM12 16v5M9 21h6",
+  logout: "M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3M16 17l5-5-5-5M21 12H9",
+  sun: "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 17a5 5 0 100-10 5 5 0 000 10z",
+  moon: "M20.8 14.5A8.5 8.5 0 119.5 3.2a7 7 0 0011.3 11.3z",
+  monitor: "M4 4h16v11H4zM9 20h6M12 15v5",
+  download: "M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19h16",
+  chevron: "M9 6l6 6-6 6",
 };
 </script>
 
@@ -76,56 +110,57 @@ const paths = {
   <!-- Die Login-Ansicht bringt ihr eigenes Layout mit. -->
   <RouterView v-if="!session.user" />
 
-  <div v-else class="flex min-h-screen">
+  <div v-else class="flex min-h-screen" :style="{ background: 'var(--surface-page)' }">
     <aside
-      class="flex w-56 shrink-0 flex-col border-r"
+      class="flex w-60 shrink-0 flex-col"
       :style="{
-        borderColor: 'var(--border-ring)',
+        borderRight: '1px solid var(--line-hairline)',
         background: 'var(--surface-card)',
       }"
     >
-      <div class="flex items-center gap-2 px-5 py-5">
+      <div class="flex items-center gap-2.5 px-5 py-5">
         <svg
-          width="22"
-          height="22"
+          width="24"
+          height="24"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"
         >
           <path
             d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z"
-            fill="var(--series-1)"
+            fill="var(--accent)"
           />
         </svg>
-        <span class="text-[15px] font-semibold tracking-tight">VoltPanel</span>
+        <span class="text-[16px] font-semibold tracking-tight">VoltPanel</span>
       </div>
 
-      <nav class="flex flex-1 flex-col gap-0.5 px-3">
+      <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
         <RouterLink
           v-for="item in nav"
           :key="item.to"
           :to="item.to"
-          class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors"
+          class="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13px] transition-colors"
           :style="
             isActiveNav(item)
               ? {
-                  background: 'var(--surface-sunken)',
-                  color: 'var(--ink-primary)',
-                  fontWeight: 500,
+                  background: 'var(--accent)',
+                  color: 'var(--accent-contrast)',
+                  fontWeight: 600,
                 }
               : { color: 'var(--ink-secondary)' }
           "
         >
           <svg
-            width="16"
-            height="16"
+            width="17"
+            height="17"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="1.7"
+            stroke-width="1.8"
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
+            class="shrink-0"
           >
             <path :d="paths[item.icon]" />
           </svg>
@@ -136,46 +171,108 @@ const paths = {
           <span
             v-if="item.key === 'nav.settings' && update.available"
             class="ml-auto h-1.5 w-1.5 rounded-full"
-            :style="{ background: 'var(--series-2)' }"
+            :style="{ background: isActiveNav(item) ? 'var(--accent-contrast)' : 'var(--series-2)' }"
             :title="t('update.available', { v: update.latest })"
           />
         </RouterLink>
-      </nav>
 
-      <div
-        class="border-t px-3 py-3"
-        :style="{ borderColor: 'var(--border-ring)' }"
-      >
-        <div class="px-2.5 pb-2">
-          <div class="truncate text-[13px]">
-            {{ session.user.display_name || session.user.email }}
-          </div>
-          <div class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
-            {{ session.user.role }} · {{ session.tenant?.name }}
-          </div>
-        </div>
+        <div class="my-2 border-t" :style="{ borderColor: 'var(--line-hairline)' }" />
+
         <button
-          class="w-full rounded-md px-2.5 py-2 text-left text-[13px] transition-colors hover:opacity-80"
+          class="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition-colors hover:opacity-80"
           :style="{ color: 'var(--ink-secondary)' }"
           @click="onLogout"
         >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            class="shrink-0"
+          >
+            <path :d="paths.logout" />
+          </svg>
           {{ t("nav.logout") }}
         </button>
-        <div
-          class="px-2.5 pt-2 text-[11px]"
-          :style="{ color: 'var(--ink-muted)' }"
-        >
-          {{ session.version?.version }}
-        </div>
+      </nav>
+
+      <div class="px-5 py-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        VoltPanel {{ session.version?.version }}
       </div>
     </aside>
 
-    <main class="min-w-0 flex-1 overflow-x-hidden">
+    <div class="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+      <header
+        class="flex items-center justify-between gap-3 px-6 py-3"
+        :style="{ borderBottom: '1px solid var(--line-hairline)', background: 'var(--surface-card)' }"
+      >
+        <div class="flex min-w-0 items-center gap-3">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold"
+            :style="{ background: 'var(--accent-soft)', color: 'var(--accent)' }"
+            aria-hidden="true"
+          >
+            {{ avatarInitial }}
+          </div>
+          <div class="min-w-0 leading-tight">
+            <div class="truncate text-[13px] font-medium">
+              {{ session.user.display_name || session.user.email }}
+            </div>
+            <div class="truncate text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+              {{ session.user.role }} · {{ session.tenant?.name }}
+            </div>
+          </div>
+          <div
+            v-if="system"
+            class="ml-2 hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] sm:flex"
+            :style="{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }"
+          >
+            <span
+              class="inline-block h-1.5 w-1.5 rounded-full"
+              :style="{ background: 'var(--status-good)' }"
+              aria-hidden="true"
+            />
+            {{ system.platform || system.os }} · {{ t('dash.uptime') }} {{ formatUptime(system.uptime) }}
+          </div>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2">
+          <RouterLink
+            v-if="update.available && hasRole('admin')"
+            to="/settings"
+            class="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium sm:flex"
+            :style="{ background: 'var(--accent-soft)', color: 'var(--accent)' }"
+            :title="t('update.available', { v: update.latest })"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path :d="paths.download" />
+            </svg>
+            {{ t('update.available', { v: update.latest }) }}
+          </RouterLink>
+
+          <button
+            class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:opacity-80"
+            :style="{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }"
+            :title="t(`settings.theme${theme.mode.charAt(0).toUpperCase()}${theme.mode.slice(1)}`)"
+            @click="cycleTheme"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path :d="paths[themeIcon[theme.mode]]" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
       <div
         v-if="session.user.must_change_pw"
-        class="border-b px-8 py-2.5 text-[13px]"
+        class="px-8 py-2.5 text-[13px]"
         :style="{
-          borderColor: 'var(--border-ring)',
+          borderBottom: '1px solid var(--line-hairline)',
           background:
             'color-mix(in srgb, var(--status-warning) 14%, var(--surface-card))',
         }"
@@ -185,7 +282,9 @@ const paths = {
           t("settings.password")
         }}</RouterLink>
       </div>
-      <RouterView />
-    </main>
+      <main class="min-w-0 flex-1">
+        <RouterView />
+      </main>
+    </div>
   </div>
 </template>

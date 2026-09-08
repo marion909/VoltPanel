@@ -78,11 +78,7 @@ onMounted(loadVersions);
 
 <template>
   <section
-    class="rounded-lg border p-5"
-    :style="{
-      borderColor: 'var(--border-ring)',
-      background: 'var(--surface-card)',
-    }"
+    class="panel-card p-5"
   >
     <div class="mb-1 flex items-center justify-between">
       <h2 class="text-[14px] font-medium">{{ t("php.title") }}</h2>
@@ -127,7 +123,7 @@ onMounted(loadVersions);
       />
       <button
         class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         :disabled="!newName.trim() || busy !== ''"
         @click="install"
       >

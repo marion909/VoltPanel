@@ -82,8 +82,7 @@ onMounted(() => {
 
     <div
       v-if="open"
-      class="mt-3 rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mt-3 p-4"
     >
       <!-- Das Ergebnis: die Site steht, und das Datenbankpasswort steht hier
            genau einmal — danach gibt das Panel es nicht mehr heraus. -->
@@ -155,7 +154,7 @@ onMounted(() => {
             type="submit"
             :disabled="busy"
             class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-            :style="{ background: 'var(--series-1)' }"
+            :style="{ background: 'var(--accent)' }"
           >
             {{ busy ? t("appstore.installing") : t("appstore.install") }}
           </button>

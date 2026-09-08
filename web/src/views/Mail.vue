@@ -233,8 +233,7 @@ onMounted(load)
     -->
     <div
       v-if="domains.length"
-      class="mb-5 rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 p-4"
     >
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -286,8 +285,7 @@ onMounted(load)
     <!-- Nicht eingerichtet: ohne Mailspeicher hilft eine Liste niemandem. -->
     <div
       v-if="status && !bereit"
-      class="mb-5 rounded-lg border p-5"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t('mail.setupTitle') }}</h2>
       <p class="mb-3 whitespace-pre-line text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
@@ -317,7 +315,7 @@ onMounted(load)
         v-if="isAdmin() && status.postfix_installed"
         :disabled="busy"
         class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--series-1)' }"
+        :style="{ background: 'var(--accent)' }"
         @click="setup"
       >
         {{ busy ? t('mail.settingUp') : t('mail.setup') }}
@@ -329,8 +327,7 @@ onMounted(load)
          ein leerer Block wäre keine Auskunft. -->
     <div
       v-if="spam && spam.installed"
-      class="mb-5 rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card mb-5 p-4"
     >
       <h2 class="mb-2 text-[14px] font-medium">{{ t('mail.spamTitle') }}</h2>
       <p v-if="!spam.reachable" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
@@ -390,8 +387,7 @@ onMounted(load)
     <template v-else>
       <!-- Neue Domäne -->
       <div
-        class="mb-5 flex flex-wrap items-end gap-2 rounded-lg border p-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card mb-5 flex flex-wrap items-end gap-2 p-4"
       >
         <label class="block">
           <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
@@ -406,7 +402,7 @@ onMounted(load)
         </label>
         <button
           class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
           :disabled="busy || !domainForm.trim()"
           @click="domainAnlegen"
         >
@@ -429,8 +425,7 @@ onMounted(load)
         <article
           v-for="d in domains"
           :key="d.id"
-          class="rounded-lg border p-4"
-          :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+          class="panel-card p-4"
         >
           <header class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">

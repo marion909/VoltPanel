@@ -219,8 +219,8 @@ onMounted(load)
           :key="key"
           class="rounded-md border px-3 py-1.5 text-[12px]"
           :style="{
-            borderColor: tab === key ? 'var(--series-1)' : 'var(--line-axis)',
-            color: tab === key ? 'var(--series-1)' : 'var(--ink-secondary)',
+            borderColor: tab === key ? 'var(--accent)' : 'var(--line-axis)',
+            color: tab === key ? 'var(--accent)' : 'var(--ink-secondary)',
           }"
           @click="tab = key"
         >
@@ -229,7 +229,7 @@ onMounted(load)
 
         <button
           class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
           @click="tab === 'tenants' ? (showTenantForm = !showTenantForm) : (showPlanForm = !showPlanForm)"
         >
           {{ tab === 'tenants' ? t('tenants.new') : t('plans.new') }}
@@ -245,8 +245,7 @@ onMounted(load)
     <template v-if="tab === 'tenants'">
       <form
         v-if="showTenantForm"
-        class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-3"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-3"
         @submit.prevent="createTenant"
       >
         <label class="block">
@@ -268,7 +267,7 @@ onMounted(load)
         <div class="flex items-end">
           <button type="submit" :disabled="busy"
                   class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                  :style="{ background: 'var(--series-1)' }">
+                  :style="{ background: 'var(--accent)' }">
             {{ busy ? t('common.loading') : t('sites.create') }}
           </button>
         </div>
@@ -282,8 +281,7 @@ onMounted(load)
         <article
           v-for="tenant in tenants"
           :key="tenant.id"
-          class="rounded-lg border p-4"
-          :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+          class="panel-card p-4"
         >
           <header class="mb-3 flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -420,8 +418,7 @@ onMounted(load)
 
       <form
         v-if="showPlanForm"
-        class="mb-5 grid gap-3 rounded-lg border p-4 sm:grid-cols-4"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card mb-5 grid gap-3 p-4 sm:grid-cols-4"
         @submit.prevent="createPlan"
       >
         <label class="block sm:col-span-2">
@@ -447,7 +444,7 @@ onMounted(load)
           </label>
           <button type="submit" :disabled="busy"
                   class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                  :style="{ background: 'var(--series-1)' }">
+                  :style="{ background: 'var(--accent)' }">
             {{ busy ? t('common.loading') : t('sites.create') }}
           </button>
         </div>
@@ -459,8 +456,7 @@ onMounted(load)
 
       <div
         v-if="plans.length"
-        class="overflow-hidden rounded-lg border"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card overflow-hidden"
       >
         <table class="w-full text-left text-[13px]">
           <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">

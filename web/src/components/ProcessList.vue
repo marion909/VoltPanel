@@ -90,8 +90,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
     <div
       v-else-if="visible.length"
-      class="overflow-x-auto rounded-lg border"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card overflow-x-auto"
     >
       <table class="w-full text-left text-[12px]">
         <thead class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">

@@ -31,7 +31,7 @@ const activeTabs = computed(() =>
         :style="
           activeTabs[tab.to]
             ? {
-                borderColor: 'var(--series-1)',
+                borderColor: 'var(--accent)',
                 color: 'var(--ink-primary)',
                 fontWeight: 500,
               }

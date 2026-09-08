@@ -62,7 +62,7 @@ async function submit() {
     <div class="fade-in w-full max-w-sm">
       <div class="mb-6 flex items-center justify-center gap-2">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z" fill="var(--series-1)" />
+          <path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z" fill="var(--accent)" />
         </svg>
         <span class="text-[19px] font-semibold tracking-tight">
           {{ brand ? brand.name : 'VoltPanel' }}
@@ -70,8 +70,7 @@ async function submit() {
       </div>
 
       <form
-        class="rounded-xl border p-6"
-        :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+        class="panel-card p-6"
         @submit.prevent="submit"
       >
         <h1 class="mb-1 text-[15px] font-medium">{{ t('login.title') }}</h1>
@@ -171,7 +170,7 @@ async function submit() {
           type="submit"
           :disabled="busy"
           class="w-full rounded-md px-3 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-60"
-          :style="{ background: 'var(--series-1)' }"
+          :style="{ background: 'var(--accent)' }"
         >
           {{ busy ? t('common.loading') : t('login.submit') }}
         </button>

@@ -107,8 +107,7 @@ onMounted(load)
     </p>
 
     <div
-      class="rounded-lg border p-4"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card p-4"
     >
       <div v-if="fw" class="text-[12px]">
         <div class="mb-2 flex items-center gap-2">
@@ -206,8 +205,7 @@ onMounted(load)
       schrieb eine Zeile ins Protokoll, und dort blieb sie liegen.
     -->
     <div
-      class="rounded-lg border p-4 text-[12px]"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card p-4 text-[12px]"
     >
       <InstallHint
         v-if="scan && !scan.available"
@@ -272,8 +270,7 @@ onMounted(load)
     <h2 class="mb-3 mt-6 text-[14px] font-medium">{{ t('fw.f2bTitle') }}</h2>
 
     <div
-      class="rounded-lg border p-4 text-[12px]"
-      :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-card)' }"
+      class="panel-card p-4 text-[12px]"
     >
       <InstallHint
         v-if="f2b && f2b.available === false"
