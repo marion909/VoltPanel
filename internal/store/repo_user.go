@@ -190,6 +190,6 @@ func scanUser(sc scanner) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	u.Role, u.TOTPEnabled, u.MustChangePW = Role(role), totp == 1, mustChange == 1
+	u.Role, u.TOTPEnabled, u.MustChangePW = Role(role), intToBool(totp), intToBool(mustChange)
 	return &u, nil
 }

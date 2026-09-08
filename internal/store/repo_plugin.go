@@ -101,7 +101,7 @@ func scanPlugin(row scanner) (*Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.Enabled = enabled != 0
+	p.Enabled = intToBool(enabled)
 	if installed.Valid {
 		p.InstalledAt = &installed.Int64
 	}

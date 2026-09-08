@@ -325,6 +325,6 @@ func scanSite(sc scanner) (*Site, error) {
 	}
 	site.Aliases, site.Type = decodeList(aliases), SiteType(typ)
 	site.Settings = decodeSettings(settings)
-	site.SSLEnabled, site.ForceHTTPS, site.HSTS = ssl == 1, force == 1, hsts == 1
+	site.SSLEnabled, site.ForceHTTPS, site.HSTS = intToBool(ssl), intToBool(force), intToBool(hsts)
 	return &site, nil
 }

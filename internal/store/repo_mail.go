@@ -508,7 +508,7 @@ func scanMailDomain(row scanner) (*MailDomain, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.Active = active != 0
+	d.Active = intToBool(active)
 	return &d, nil
 }
 
@@ -523,7 +523,7 @@ func scanMailbox(row scanner) (*Mailbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	m.Active = active != 0
+	m.Active = intToBool(active)
 	return &m, nil
 }
 
@@ -538,6 +538,6 @@ func scanMailAlias(row scanner) (*MailAlias, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Active = active != 0
+	a.Active = intToBool(active)
 	return &a, nil
 }

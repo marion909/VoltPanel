@@ -251,6 +251,6 @@ func scanCronjob(sc scanner) (*Cronjob, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Enabled = enabled == 1
+	c.Enabled = intToBool(enabled)
 	return &c, nil
 }

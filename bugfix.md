@@ -117,11 +117,6 @@ gibt also keinen Fake, um das an einem echten Test zu verifizieren. Eine
 Umstellung ohne Testabsicherung für eine Verhaltensänderung an einem
 Lösch-Pfad wäre das falsche Risiko für diesen Fund.
 
-`internal/store/helpers.go:62-67` (`boolToInt`, ohne Umkehrfunktion) —
-Betrifft mindestens 12 Stellen in 10 Dateien — jede `scanX`-Funktion
-rekonstruiert die Rückrichtung von Hand und uneinheitlich. — Design —
-Symmetrisches `intToBool(i int) bool { return i != 0 }` in `helpers.go`.
-
 `internal/core/apps.go:313-316,411-414`, `deploys.go:332-335` — Der Aufbau
 einer `site_id → domain`-Map steht dreimal wortgleich in zwei Dateien. —
 Design — Hilfsfunktion `domainsByID(sites []*store.Site) map[int64]string`.

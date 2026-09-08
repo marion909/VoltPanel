@@ -94,7 +94,7 @@ func scanPlan(sc scanner) (*Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.IsDefault = isDefault == 1
+	p.IsDefault = intToBool(isDefault)
 	return &p, nil
 }
 

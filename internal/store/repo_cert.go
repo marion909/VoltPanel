@@ -149,6 +149,6 @@ func scanCert(sc scanner) (*Cert, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Domains, c.AutoRenew = decodeList(domains), autoRenew == 1
+	c.Domains, c.AutoRenew = decodeList(domains), intToBool(autoRenew)
 	return &c, nil
 }

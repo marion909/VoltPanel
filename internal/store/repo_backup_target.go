@@ -204,8 +204,8 @@ func scanBackupTarget(sc scanner) (*BackupTarget, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.PathStyle, t.UseTLS = pathStyle == 1, useTLS == 1
-	t.SkipVerify, t.Enabled = skipVerify == 1, enabled == 1
+	t.PathStyle, t.UseTLS = intToBool(pathStyle), intToBool(useTLS)
+	t.SkipVerify, t.Enabled = intToBool(skipVerify), intToBool(enabled)
 	// Das Geheimnis selbst verlässt den Server nicht; die Oberfläche muss aber
 	// wissen, ob eines hinterlegt ist, um "unverändert" von "leer" zu trennen.
 	t.HasSecret = t.SecretEnc != ""

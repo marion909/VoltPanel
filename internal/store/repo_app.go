@@ -329,7 +329,7 @@ func scanApp(sc scanner) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Enabled = enabled != 0
+	a.Enabled = intToBool(enabled)
 	// Eine kaputte Zeile darf nicht die ganze Liste unlesbar machen.
 	if err := json.Unmarshal([]byte(args), &a.Args); err != nil {
 		a.Args = nil

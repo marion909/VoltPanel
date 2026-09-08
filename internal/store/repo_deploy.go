@@ -245,7 +245,7 @@ func scanDeploy(sc scanner) (*Deploy, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.AutoDeploy = auto != 0
+	d.AutoDeploy = intToBool(auto)
 	if err := json.Unmarshal([]byte(steps), &d.Steps); err != nil {
 		d.Steps = nil
 	}

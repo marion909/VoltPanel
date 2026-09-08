@@ -66,6 +66,12 @@ func boolToInt(b bool) int {
 	return 0
 }
 
+// intToBool ist die Umkehrung von boolToInt — jede scanX-Funktion rekonstruierte
+// die Rückrichtung sonst von Hand und uneinheitlich (mal `!= 0`, mal `== 1`).
+func intToBool(i int) bool {
+	return i != 0
+}
+
 // nilIfEmpty verhindert, dass ein leerer optionaler Fremdschlüssel als 0
 // gespeichert wird und damit ins Leere zeigt.
 func nilIfEmpty(id *int64) any {
