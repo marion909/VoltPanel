@@ -117,11 +117,12 @@ gibt also keinen Fake, um das an einem echten Test zu verifizieren. Eine
 Umstellung ohne Testabsicherung für eine Verhaltensänderung an einem
 Lösch-Pfad wäre das falsche Risiko für diesen Fund.
 
-`internal/core/databases.go:507-514` (`tenantPrefix`) und `ftp.go:283-288`
-(Teil von `buildName`) — Beide leiten aus demselben Tenant dieselbe
-Präfix-Form ab — Zeile für Zeile identisch, einmal als Methode, einmal
-inline. — Design — `FTPService.buildName` könnte `tenantPrefix` aus
-`DatabaseService` wiederverwenden.
+**Erledigt:** `tenantSlugPrefix(slug string) string` als gemeinsame
+Hilfsfunktion — `DatabaseService.tenantPrefix` und `FTPService.buildName`
+leiteten aus demselben Tenant-Slug Zeile für Zeile dieselbe Präfix-Form ab,
+einmal als Methode, einmal inline. Damit ist dieser Abschnitt der
+Bugfix-Liste vollständig abgearbeitet (v0.4.102–v0.4.115, siehe
+CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 

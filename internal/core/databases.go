@@ -548,8 +548,14 @@ func (s *DatabaseService) tenantPrefix(ctx context.Context, sc store.Scope, tena
 	if err != nil {
 		return "", err
 	}
-	slug := reNonAlnum.ReplaceAllString(strings.ToLower(tenant.Slug), "_")
-	return strings.Trim(slug, "_"), nil
+	return tenantSlugPrefix(tenant.Slug), nil
+}
+
+// tenantSlugPrefix wandelt einen Tenant-Slug in die Präfix-Form für Namen um
+// (Datenbanken hier, FTP-Konten in ftp.go) — klein geschrieben, alles außer
+// Buchstaben und Ziffern zu "_", ohne führende oder folgende "_".
+func tenantSlugPrefix(slug string) string {
+	return strings.Trim(reNonAlnum.ReplaceAllString(strings.ToLower(slug), "_"), "_")
 }
 
 // prefixedName setzt den Tenant-Präfix davor und hält die Längengrenze ein.

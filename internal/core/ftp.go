@@ -284,6 +284,5 @@ func (s *FTPService) buildName(ctx context.Context, sc store.Scope, site *store.
 	if err != nil {
 		return "", err
 	}
-	prefix := strings.Trim(reNonAlnum.ReplaceAllString(strings.ToLower(tenant.Slug), "_"), "_")
-	return prefixedName(prefix, wish, 31), nil
+	return prefixedName(tenantSlugPrefix(tenant.Slug), wish, 31), nil
 }
