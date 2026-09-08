@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.117 — 2026-09-08
+
 - volt tenant import gab bei einem nur teilweise geglückten Import
   (Rebuilt < Sites oder vorhandene Warnungen) trotzdem immer
   Exitcode 0 zurück — jetzt wie site rebuild --all ein Fehler, der
