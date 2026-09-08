@@ -7,6 +7,28 @@ Type=oneshot
 User=volt
 Group=volt
 ExecStart=/usr/local/bin/volt backup create
+
+# Dieselbe Sandbox wie volt-web.service — unprivilegiert heißt hier nicht
+# ungeschützt, auch ein oneshot-Job läuft mit vollem Zugriff auf das, was
+# der Prozess ohne diese Zeilen anfassen könnte.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
+ReadWritePaths=/var/lib/volt /var/log/volt /var/backups/volt /etc/volt/keys
+ReadOnlyPaths=/etc/volt
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=volt-backup

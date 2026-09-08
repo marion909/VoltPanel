@@ -136,10 +136,22 @@ vollständig abgearbeitet (v0.4.116–v0.4.125, siehe CHANGELOG.md).
 
 ## packaging/, scripts/
 
-`packaging/install.sh:111-112` — Der GPG-Schlüssel des Sury-PHP-Repos wird
-per `curl` geladen und ohne Fingerprint-/Prüfsummenabgleich sofort als
-vertrauenswürdig eingebunden. — Sicherheit — Einen bekannten Fingerprint des
-Sury-Schlüssels im Skript hinterlegen und nach dem Download gegenprüfen.
+**Bewusst nicht umgesetzt:** `packaging/install.sh:111-112` — Der
+GPG-Schlüssel des Sury-PHP-Repos wird per `curl` geladen und ohne
+Fingerprint-Abgleich sofort als vertrauenswürdig eingebunden. Recherchiert:
+der `DEB.SURY.ORG Automatic Signing Key` hat laut mehreren
+Support-Threads (GitHub-Issues, Foren) bereits mindestens einmal ohne
+Vorankündigung gewechselt/ist abgelaufen ("Apt key for Debian Package is
+expiring on 16.02.2024", diverse "signatures were invalid"-Threads) — ein
+im Skript hinterlegter, hart verglichener Fingerprint bräche dann bei der
+nächsten Rotation jede Neuinstallation mit einer kryptischen
+Fingerprint-Mismatch-Meldung, bis jemand das Skript von Hand nachzieht.
+Das wäre ein schlechterer, weil überraschenderer Ausfallmodus als der
+heutige (verhaltene) Zustand. Ein per Web-Recherche gefundener Fingerprint
+ließ sich außerdem nicht gegen eine offizielle Sury-Quelle absichern — die
+Projektseite selbst nennt keinen. Ein fest hinterlegter Fingerprint für
+einen Schlüssel mit dokumentierter Rotationshistorie wäre das falsche
+Risiko für diesen Fund.
 
 **Erledigt, abweichend vom Vorschlag:** Der Unix-Socket entstand per
 `net.Listen` mit den ererbten Prozessrechten, bevor `os.Chmod(0o660)` sie
@@ -154,12 +166,6 @@ herum und stellt sie sofort danach zurück — schließt dasselbe Zeitfenster,
 ohne die übrigen Dateien des Agents zu beeinflussen. Test
 `TestListenSchmaelertUmaskNurWaehrendDesSocketAufbaus` sichert ab, dass
 nichts von der Umask-Änderung nach außen dringt.
-
-`packaging/systemd/volt-backup.service`, `packaging/systemd/volt-renew.service`
-— Laufen zwar unprivilegiert als `User=volt`, verzichten aber komplett auf
-die Sandboxing-Direktiven, die `volt-web.service` bereits nutzt
-(`NoNewPrivileges`, `ProtectSystem`, `ProtectHome`, `RestrictNamespaces`
-usw.). — Design — Dieselben Hardening-Zeilen ergänzen.
 
 `scripts/build-pages.sh:53,55` — Nutzt feste, vorhersagbare Pfade
 `/tmp/other-latest.json`/`/tmp/other-latest.sig` statt `mktemp`, obwohl
