@@ -126,11 +126,6 @@ CHANGELOG.md).
 
 ## CLI-Usability (cmd/volt)
 
-`cmd/volt/site.go:85` — `--type` wird als roher String ungeprüft an
-`store.SiteType(siteType)` weitergereicht, ohne eigene Validierung — anders
-als `user add --role`. — Design — `Valid()`-Prüfung für die drei Site-Typen
-analog zu `store.Role.Valid()` ergänzen.
-
 `cmd/volt/site.go:74-81`, `db.go:82-89`, `cert.go:82-85` —
 Erfolgsmeldungen von `site add`/`db add`/`cert issue` nennen nirgends den
 Tenant, obwohl `--tenant` bei allen dreien still auf `1` fällt, falls

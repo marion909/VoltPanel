@@ -67,9 +67,14 @@ func (a *app) siteAddCmd() *cobra.Command {
 				siteType = string(store.SiteProxy)
 			}
 
+			t := store.SiteType(siteType)
+			if !t.Valid() {
+				return fmt.Errorf("typ %q ist unbekannt (static, php, proxy)", siteType)
+			}
+
 			svc := core.NewSiteService(a.store, a.agent, a.cfg)
 			site, err := svc.CreateSite(cmd.Context(), store.SystemScope(), core.CreateSiteInput{
-				Domain: args[0], Aliases: aliases, Type: store.SiteType(siteType),
+				Domain: args[0], Aliases: aliases, Type: t,
 				PHPVersion: phpVer, ProxyTarget: proxyTo, DocumentRoot: docRoot, TenantID: tenantID,
 			})
 			if err != nil {

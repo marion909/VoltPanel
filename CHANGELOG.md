@@ -13,7 +13,9 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
-Nichts — der letzte Stand ist veröffentlicht.
+- volt site add --type nahm jeden String ungeprüft an, anders als
+  user add --role — store.SiteType hatte bereits ein Valid(), die
+  CLI rief es nur nie auf; jetzt ergänzt
 
 ## v0.4.122 — 2026-09-08
 
