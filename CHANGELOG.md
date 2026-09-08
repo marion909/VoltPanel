@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.96 — 2026-09-08
+
 - formatBytes prüfte nur Number(bytes) || 0 und ließ negative Zahlen
   unverändert durch — ergab z. B. "-5 B" bzw. "-53.2 KiB/s" statt 0;
   negative Werte werden jetzt auf 0 gekappt
