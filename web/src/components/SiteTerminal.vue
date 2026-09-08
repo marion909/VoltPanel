@@ -18,38 +18,43 @@ let observer = null
 // der Rest der Oberfläche zusammen — jede andere Seite würde sonst dafür
 // mitbezahlen.
 onMounted(async () => {
-  const [{ Terminal }, { FitAddon }] = await Promise.all([
-    import('@xterm/xterm'),
-    import('@xterm/addon-fit'),
-    import('@xterm/xterm/css/xterm.css'),
-  ])
+  try {
+    const [{ Terminal }, { FitAddon }] = await Promise.all([
+      import('@xterm/xterm'),
+      import('@xterm/addon-fit'),
+      import('@xterm/xterm/css/xterm.css'),
+    ])
 
-  const style = getComputedStyle(document.documentElement)
-  term = new Terminal({
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: 13,
-    cursorBlink: true,
-    scrollback: 5000,
-    theme: {
-      background: style.getPropertyValue('--surface-sunken').trim() || '#111318',
-      foreground: style.getPropertyValue('--ink-primary').trim() || '#e6e8ea',
-    },
-  })
-  fit = new FitAddon()
-  term.loadAddon(fit)
-  term.open(host.value)
-  fit.fit()
-
-  connect()
-
-  // Die Shell muss die Fenstergröße kennen, sonst bricht alles um, was mit
-  // Spalten rechnet — top, less, vim.
-  observer = new ResizeObserver(() => {
-    if (!fit || !term) return
+    const style = getComputedStyle(document.documentElement)
+    term = new Terminal({
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontSize: 13,
+      cursorBlink: true,
+      scrollback: 5000,
+      theme: {
+        background: style.getPropertyValue('--surface-sunken').trim() || '#111318',
+        foreground: style.getPropertyValue('--ink-primary').trim() || '#e6e8ea',
+      },
+    })
+    fit = new FitAddon()
+    term.loadAddon(fit)
+    term.open(host.value)
     fit.fit()
-    send({ resize: { cols: term.cols, rows: term.rows } })
-  })
-  observer.observe(host.value)
+
+    connect()
+
+    // Die Shell muss die Fenstergröße kennen, sonst bricht alles um, was mit
+    // Spalten rechnet — top, less, vim.
+    observer = new ResizeObserver(() => {
+      if (!fit || !term) return
+      fit.fit()
+      send({ resize: { cols: term.cols, rows: term.rows } })
+    })
+    observer.observe(host.value)
+  } catch {
+    status.value = 'closed'
+    message.value = t('term.failed')
+  }
 })
 
 function connect() {
@@ -94,6 +99,10 @@ function closed(reason) {
 }
 
 function restart() {
+  // Ohne Terminal (z. B. wenn schon das Laden von xterm fehlschlug) gibt es
+  // nichts zurückzusetzen und nichts, dessen Spaltenzahl connect() lesen
+  // könnte.
+  if (!term) return
   status.value = 'connecting'
   message.value = ''
   term.reset()

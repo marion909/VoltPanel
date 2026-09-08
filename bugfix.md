@@ -82,12 +82,6 @@ Toggle-Nebeneffekt.
 `web/src/views/Sites.vue:201` — Label „Proxy-Ziel" hartcodiertes Deutsch. —
 Design.
 
-`web/src/components/SiteTerminal.vue:20-53` — `onMounted` ist komplett ohne
-`try/catch`. — Bug — Schlägt der dynamische Import von
-`@xterm/xterm`/`@xterm/addon-fit` fehl, bleibt ein leerer Rahmen ohne jeden
-Hinweis stehen. Fix: Inhalt von `onMounted` in `try { … } catch { message.value
-= t('term.failed') }` einwickeln.
-
 `web/src/components/UpdateCard.vue:47-78` — `waitForPanel` pollt bis zu drei
 Minuten per `while`-Schleife/`setTimeout`; die Datei importiert
 `onUnmounted` nicht, es gibt keinen Abbruch-Mechanismus. — Bug — Verlässt
