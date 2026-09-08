@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.102 — 2026-09-08
+
 - writeJSON (internal/agent/server.go) baute den JSON-Puffer per
   json.Marshal und hängte den Zeilenumbruch per append(b, '\n') an —
   letzteres erzwang bei jeder Anfrage/Antwort eine zweite Allokation
