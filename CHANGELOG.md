@@ -13,6 +13,10 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 ## Unveröffentlicht
 
+Nichts — der letzte Stand ist veröffentlicht.
+
+## v0.4.122 — 2026-09-08
+
 - Store-Fehler (store.ErrNotFound) liefen in site remove/rebuild,
   plan remove, cron remove und user passwd/2fa-reset unverändert
   durch — ein Admin sah bei einem Tippfehler nur "fehler: nicht
