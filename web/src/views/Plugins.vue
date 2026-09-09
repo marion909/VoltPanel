@@ -2,6 +2,8 @@
 import { ref, onMounted } from "vue";
 import { api } from "../api";
 import { t } from "../i18n";
+import { askConfirm } from "../stores/confirm";
+import SkeletonCards from "../components/SkeletonCards.vue";
 
 // Plugins: server-weite Fähigkeiten aus dem festen Katalog
 // (internal/core/plugins.go). Diese Ansicht selbst ist Administratoren
@@ -62,7 +64,7 @@ async function installWebmail() {
 }
 
 async function uninstallWebmail() {
-  if (!confirm(t("plugins.webmailConfirmUninstall"))) return;
+  if (!(await askConfirm(t("plugins.webmailConfirmUninstall")))) return;
   webmailBusy.value = true;
   webmailError.value = "";
   try {
@@ -101,7 +103,7 @@ async function installieren(p) {
 }
 
 async function entfernen(p) {
-  if (!confirm(t("plugins.confirmUninstall", { name: p.name }))) return;
+  if (!(await askConfirm(t("plugins.confirmUninstall", { name: p.name })))) return;
   busy.value = p.id;
   error.value = "";
   try {
@@ -139,21 +141,18 @@ onMounted(() => {
     <h1 class="text-[18px] font-semibold tracking-tight">
       {{ t("plugins.title") }}
     </h1>
-    <p class="mt-1 max-w-2xl text-[13px]" :style="{ color: 'var(--ink-secondary)' }">
+    <p class="mt-1 max-w-2xl text-[13px] text-ink-secondary">
       {{ t("plugins.subtitle") }}
     </p>
 
     <p
       v-if="error"
-      class="mt-4 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mt-4 text-[13px] text-status-critical"
       role="alert"
     >
       {{ error }}
     </p>
-    <p v-if="loading" class="mt-4 text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t("common.loading") }}
-    </p>
+    <SkeletonCards v-if="loading" class="mt-5" :count="6" height="h-24" />
 
     <div v-else class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div
@@ -164,7 +163,7 @@ onMounted(() => {
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
             <div class="text-[13px] font-medium">{{ p.name }}</div>
-            <div class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <div class="mt-0.5 text-[11px] text-ink-muted">
               {{ p.description }}
             </div>
           </div>
@@ -183,7 +182,7 @@ onMounted(() => {
         </div>
 
         <div class="mt-3 flex items-center justify-between gap-2">
-          <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <span class="text-[11px] text-ink-muted">
             {{ p.installed ? t("plugins.installed") : t("plugins.notInstalled") }}
           </span>
 
@@ -224,14 +223,13 @@ onMounted(() => {
 
     <section class="mt-8">
       <h2 class="text-[15px] font-semibold tracking-tight">{{ t("plugins.webmailTitle") }}</h2>
-      <p class="mt-1 max-w-2xl text-[13px]" :style="{ color: 'var(--ink-secondary)' }">
+      <p class="mt-1 max-w-2xl text-[13px] text-ink-secondary">
         {{ t("plugins.webmailSubtitle") }}
       </p>
 
       <p
         v-if="webmailError"
-        class="mt-3 text-[13px]"
-        :style="{ color: 'var(--status-critical)' }"
+        class="mt-3 text-[13px] text-status-critical"
         role="alert"
       >
         {{ webmailError }}
@@ -245,7 +243,7 @@ onMounted(() => {
           <div class="text-[13px] font-medium">
             <a :href="'https://' + webmail.hostname" target="_blank" rel="noopener">{{ webmail.hostname }}</a>
           </div>
-          <div class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <div class="mt-0.5 text-[11px] text-ink-muted">
             PHP {{ webmail.php_version }}
           </div>
           <button
@@ -259,7 +257,7 @@ onMounted(() => {
         </template>
         <template v-else>
           <div class="flex flex-wrap items-end gap-2">
-            <label class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <label class="text-[11px] text-ink-muted">
               {{ t("plugins.webmailPhpVersion") }}
               <select
                 v-model="webmailForm.php_version"
@@ -278,7 +276,7 @@ onMounted(() => {
               {{ webmailBusy ? t("plugins.webmailInstalling") : t("plugins.webmailInstall") }}
             </button>
           </div>
-          <p class="mt-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <p class="mt-2 text-[11px] text-ink-muted">
             {{ t("plugins.webmailHostnameHint") }}
           </p>
         </template>

@@ -17,7 +17,7 @@ const activeTabs = computed(() =>
 </script>
 
 <template>
-  <div class="border-b px-8 pt-6" :style="{ borderColor: 'var(--border-ring)' }">
+  <div class="border-b px-8 pt-6 border-border-ring">
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 class="text-[18px] font-semibold tracking-tight">{{ t('nav.frontend') }}</h1>

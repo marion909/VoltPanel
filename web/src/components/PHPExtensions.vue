@@ -97,14 +97,13 @@ onMounted(loadVersions);
     </div>
     <!-- Der Hinweis steht bewusst oben: wer ein Modul sucht, sucht es meist
          für eine bestimmte Site und soll gleich wissen, dass es alle trifft. -->
-    <p class="mb-4 text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+    <p class="mb-4 text-[12px] text-ink-muted">
       {{ t("php.systemwide") }}
     </p>
 
     <p
       v-if="error"
-      class="mb-3 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-3 text-[13px] text-status-critical"
     >
       {{ error }}
     </p>
@@ -122,8 +121,7 @@ onMounted(loadVersions);
         @keyup.enter="install"
       />
       <button
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         :disabled="!newName.trim() || busy !== ''"
         @click="install"
       >
@@ -133,15 +131,13 @@ onMounted(loadVersions);
 
     <p
       v-if="loading"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       …
     </p>
     <p
       v-else-if="!extensions.length"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       {{ t("php.none") }}
     </p>

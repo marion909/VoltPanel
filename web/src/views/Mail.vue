@@ -3,7 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { isAdmin } from '../stores/session'
+import { askConfirm } from '../stores/confirm'
 import InstallHint from '../components/InstallHint.vue'
+import SkeletonCards from '../components/SkeletonCards.vue'
 
 // Mail: Domänen, Postfächer, Weiterleitungen.
 //
@@ -118,8 +120,8 @@ const domainUmschalten = (d) =>
 const catchAllSetzen = (d, wert) =>
   fuehreAus(() => api.patch(`/mail/domains/${d.id}`, { catch_all: wert.trim() }))
 
-function domainEntfernen(d) {
-  if (!confirm(t('mail.confirmDeleteDomain', { domain: d.domain }))) return
+async function domainEntfernen(d) {
+  if (!(await askConfirm(t('mail.confirmDeleteDomain', { domain: d.domain })))) return
   fuehreAus(async () => {
     const res = await api.del(`/mail/domains/${d.id}`)
     if (res?.hinweis) alert(res.hinweis)
@@ -149,8 +151,8 @@ async function passwortZeigen(box) {
 const postfachUmschalten = (box) =>
   fuehreAus(() => api.patch(`/mail/mailboxes/${box.id}`, { active: !box.active }))
 
-function postfachEntfernen(box) {
-  if (!confirm(t('mail.confirmDeleteBox', { address: box.address }))) return
+async function postfachEntfernen(box) {
+  if (!(await askConfirm(t('mail.confirmDeleteBox', { address: box.address })))) return
   fuehreAus(async () => {
     const res = await api.del(`/mail/mailboxes/${box.id}`)
     if (res?.hinweis) alert(res.hinweis)
@@ -216,13 +218,13 @@ onMounted(load)
     <header class="mb-5 flex items-center justify-between gap-3">
       <div>
         <h1 class="text-[18px] font-semibold tracking-tight">{{ t('mail.title') }}</h1>
-        <p class="mt-0.5 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <p class="mt-0.5 text-[12px] text-ink-secondary">
           {{ t('mail.subtitle') }}
         </p>
       </div>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
 
@@ -238,7 +240,7 @@ onMounted(load)
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-[14px] font-medium">{{ t('mail.checkTitle') }}</h2>
-          <p class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <p class="mt-0.5 text-[11px] text-ink-muted">
             {{ t('mail.checkHint') }}
           </p>
         </div>
@@ -267,13 +269,13 @@ onMounted(load)
             </td>
             <td class="w-28 py-1 pr-2 font-medium">
               {{ b.was }}
-              <div v-if="b.domain" class="font-normal" :style="{ color: 'var(--ink-muted)' }">
+              <div v-if="b.domain" class="font-normal text-ink-muted">
                 {{ b.domain }}
               </div>
             </td>
             <td class="py-1">
               <div>{{ b.text }}</div>
-              <div v-if="b.rat" class="mt-0.5 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+              <div v-if="b.rat" class="mt-0.5 text-[11px] text-ink-muted">
                 {{ b.rat }}
               </div>
             </td>
@@ -288,7 +290,7 @@ onMounted(load)
       class="panel-card mb-5 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t('mail.setupTitle') }}</h2>
-      <p class="mb-3 whitespace-pre-line text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+      <p class="mb-3 whitespace-pre-line text-[12px] text-ink-secondary">
         {{ t('mail.setupHint') }}
       </p>
       <!-- Fehlt ein Dienst, steht der Knopf daneben. Ein Hinweis ohne Weg
@@ -314,8 +316,7 @@ onMounted(load)
       <button
         v-if="isAdmin() && status.postfix_installed"
         :disabled="busy"
-        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         @click="setup"
       >
         {{ busy ? t('mail.settingUp') : t('mail.setup') }}
@@ -330,7 +331,7 @@ onMounted(load)
       class="panel-card mb-5 p-4"
     >
       <h2 class="mb-2 text-[14px] font-medium">{{ t('mail.spamTitle') }}</h2>
-      <p v-if="!spam.reachable" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+      <p v-if="!spam.reachable" class="text-[12px] text-ink-muted">
         {{ spam.hinweis || t('mail.spamUnreachable') }}
       </p>
       <template v-else>
@@ -345,8 +346,7 @@ onMounted(load)
         </div>
         <div
           v-if="spam.actions && Object.keys(spam.actions).length"
-          class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]"
-          :style="{ color: 'var(--ink-muted)' }"
+          class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-muted"
         >
           <span v-for="(n, name) in spam.actions" :key="name">{{ name }}: {{ n }}</span>
         </div>
@@ -368,21 +368,18 @@ onMounted(load)
           {{ credentials.address }} · {{ credentials.password }}
         </div>
         <button
-          class="text-[12px] underline"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="text-[12px] underline text-ink-secondary"
           @click="credentials = null"
         >
           {{ t('common.close') }}
         </button>
       </div>
-      <p class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+      <p class="mt-1 text-[11px] text-ink-muted">
         {{ t('mail.passwordNote') }}
       </p>
     </div>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-secondary)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonCards v-if="loading" :count="3" cols="" height="h-16" />
 
     <template v-else>
       <!-- Neue Domäne -->
@@ -390,7 +387,7 @@ onMounted(load)
         class="panel-card mb-5 flex flex-wrap items-end gap-2 p-4"
       >
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('mail.newDomain') }}
           </span>
           <input
@@ -401,14 +398,13 @@ onMounted(load)
           />
         </label>
         <button
-          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
           :disabled="busy || !domainForm.trim()"
           @click="domainAnlegen"
         >
           {{ t('common.create') }}
         </button>
-        <p class="w-full text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="w-full text-[11px] text-ink-muted">
           {{ t('mail.dnsHint') }}
         </p>
       </div>
@@ -435,29 +431,26 @@ onMounted(load)
                 :title="d.active ? t('mail.active') : t('mail.inactive')"
               ></span>
               <span class="text-[14px] font-medium">{{ d.domain }}</span>
-              <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+              <span class="text-[11px] text-ink-muted">
                 {{ t('mail.counts', { boxes: boxenVon(d.id).length, aliases: aliaseVon(d.id).length }) }}
               </span>
             </div>
             <div class="flex gap-3 text-[11px]">
               <button
-                class="underline"
-                :style="{ color: 'var(--ink-secondary)' }"
+                class="underline text-ink-secondary"
                 @click="umschalten(d)"
               >
                 {{ offen[d.id] ? t('common.close') : t('mail.manage') }}
               </button>
               <button
-                class="underline"
-                :style="{ color: 'var(--ink-secondary)' }"
+                class="underline text-ink-secondary"
                 :disabled="busy"
                 @click="domainUmschalten(d)"
               >
                 {{ d.active ? t('mail.disable') : t('mail.enable') }}
               </button>
               <button
-                class="underline"
-                :style="{ color: 'var(--status-critical)' }"
+                class="underline text-status-critical"
                 :disabled="busy"
                 @click="domainEntfernen(d)"
               >
@@ -476,19 +469,19 @@ onMounted(load)
               <table class="text-[12px]">
                 <tbody>
                   <tr>
-                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">IMAP</td>
+                    <td class="py-0.5 pr-4 text-ink-muted">IMAP</td>
                     <td class="py-0.5 font-mono">
                       {{ settings.host }}:{{ settings.imap_port }} · {{ settings.imap_encryption }}
                     </td>
                   </tr>
                   <tr>
-                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">SMTP</td>
+                    <td class="py-0.5 pr-4 text-ink-muted">SMTP</td>
                     <td class="py-0.5 font-mono">
                       {{ settings.host }}:{{ settings.smtp_port }} · {{ settings.smtp_encryption }}
                     </td>
                   </tr>
                   <tr>
-                    <td class="py-0.5 pr-4" :style="{ color: 'var(--ink-muted)' }">
+                    <td class="py-0.5 pr-4 text-ink-muted">
                       {{ t('mail.clientUser') }}
                     </td>
                     <td class="py-0.5">{{ t('mail.clientUserValue') }}</td>
@@ -515,23 +508,20 @@ onMounted(load)
                     {{ b.quota_mb ? b.quota_mb + ' MB' : t('mail.noQuota') }}
                   </span>
                   <button
-                    class="underline"
-                    :style="{ color: 'var(--ink-secondary)' }"
+                    class="underline text-ink-secondary"
                     @click="passwortZeigen(b)"
                   >
                     {{ t('mail.showPassword') }}
                   </button>
                   <button
-                    class="underline"
-                    :style="{ color: 'var(--ink-secondary)' }"
+                    class="underline text-ink-secondary"
                     :disabled="busy"
                     @click="postfachUmschalten(b)"
                   >
                     {{ b.active ? t('mail.disable') : t('mail.enable') }}
                   </button>
                   <button
-                    class="underline"
-                    :style="{ color: 'var(--status-critical)' }"
+                    class="underline text-status-critical"
                     :disabled="busy"
                     @click="postfachEntfernen(b)"
                   >
@@ -586,7 +576,7 @@ onMounted(load)
                   :style="inputStyle"
                   @change="catchAllSetzen(d, $event.target.value)"
                 />
-                <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                <span class="text-[11px] text-ink-muted">
                   {{ t('mail.catchAllHint') }}
                 </span>
               </div>
@@ -596,7 +586,7 @@ onMounted(load)
             <section>
               <h3 class="mb-2 text-[12px] font-medium">{{ t('mail.dkim') }}</h3>
               <template v-if="dkim[d.id]">
-                <p class="mb-1 text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+                <p class="mb-1 text-[11px] text-ink-secondary">
                   {{ t('mail.dkimRecord') }}
                 </p>
                 <div
@@ -606,7 +596,7 @@ onMounted(load)
                   <div>TXT &nbsp;{{ dkim[d.id].name }}</div>
                   <div class="mt-1 break-all">{{ dkim[d.id].value }}</div>
                 </div>
-                <p class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                <p class="mt-1 text-[11px] text-ink-muted">
                   {{ t('mail.dkimHint') }}
                 </p>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -618,7 +608,7 @@ onMounted(load)
                   >
                     {{ t('mail.dnsPublish') }}
                   </button>
-                  <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                  <span class="text-[11px] text-ink-muted">
                     {{ t('mail.dnsPublishHint') }}
                   </span>
                 </div>
@@ -645,7 +635,7 @@ onMounted(load)
                   >
                     {{ t('mail.autoconfigPublish') }}
                   </button>
-                  <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                  <span class="text-[11px] text-ink-muted">
                     {{ t('mail.autoconfigPublishHint') }}
                   </span>
                 </div>
@@ -665,7 +655,7 @@ onMounted(load)
                 </ul>
               </template>
               <template v-else>
-                <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                <p class="mb-2 text-[11px] text-ink-muted">
                   {{ t('mail.dkimNone') }}
                 </p>
                 <button
@@ -690,8 +680,7 @@ onMounted(load)
                 >
                   <code class="font-mono">{{ a.source }} → {{ a.destination }}</code>
                   <button
-                    class="underline"
-                    :style="{ color: 'var(--status-critical)' }"
+                    class="underline text-status-critical"
                     :disabled="busy"
                     @click="aliasEntfernen(a)"
                   >

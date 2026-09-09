@@ -246,7 +246,7 @@ watch(logType, loadLog)
 <template>
   <div class="fade-in px-8 py-6">
     <header class="mb-5">
-      <button class="mb-2 text-[12px] underline" :style="{ color: 'var(--ink-muted)' }"
+      <button class="mb-2 text-[12px] underline text-ink-muted"
               @click="router.push('/frontend/sites')">
         ← {{ t('sites.title') }}
       </button>
@@ -254,7 +254,7 @@ watch(logType, loadLog)
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-[18px] font-semibold tracking-tight">{{ site?.domain }}</h1>
-          <p v-if="site" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+          <p v-if="site" class="text-[12px] text-ink-muted">
             {{ site.type }}<template v-if="site.php_version"> · PHP {{ site.php_version }}</template>
             · {{ site.system_user }} · {{ formatBytes(site.disk_bytes) }}
           </p>
@@ -267,7 +267,7 @@ watch(logType, loadLog)
       </div>
     </header>
 
-    <nav class="mb-4 flex flex-wrap gap-1 border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+    <nav class="mb-4 flex flex-wrap gap-1 border-b border-line-hairline">
       <button
         v-for="item in tabs"
         :key="item.key"
@@ -282,11 +282,11 @@ watch(logType, loadLog)
       </button>
     </nav>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
-    <p v-if="notice" class="mb-4 text-[13px]" :style="{ color: 'var(--status-good)' }">{{ notice }}</p>
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="notice" class="mb-4 text-[13px] text-status-good">{{ notice }}</p>
+    <p v-if="loading" class="text-[13px] text-ink-muted">
       {{ t('common.loading') }}
     </p>
 
@@ -332,11 +332,11 @@ watch(logType, loadLog)
             <option :value="307">307</option>
             <option :value="308">308</option>
           </select>
-          <button class="px-2 text-[12px]" :style="{ color: 'var(--status-critical)' }"
+          <button class="px-2 text-[12px] text-status-critical"
                   @click="removeRedirect(i)">×</button>
         </div>
 
-        <button class="text-[12px] underline" :style="{ color: 'var(--accent)' }" @click="addRedirect">
+        <button class="text-[12px] underline text-accent" @click="addRedirect">
           + {{ t('site.addRedirect') }}
         </button>
       </div>
@@ -344,7 +344,7 @@ watch(logType, loadLog)
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="panel-card p-5">
           <h2 class="mb-1 text-[14px] font-medium">{{ t('site.denyIPs') }}</h2>
-          <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.ipHint') }}</p>
+          <p class="mb-2 text-[11px] text-ink-muted">{{ t('site.ipHint') }}</p>
           <textarea v-model="settings._denyText" rows="4" spellcheck="false"
                     class="tabular w-full rounded-md border px-3 py-2 font-mono text-[12px]"
                     :style="inputStyle" placeholder="203.0.113.5&#10;198.51.100.0/24"></textarea>
@@ -352,7 +352,7 @@ watch(logType, loadLog)
 
         <div class="panel-card p-5">
           <h2 class="mb-1 text-[14px] font-medium">{{ t('site.allowIPs') }}</h2>
-          <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.allowHint') }}</p>
+          <p class="mb-2 text-[11px] text-ink-muted">{{ t('site.allowHint') }}</p>
           <textarea v-model="settings._allowText" rows="4" spellcheck="false"
                     class="tabular w-full rounded-md border px-3 py-2 font-mono text-[12px]"
                     :style="inputStyle" placeholder="10.0.0.0/8"></textarea>
@@ -361,18 +361,18 @@ watch(logType, loadLog)
 
       <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.basicAuth') }}</h2>
-        <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.authHint') }}</p>
+        <p class="mb-3 text-[11px] text-ink-muted">{{ t('site.authHint') }}</p>
 
         <div v-for="(u, i) in authUsers" :key="i" class="mb-2 flex flex-wrap gap-2">
           <input v-model="u.username" placeholder="benutzer"
                  class="w-40 rounded-md border px-3 py-1.5 text-[12px]" :style="inputStyle" />
           <input v-model="u.password" type="password" :placeholder="t('site.authPassword')"
                  class="min-w-48 flex-1 rounded-md border px-3 py-1.5 text-[12px]" :style="inputStyle" />
-          <button class="px-2 text-[12px]" :style="{ color: 'var(--status-critical)' }"
+          <button class="px-2 text-[12px] text-status-critical"
                   @click="authUsers.splice(i, 1)">×</button>
         </div>
 
-        <button class="text-[12px] underline" :style="{ color: 'var(--accent)' }"
+        <button class="text-[12px] underline text-accent"
                 @click="authUsers.push({ username: '', password: '' })">
           + {{ t('site.addAuthUser') }}
         </button>
@@ -380,21 +380,21 @@ watch(logType, loadLog)
 
       <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.extraLines') }}</h2>
-        <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.extraHint') }}</p>
+        <p class="mb-2 text-[11px] text-ink-muted">{{ t('site.extraHint') }}</p>
         <textarea v-model="settings._extraText" rows="5" spellcheck="false"
                   class="tabular w-full rounded-md border px-3 py-2 font-mono text-[12px]"
                   :style="inputStyle" placeholder="add_header X-Robots-Tag noindex;"></textarea>
 
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('site.maxBody') }}
             </span>
             <input v-model="settings.max_body_size" placeholder="64M"
                    class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
           </label>
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('site.fastcgiTimeout') }}
             </span>
             <input v-model.number="settings.fastcgi_timeout" type="number" min="0" max="3600"
@@ -404,8 +404,7 @@ watch(logType, loadLog)
       </div>
 
       <button :disabled="busy"
-              class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-              :style="{ background: 'var(--accent)' }" @click="saveSettings">
+              class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent" @click="saveSettings">
         {{ busy ? t('common.loading') : t('common.save') }}
       </button>
     </section>
@@ -415,7 +414,7 @@ watch(logType, loadLog)
       <div class="panel-card p-5">
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('sites.php') }}
             </span>
             <select v-model="php.pool.php_version" class="w-full rounded-md border px-3 py-2 text-[13px]"
@@ -426,7 +425,7 @@ watch(logType, loadLog)
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('site.processManager') }}
             </span>
             <select v-model="php.pool.pm" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle">
@@ -437,7 +436,7 @@ watch(logType, loadLog)
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('site.maxChildren') }}
             </span>
             <input v-model.number="php.pool.max_children" type="number" min="1" max="500"
@@ -445,7 +444,7 @@ watch(logType, loadLog)
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               memory_limit
             </span>
             <input v-model="php.pool.memory_limit" placeholder="256M"
@@ -453,7 +452,7 @@ watch(logType, loadLog)
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               max_execution_time
             </span>
             <input v-model.number="php.pool.max_execution_time" type="number" min="1" max="3600"
@@ -461,7 +460,7 @@ watch(logType, loadLog)
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               upload_max_filesize
             </span>
             <input v-model="php.pool.upload_max_filesize" placeholder="64M"
@@ -473,19 +472,19 @@ watch(logType, loadLog)
              leert — deshalb nur für Administratoren. -->
         <template v-if="isAdmin()">
           <label class="mt-4 block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               disable_functions
             </span>
             <textarea v-model="php.pool.disable_functions" rows="3" spellcheck="false"
                       class="w-full rounded-md border px-3 py-2 font-mono text-[11px]"
                       :style="inputStyle"></textarea>
-            <span class="mt-1 block text-[11px]" :style="{ color: 'var(--status-warning)' }">
+            <span class="mt-1 block text-[11px] text-status-warning">
               {{ t('site.disableFunctionsHint') }}
             </span>
           </label>
 
           <label class="mt-3 block">
-            <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[12px] text-ink-secondary">
               {{ t('site.extraINI') }}
             </span>
             <textarea v-model="php.pool.extra_ini" rows="3" spellcheck="false"
@@ -495,8 +494,7 @@ watch(logType, loadLog)
         </template>
 
         <button :disabled="busy"
-                class="mt-4 rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }" @click="savePHP">
+                class="mt-4 rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent" @click="savePHP">
           {{ busy ? t('common.loading') : t('common.save') }}
         </button>
       </div>
@@ -511,7 +509,7 @@ watch(logType, loadLog)
           <input v-model="site.force_https" type="checkbox" class="mt-0.5" />
           <span>
             {{ t('site.forceHTTPS') }}
-            <span class="block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <span class="block text-[11px] text-ink-muted">
               {{ t('site.forceHTTPSHint') }}
             </span>
           </span>
@@ -530,8 +528,7 @@ watch(logType, loadLog)
         </label>
 
         <button :disabled="busy"
-                class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }" @click="saveHTTPS">
+                class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent" @click="saveHTTPS">
           {{ t('common.save') }}
         </button>
       </div>
@@ -553,7 +550,7 @@ watch(logType, loadLog)
 
       <div class="panel-card p-5">
         <h2 class="mb-1 text-[14px] font-medium">{{ t('site.issueCert') }}</h2>
-        <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('site.certHint') }}</p>
+        <p class="mb-3 text-[11px] text-ink-muted">{{ t('site.certHint') }}</p>
 
         <label class="mb-3 flex items-center gap-2 text-[13px]">
           <input v-model="wildcard" type="checkbox" />
@@ -561,7 +558,7 @@ watch(logType, loadLog)
         </label>
 
         <label v-if="wildcard" class="mb-3 block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('site.cfToken') }}
           </span>
           <input v-model="cfToken" type="password" :placeholder="t('site.cfTokenHint')"
@@ -569,8 +566,7 @@ watch(logType, loadLog)
         </label>
 
         <button :disabled="busy"
-                class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }" @click="issueCert">
+                class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent" @click="issueCert">
           {{ busy ? t('site.issuing') : t('site.issueCert') }}
         </button>
       </div>
@@ -598,8 +594,7 @@ watch(logType, loadLog)
       </div>
 
       <pre
-        class="panel-card max-h-[32rem] overflow-auto p-4 font-mono text-[11px] leading-relaxed"
-        :style="{ color: 'var(--ink-secondary)' }"
+        class="panel-card max-h-[32rem] overflow-auto p-4 font-mono text-[11px] leading-relaxed text-ink-secondary"
       >{{ logText }}</pre>
     </section>
   </div>

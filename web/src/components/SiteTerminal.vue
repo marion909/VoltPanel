@@ -119,11 +119,10 @@ onBeforeUnmount(() => {
 <template>
   <div>
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('term.hint') }}</p>
+      <p class="text-[11px] text-ink-muted">{{ t('term.hint') }}</p>
       <button
         v-if="status === 'closed'"
-        class="rounded-md px-3 py-1 text-[12px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1 text-[12px] font-medium text-white bg-accent"
         @click="restart"
       >
         {{ t('term.reconnect') }}
@@ -136,7 +135,7 @@ onBeforeUnmount(() => {
       :style="{ borderColor: 'var(--border-ring)', background: 'var(--surface-sunken)' }"
     ></div>
 
-    <p v-if="message" class="mt-2 text-[12px]" :style="{ color: 'var(--ink-muted)' }" role="status">
+    <p v-if="message" class="mt-2 text-[12px] text-ink-muted" role="status">
       {{ message }}
     </p>
   </div>

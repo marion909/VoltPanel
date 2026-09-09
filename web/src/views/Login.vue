@@ -81,8 +81,7 @@ async function submit() {
         -->
         <p
           v-if="brand"
-          class="mb-4 text-[12px]"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="mb-4 text-[12px] text-ink-secondary"
         >
           {{ t('login.tenantOnly') }}
         </p>
@@ -100,7 +99,7 @@ async function submit() {
         </p>
 
         <label class="mb-3 block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('login.email') }}
           </span>
           <input
@@ -109,7 +108,7 @@ async function submit() {
             autocomplete="username"
             required
             :disabled="totpRequired"
-            class="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2"
+            class="w-full rounded-md border px-3 py-2 text-[13px]"
             :style="{
               borderColor: 'var(--line-axis)',
               background: 'var(--surface-page)',
@@ -119,7 +118,7 @@ async function submit() {
         </label>
 
         <label class="mb-3 block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('login.password') }}
           </span>
           <input
@@ -128,7 +127,7 @@ async function submit() {
             autocomplete="current-password"
             required
             :disabled="totpRequired"
-            class="w-full rounded-md border px-3 py-2 text-[13px] outline-none focus:ring-2"
+            class="w-full rounded-md border px-3 py-2 text-[13px]"
             :style="{
               borderColor: 'var(--line-axis)',
               background: 'var(--surface-page)',
@@ -138,7 +137,7 @@ async function submit() {
         </label>
 
         <label v-if="totpRequired" class="mb-3 block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('login.totp') }}
           </span>
           <input
@@ -148,7 +147,7 @@ async function submit() {
             maxlength="6"
             required
             autofocus
-            class="tabular w-full rounded-md border px-3 py-2 text-center text-[16px] tracking-[0.3em] outline-none focus:ring-2"
+            class="tabular w-full rounded-md border px-3 py-2 text-center text-[16px] tracking-[0.3em]"
             :style="{
               borderColor: 'var(--line-axis)',
               background: 'var(--surface-page)',
@@ -159,8 +158,7 @@ async function submit() {
 
         <p
           v-if="error"
-          class="mb-3 text-[12px]"
-          :style="{ color: 'var(--status-critical)' }"
+          class="mb-3 text-[12px] text-status-critical"
           role="alert"
         >
           {{ error }}
@@ -169,8 +167,7 @@ async function submit() {
         <button
           type="submit"
           :disabled="busy"
-          class="w-full rounded-md px-3 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-60"
-          :style="{ background: 'var(--accent)' }"
+          class="w-full rounded-md px-3 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-60 bg-accent"
         >
           {{ busy ? t('common.loading') : t('login.submit') }}
         </button>

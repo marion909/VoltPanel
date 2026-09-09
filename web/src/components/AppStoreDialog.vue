@@ -87,22 +87,22 @@ onMounted(() => {
       <!-- Das Ergebnis: die Site steht, und das Datenbankpasswort steht hier
            genau einmal — danach gibt das Panel es nicht mehr heraus. -->
       <div v-if="result">
-        <p class="text-[13px] font-medium" :style="{ color: 'var(--status-good)' }">
+        <p class="text-[13px] font-medium text-status-good">
           {{ t("appstore.wpDone", { domain: result.site?.domain }) }}
         </p>
         <table class="mt-2 text-[12px]">
           <tbody>
             <tr>
-              <td class="pr-3" :style="{ color: 'var(--ink-muted)' }">{{ t("appstore.dbName") }}</td>
+              <td class="pr-3 text-ink-muted">{{ t("appstore.dbName") }}</td>
               <td class="font-mono">{{ result.database?.name }}</td>
             </tr>
             <tr>
-              <td class="pr-3" :style="{ color: 'var(--ink-muted)' }">{{ t("appstore.dbPassword") }}</td>
+              <td class="pr-3 text-ink-muted">{{ t("appstore.dbPassword") }}</td>
               <td class="font-mono">{{ result.db_password }}</td>
             </tr>
           </tbody>
         </table>
-        <p class="mt-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="mt-2 text-[11px] text-ink-muted">
           {{ t("appstore.wpNext") }}
         </p>
         <button
@@ -117,7 +117,7 @@ onMounted(() => {
 
       <form v-else class="grid gap-3 sm:grid-cols-3" @submit.prevent="installWordPress">
         <label class="block sm:col-span-2">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t("sites.domain") }}
           </span>
           <input
@@ -129,7 +129,7 @@ onMounted(() => {
           />
         </label>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             PHP
           </span>
           <select
@@ -141,11 +141,11 @@ onMounted(() => {
           </select>
         </label>
 
-        <p class="text-[11px] sm:col-span-3" :style="{ color: 'var(--ink-muted)' }">
+        <p class="text-[11px] sm:col-span-3 text-ink-muted">
           {{ t("appstore.wpHint") }}
         </p>
 
-        <p v-if="error" class="text-[12px] sm:col-span-3" :style="{ color: 'var(--status-critical)' }">
+        <p v-if="error" class="text-[12px] sm:col-span-3 text-status-critical">
           {{ error }}
         </p>
 
@@ -153,8 +153,7 @@ onMounted(() => {
           <button
             type="submit"
             :disabled="busy"
-            class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-            :style="{ background: 'var(--accent)' }"
+            class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60 bg-accent"
           >
             {{ busy ? t("appstore.installing") : t("appstore.install") }}
           </button>

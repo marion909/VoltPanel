@@ -43,6 +43,31 @@
   --radius-card: 14px;
 }
 
+/* Hängt die Farbrollen als Tailwind-Theme-Tokens ein — dadurch entsteht
+   text-ink-muted/bg-surface-card/border-status-critical usw. als normale
+   Utility-Klasse. Jede Referenz ist eine Weiterleitung (var(--color-x): var(--x)),
+   keine Kopie: Light/Dark tauschen weiterhin nur an der einen Stelle oben,
+   diese Zeilen ändern sich nie mit. Ersetzt schrittweise die :style-Objekte,
+   die bisher für jede einzelne Farbe nötig waren (siehe design.md, Fund 1) —
+   dynamische Ampel-Farben (RingGauge/QuotaBar) bleiben bewusst :style, weil
+   sie zur Laufzeit zwischen mehreren Werten wechseln. */
+@theme {
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-line-hairline: var(--line-hairline);
+  --color-line-axis: var(--line-axis);
+  --color-border-ring: var(--border-ring);
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-critical: var(--status-critical);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
@@ -126,6 +151,32 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+/* Sichtbarer Fokus galt bisher nur für die drei Felder auf der
+   Login-Seite (dort einzeln per focus:ring-2 eingetragen) — der Rest der
+   App verließ sich auf den Browser-Standard. Global statt pro Formular,
+   damit jede künftige Eingabe automatisch mitzieht. outline statt
+   Tailwinds Ring (box-shadow): ein Ring würde an jeder Stelle abgeschnitten,
+   an der eine Karte overflow-hidden trägt (z. B. jede Tabellen-Karte) —
+   ein outline nicht, der wird nie geclippt. */
+input,
+select,
+textarea,
+button,
+a[href],
+[tabindex] {
+  outline: none;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a[href]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @keyframes volt-fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
@@ -135,7 +186,17 @@ body {
   animation: volt-fade-in 0.18s ease-out;
 }
 
+@keyframes volt-skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.skeleton-bar {
+  animation: volt-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in { animation: none; }
+  .skeleton-bar { animation: none; opacity: 0.75; }
   * { transition-duration: 0.01ms !important; }
 }

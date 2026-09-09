@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import { askConfirm } from '../stores/confirm'
+import SkeletonCards from '../components/SkeletonCards.vue'
 
 const deploys = ref([])
 const sites = ref([])
@@ -128,7 +130,7 @@ async function ladeStaende(d) {
 }
 
 async function zurueck(d, release) {
-  if (!confirm(t('deploy.confirmRollback', { r: release }))) return
+  if (!(await askConfirm(t('deploy.confirmRollback', { r: release })))) return
   busy.value = true
   try {
     await api.post(`/deploys/${d.id}/rollback`, { release })
@@ -142,7 +144,7 @@ async function zurueck(d, release) {
 }
 
 async function entfernen(d) {
-  if (!confirm(t('deploy.confirmDelete', { name: d.domain }))) return
+  if (!(await askConfirm(t('deploy.confirmDelete', { name: d.domain })))) return
   busy.value = true
   try {
     await api.del(`/deploys/${d.id}`)
@@ -174,8 +176,7 @@ onUnmounted(stoppeTicker)
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('deploy.title') }}</h1>
       <button
         v-if="freieSites.length"
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
         @click="showForm = !showForm"
       >
         {{ t('deploy.new') }}
@@ -184,8 +185,7 @@ onUnmounted(stoppeTicker)
 
     <p
       v-if="error"
-      class="mb-4 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-4 text-[13px] text-status-critical"
       role="alert"
     >
       {{ error }}
@@ -214,7 +214,7 @@ onUnmounted(stoppeTicker)
       @submit.prevent="speichern"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('deploy.site') }}
         </span>
         <select v-model="form.site_id" required
@@ -224,7 +224,7 @@ onUnmounted(stoppeTicker)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('deploy.branch') }}
         </span>
         <input v-model="form.ref" placeholder="main"
@@ -232,18 +232,18 @@ onUnmounted(stoppeTicker)
       </label>
 
       <label class="block sm:col-span-2">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('deploy.repo') }}
         </span>
         <input v-model="form.repo_url" required placeholder="git@github.com:name/repo.git"
                class="w-full rounded-md border px-3 py-2 font-mono text-[12px]" :style="inputStyle" />
-        <span class="mt-1 block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <span class="mt-1 block text-[11px] text-ink-muted">
           {{ t('deploy.repoHint') }}
         </span>
       </label>
 
       <fieldset class="sm:col-span-2">
-        <legend class="mb-1 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <legend class="mb-1 text-[12px] text-ink-secondary">
           {{ t('deploy.steps') }}
         </legend>
         <div class="flex flex-wrap gap-3">
@@ -261,19 +261,15 @@ onUnmounted(stoppeTicker)
 
       <div class="sm:col-span-2">
         <button type="submit" :disabled="busy"
-                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }">
+                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
           {{ busy ? t('common.loading') : t('common.save') }}
         </button>
       </div>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonCards v-if="loading" :count="3" cols="" height="h-20" />
     <p v-else-if="!deploys.length"
-       class="text-[13px]"
-       :style="{ color: 'var(--ink-muted)' }">
+       class="text-[13px] text-ink-muted">
       {{ t('deploy.empty') }}
     </p>
 
@@ -289,15 +285,15 @@ onUnmounted(stoppeTicker)
               <span class="h-1.5 w-1.5 shrink-0 rounded-full"
                     :style="{ background: statusFarbe(d.last_status) }"></span>
               <span class="truncate text-[14px] font-medium">{{ d.domain }}</span>
-              <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+              <span class="text-[11px] text-ink-muted">
                 {{ d.ref }}
               </span>
             </div>
-            <div class="truncate font-mono text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <div class="truncate font-mono text-[11px] text-ink-muted">
               {{ d.repo_url }}
             </div>
           </div>
-          <div class="text-right text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+          <div class="text-right text-[11px] text-ink-secondary">
             <template v-if="d.last_release">
               {{ d.last_release }}<template v-if="d.last_commit"> &middot; {{ d.last_commit }}</template>
             </template>
@@ -305,7 +301,7 @@ onUnmounted(stoppeTicker)
           </div>
         </header>
 
-        <div class="text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+        <div class="text-[11px] text-ink-secondary">
           {{ t('deploy.hookUrl') }}:
           <code class="break-all font-mono">{{ d.hook_url }}</code>
         </div>
@@ -314,7 +310,7 @@ onUnmounted(stoppeTicker)
              "fehlgeschlagen" meldet, zwingt zur Shell — und die hat der Kunde
              nicht. -->
         <details v-if="d.last_log" class="mt-2">
-          <summary class="cursor-pointer text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+          <summary class="cursor-pointer text-[11px] text-ink-secondary">
             {{ t('deploy.log') }}
           </summary>
           <pre class="mt-1 max-h-64 overflow-auto rounded-md p-2 font-mono text-[11px]"
@@ -324,14 +320,14 @@ onUnmounted(stoppeTicker)
 
         <div v-if="offen[d.id]" class="mt-3 space-y-2">
           <div v-if="keys[d.id]">
-            <p class="text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <p class="text-[11px] text-ink-secondary">
               {{ t('deploy.key') }}
             </p>
             <code class="block break-all font-mono text-[11px]">{{ keys[d.id] }}</code>
           </div>
 
           <div v-if="releases[d.id]">
-            <p class="text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <p class="text-[11px] text-ink-secondary">
               {{ t('deploy.releases') }}
             </p>
             <ul class="mt-1 space-y-1">
@@ -340,7 +336,7 @@ onUnmounted(stoppeTicker)
                 <code class="font-mono">{{ r }}</code>
                 <span v-if="r === releases[d.id].current"
                       :style="{ color: 'var(--status-good)' }">{{ t('deploy.current') }}</span>
-                <button v-else class="underline" :style="{ color: 'var(--ink-secondary)' }"
+                <button v-else class="underline text-ink-secondary"
                         :disabled="busy" @click="zurueck(d, r)">
                   {{ t('deploy.rollback') }}
                 </button>
@@ -350,15 +346,15 @@ onUnmounted(stoppeTicker)
         </div>
 
         <footer class="mt-3 flex flex-wrap gap-3 text-[11px]">
-          <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+          <button class="underline text-ink-secondary"
                   :disabled="busy || d.last_status === 'running'" @click="starten(d)">
             {{ d.last_status === 'running' ? t('deploy.running') : t('deploy.run') }}
           </button>
-          <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+          <button class="underline text-ink-secondary"
                   @click="staendeLaden(d)">
             {{ offen[d.id] ? t('deploy.hideDetails') : t('deploy.details') }}
           </button>
-          <button class="underline" :style="{ color: 'var(--status-critical)' }"
+          <button class="underline text-status-critical"
                   :disabled="busy" @click="entfernen(d)">
             {{ t('common.delete') }}
           </button>

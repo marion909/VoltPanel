@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { formatBytes } from '../format'
+import { formatBytes, statusForPercent } from '../format'
 import { t } from '../i18n'
 
 const props = defineProps({
@@ -20,27 +20,21 @@ const limitText = computed(() => (props.bytes ? formatBytes(props.limit) : Strin
 // Wie bei den Ring-Gauges: die Farbe meint einen Zustand, keine Identität —
 // deshalb aus der Statuspalette. Sie steht nie allein, die Zahlen daneben
 // tragen dieselbe Aussage.
-const color = computed(() => {
-  if (unlimited.value) return 'var(--series-1)'
-  if (props.percent >= 90) return 'var(--status-critical)'
-  if (props.percent >= 75) return 'var(--status-warning)'
-  return 'var(--status-good)'
-})
+const color = computed(() => (unlimited.value ? 'var(--series-1)' : statusForPercent(props.percent)))
 </script>
 
 <template>
   <div>
     <div class="mb-1 flex items-baseline justify-between gap-2">
-      <span class="text-[12px]" :style="{ color: 'var(--ink-secondary)' }">{{ label }}</span>
-      <span class="tabular text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+      <span class="text-[12px] text-ink-secondary">{{ label }}</span>
+      <span class="tabular text-[12px] text-ink-muted">
         <template v-if="unlimited">{{ usedText }}</template>
         <template v-else>{{ usedText }} / {{ limitText }}</template>
       </span>
     </div>
 
     <div
-      class="h-1.5 overflow-hidden rounded-full"
-      :style="{ background: 'var(--surface-sunken)' }"
+      class="h-1.5 overflow-hidden rounded-full bg-surface-sunken"
       role="meter"
       :aria-valuenow="unlimited ? undefined : Math.round(percent)"
       :aria-valuemin="0"

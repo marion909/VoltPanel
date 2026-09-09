@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { isAdmin } from '../stores/session'
+import { askConfirm } from '../stores/confirm'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const accounts = ref([])
 const sites = ref([])
@@ -114,7 +116,7 @@ async function toggle(account) {
 }
 
 async function remove(account) {
-  if (!confirm(t('ftp.confirmDelete', { name: account.username }))) return
+  if (!(await askConfirm(t('ftp.confirmDelete', { name: account.username })))) return
   try {
     await api.del(`/ftp/${account.id}`)
     await load()
@@ -132,15 +134,14 @@ onMounted(load)
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('ftp.title') }}</h1>
       <button
         v-if="status?.ready"
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
         @click="showForm = !showForm"
       >
         {{ showForm ? t('common.cancel') : t('ftp.new') }}
       </button>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
 
@@ -150,19 +151,18 @@ onMounted(load)
       class="panel-card mb-5 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t('ftp.setupTitle') }}</h2>
-      <p class="mb-3 text-[12px] whitespace-pre-line" :style="{ color: 'var(--ink-secondary)' }">
+      <p class="mb-3 text-[12px] whitespace-pre-line text-ink-secondary">
         {{ t('ftp.setupHint', { from: status.passive_from, to: status.passive_to }) }}
       </p>
       <button
         v-if="isAdmin()"
         :disabled="busy"
-        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         @click="setup"
       >
         {{ busy ? t('ftp.settingUp') : t('ftp.setup') }}
       </button>
-      <p v-else class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+      <p v-else class="text-[12px] text-ink-muted">
         {{ t('ftp.setupAdminOnly') }}
       </p>
     </div>
@@ -178,8 +178,7 @@ onMounted(load)
 
     <p
       v-if="status?.firewall_hint"
-      class="mb-4 text-[12px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="mb-4 text-[12px] text-ink-muted"
     >
       {{ status.firewall_hint }}
     </p>
@@ -193,7 +192,7 @@ onMounted(load)
         background: 'color-mix(in srgb, var(--status-good) 8%, var(--surface-card))',
       }"
     >
-      <div class="mb-2 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+      <div class="mb-2 text-[12px] text-ink-secondary">
         {{ t('ftp.credentials') }}
       </div>
       <dl class="tabular grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
@@ -202,7 +201,7 @@ onMounted(load)
         <dt :style="{ color: 'var(--ink-muted)' }">{{ t('db.password') }}</dt>
         <dd class="font-medium break-all">{{ credentials.password }}</dd>
       </dl>
-      <button class="mt-2 text-[11px] underline" :style="{ color: 'var(--ink-muted)' }"
+      <button class="mt-2 text-[11px] underline text-ink-muted"
               @click="credentials = null">
         {{ t('common.cancel') }}
       </button>
@@ -214,7 +213,7 @@ onMounted(load)
       @submit.prevent="create"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('files.site') }}
         </span>
         <select v-model="form.site_id" required
@@ -225,7 +224,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('ftp.username') }}
         </span>
         <input v-model="form.username" :placeholder="t('ftp.usernameAuto')"
@@ -233,7 +232,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('ftp.subdir') }}
         </span>
         <input v-model="form.subdir" placeholder="public"
@@ -242,35 +241,32 @@ onMounted(load)
 
       <div class="flex items-end gap-3">
         <label class="block flex-1">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('ftp.quota') }}
           </span>
           <input v-model="form.quota_mb" type="number" min="0" placeholder="0"
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
         <button type="submit" :disabled="busy"
-                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }">
+                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
           {{ busy ? t('common.loading') : t('sites.create') }}
         </button>
       </div>
     </form>
 
-    <p v-if="orphans.length" class="mb-4 text-[12px]" :style="{ color: 'var(--status-warning)' }">
+    <p v-if="orphans.length" class="mb-4 text-[12px] text-status-warning">
       {{ t('ftp.orphans', { names: orphans.join(', ') }) }}
     </p>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonRows v-if="loading" :cols="5" />
 
     <div
       v-else-if="accounts.length"
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t('ftp.username') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('files.site') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('ftp.home') }}</th>
@@ -280,12 +276,12 @@ onMounted(load)
         </thead>
         <tbody>
           <tr v-for="account in accounts" :key="account.id"
-              class="border-b last:border-0" :style="{ borderColor: 'var(--line-hairline)' }">
+              class="border-b last:border-0 border-line-hairline">
             <td class="px-4 py-2.5 font-medium">{{ account.username }}</td>
-            <td class="px-4 py-2.5" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="px-4 py-2.5 text-ink-secondary">
               {{ siteName(account.site_id) }}
             </td>
-            <td class="px-4 py-2.5 font-mono text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="px-4 py-2.5 font-mono text-[12px] text-ink-secondary">
               {{ account.home_dir }}
             </td>
             <td class="px-4 py-2.5">
@@ -296,19 +292,19 @@ onMounted(load)
               </span>
             </td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
-              <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+              <button class="text-[12px] underline text-ink-secondary"
                       @click="reveal(account)">
                 {{ t('db.reveal') }}
               </button>
-              <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+              <button class="ml-3 text-[12px] underline text-ink-secondary"
                       @click="newPassword(account)">
                 {{ t('db.newPassword') }}
               </button>
-              <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+              <button class="ml-3 text-[12px] underline text-ink-secondary"
                       @click="toggle(account)">
                 {{ account.status === 'active' ? t('ftp.disable') : t('ftp.enable') }}
               </button>
-              <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--status-critical)' }"
+              <button class="ml-3 text-[12px] underline text-status-critical"
                       @click="remove(account)">
                 {{ t('sites.delete') }}
               </button>
@@ -318,7 +314,7 @@ onMounted(load)
       </table>
     </div>
 
-    <p v-else-if="status?.ready" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-else-if="status?.ready" class="text-[13px] text-ink-muted">
       {{ t('ftp.empty') }}
     </p>
   </div>

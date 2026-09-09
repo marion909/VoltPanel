@@ -4,6 +4,8 @@ import { api } from '../api'
 import { t } from '../i18n'
 import { isAdmin } from '../stores/session'
 import { formatBytes } from '../format'
+import { askConfirm } from '../stores/confirm'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const databases = ref([])
 const sites = ref([])
@@ -90,7 +92,7 @@ async function create() {
 }
 
 async function remove(db) {
-  if (!confirm(t('db.confirmDelete', { name: db.name }))) return
+  if (!(await askConfirm(t('db.confirmDelete', { name: db.name })))) return
   try {
     await api.del(`/databases/${db.id}`)
     await load()
@@ -115,7 +117,7 @@ async function runImport(event) {
   const db = importTarget.value
   event.target.value = ''
   if (!file || !db) return
-  if (!confirm(t('db.confirmImport', { file: file.name, name: db.name }))) return
+  if (!(await askConfirm(t('db.confirmImport', { file: file.name, name: db.name })))) return
 
   importing.value = db.id
   error.value = ''
@@ -218,7 +220,7 @@ async function addHost(user) {
 }
 
 async function removeHost(user, host) {
-  if (!confirm(t('db.confirmDeleteHost', { host: host.host }))) return
+  if (!(await askConfirm(t('db.confirmDeleteHost', { host: host.host })))) return
   try {
     await api.del(`/db-hosts/${host.id}`)
     await loadHosts(user)
@@ -230,7 +232,7 @@ async function removeHost(user, host) {
 // Der Schalter startet MariaDB neu. Deshalb die Rückfrage, und deshalb steht
 // er nur Administratoren zur Verfügung.
 async function setRemoteAccess(enabled) {
-  if (enabled && !confirm(t('db.confirmRemoteOn'))) return
+  if (enabled && !(await askConfirm(t('db.confirmRemoteOn')))) return
   busy.value = true
   try {
     remote.value = await api.post('/databases-remote', { enabled })
@@ -243,7 +245,7 @@ async function setRemoteAccess(enabled) {
 }
 
 async function removeUser(user) {
-  if (!confirm(t('db.confirmDeleteUser', { name: user.username }))) return
+  if (!(await askConfirm(t('db.confirmDeleteUser', { name: user.username })))) return
   try {
     await api.del(`/db-users/${user.id}`)
     usersByDB.value = {
@@ -263,18 +265,17 @@ onMounted(load)
     <header class="mb-5 flex items-center justify-between gap-3">
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('db.title') }}</h1>
       <button
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
         @click="showForm = !showForm"
       >
         {{ showForm ? t('common.cancel') : t('db.new') }}
       </button>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
-    <p v-if="notice" class="mb-4 text-[13px]" :style="{ color: 'var(--status-good)' }" role="status">
+    <p v-if="notice" class="mb-4 text-[13px] text-status-good" role="status">
       {{ notice }}
     </p>
 
@@ -289,7 +290,7 @@ onMounted(load)
         background: 'color-mix(in srgb, var(--status-good) 8%, var(--surface-card))',
       }"
     >
-      <div class="mb-2 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+      <div class="mb-2 text-[12px] text-ink-secondary">
         {{ t('db.credentialsOnce') }}
       </div>
       <dl class="tabular grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
@@ -302,7 +303,7 @@ onMounted(load)
         <dt :style="{ color: 'var(--ink-muted)' }">{{ t('db.password') }}</dt>
         <dd class="font-medium break-all">{{ credentials.password }}</dd>
       </dl>
-      <button class="mt-2 text-[11px] underline" :style="{ color: 'var(--ink-muted)' }"
+      <button class="mt-2 text-[11px] underline text-ink-muted"
               @click="credentials = null">
         {{ t('common.cancel') }}
       </button>
@@ -314,7 +315,7 @@ onMounted(load)
       @submit.prevent="create"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('db.name') }}
         </span>
         <input v-model="form.name" required placeholder="wordpress"
@@ -322,7 +323,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('files.site') }}
         </span>
         <select v-model="form.site_id" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle">
@@ -332,7 +333,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('db.password') }}
         </span>
         <input v-model="form.password" type="text" :placeholder="t('db.passwordGenerated')"
@@ -345,24 +346,21 @@ onMounted(load)
           {{ t('db.withUser') }}
         </label>
         <button type="submit" :disabled="busy"
-                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }">
+                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
           {{ busy ? t('common.loading') : t('sites.create') }}
         </button>
       </div>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonRows v-if="loading" :cols="4" />
 
     <div
       v-else-if="databases.length"
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t('db.name') }}</th>
             <th class="px-4 py-2.5 text-right font-normal">{{ t('db.size') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('db.users') }}</th>
@@ -371,29 +369,28 @@ onMounted(load)
         </thead>
         <tbody>
           <template v-for="db in databases" :key="db.id">
-            <tr class="border-b last:border-0" :style="{ borderColor: 'var(--line-hairline)' }">
+            <tr class="border-b last:border-0 border-line-hairline">
               <td class="px-4 py-2.5 font-medium">{{ db.name }}</td>
-              <td class="tabular px-4 py-2.5 text-right" :style="{ color: 'var(--ink-secondary)' }">
+              <td class="tabular px-4 py-2.5 text-right text-ink-secondary">
                 {{ formatBytes(db.size_bytes) }}
               </td>
               <td class="px-4 py-2.5">
-                <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+                <button class="text-[12px] underline text-ink-secondary"
                         @click="toggleUsers(db)">
                   {{ expanded === db.id ? '▾' : '▸' }} {{ t('db.users') }}
                 </button>
               </td>
               <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+                <button class="text-[12px] underline text-ink-secondary"
                         @click="exportDump(db)">
                   {{ t('db.export') }}
                 </button>
-                <button class="ml-3 text-[12px] underline disabled:opacity-50"
-                        :style="{ color: 'var(--ink-secondary)' }"
+                <button class="ml-3 text-[12px] underline disabled:opacity-50 text-ink-secondary"
                         :disabled="importing === db.id"
                         @click="chooseImport(db)">
                   {{ importing === db.id ? t('db.importing') : t('db.import') }}
                 </button>
-                <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--status-critical)' }"
+                <button class="ml-3 text-[12px] underline text-status-critical"
                         @click="remove(db)">
                   {{ t('sites.delete') }}
                 </button>
@@ -416,19 +413,19 @@ onMounted(load)
                       <option value="READWRITE">READWRITE</option>
                       <option value="READONLY">READONLY</option>
                     </select>
-                    <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+                    <button class="underline text-ink-secondary"
                             @click="revealPassword(user)">
                       {{ t('db.reveal') }}
                     </button>
-                    <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+                    <button class="underline text-ink-secondary"
                             @click="resetPassword(user)">
                       {{ t('db.newPassword') }}
                     </button>
-                    <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+                    <button class="underline text-ink-secondary"
                             @click="toggleHosts(user)">
                       {{ hostsByUser[user.id] ? '▾' : '▸' }} {{ t('db.remoteHosts') }}
                     </button>
-                    <button class="underline" :style="{ color: 'var(--status-critical)' }"
+                    <button class="underline text-status-critical"
                             @click="removeUser(user)">
                       {{ t('sites.delete') }}
                     </button>
@@ -438,10 +435,9 @@ onMounted(load)
                        von außen funktioniert. -->
                   <div
                     v-if="hostsByUser[user.id]"
-                    class="ml-4 rounded-md border p-3"
-                    :style="{ borderColor: 'var(--line-hairline)' }"
+                    class="ml-4 rounded-md border p-3 border-line-hairline"
                   >
-                    <p class="mb-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                    <p class="mb-2 text-[11px] text-ink-muted">
                       {{ t('db.remoteHint') }}
                     </p>
 
@@ -449,15 +445,13 @@ onMounted(load)
                          Das gehört an die Stelle, an der jemand ihn anlegt. -->
                     <p
                       v-if="remote && !remote.listening"
-                      class="mb-2 text-[11px]"
-                      :style="{ color: 'var(--status-warning)' }"
+                      class="mb-2 text-[11px] text-status-warning"
                     >
                       {{ t('db.remoteClosed') }}
                       <button
                         v-if="isAdmin()"
                         :disabled="busy"
-                        class="ml-1 underline"
-                        :style="{ color: 'var(--accent)' }"
+                        class="ml-1 underline text-accent"
                         @click="setRemoteAccess(true)"
                       >
                         {{ t('db.remoteEnable') }}
@@ -465,12 +459,10 @@ onMounted(load)
                     </p>
                     <p
                       v-else-if="remote && isAdmin()"
-                      class="mb-2 text-[11px]"
-                      :style="{ color: 'var(--ink-muted)' }"
+                      class="mb-2 text-[11px] text-ink-muted"
                     >
                       {{ t('db.remoteOpen', { bind: remote.bind_address || '0.0.0.0', port: remote.port }) }}
-                      <button :disabled="busy" class="ml-1 underline"
-                              :style="{ color: 'var(--ink-secondary)' }"
+                      <button :disabled="busy" class="ml-1 underline text-ink-secondary"
                               @click="setRemoteAccess(false)">
                         {{ t('db.remoteDisable') }}
                       </button>
@@ -480,7 +472,7 @@ onMounted(load)
                          class="flex items-center gap-3 py-0.5">
                       <span class="tabular font-mono">{{ host.host }}</span>
                       <span :style="{ color: 'var(--ink-muted)' }">{{ host.note }}</span>
-                      <button class="underline" :style="{ color: 'var(--status-critical)' }"
+                      <button class="underline text-status-critical"
                               @click="removeHost(user, host)">
                         {{ t('sites.delete') }}
                       </button>
@@ -505,14 +497,14 @@ onMounted(load)
                         :style="inputStyle"
                         @input="hostForms[user.id] = { ...(hostForms[user.id] || {}), note: $event.target.value }"
                       />
-                      <button type="submit" class="underline" :style="{ color: 'var(--accent)' }">
+                      <button type="submit" class="underline text-accent">
                         + {{ t('db.remoteAdd') }}
                       </button>
                     </form>
                   </div>
                   </div>
                 </div>
-                <button class="mt-2 text-[12px] underline" :style="{ color: 'var(--accent)' }"
+                <button class="mt-2 text-[12px] underline text-accent"
                         @click="addUser(db)">
                   + {{ t('db.addUser') }}
                 </button>
@@ -523,6 +515,6 @@ onMounted(load)
       </table>
     </div>
 
-    <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">{{ t('db.empty') }}</p>
+    <p v-else class="text-[13px] text-ink-muted">{{ t('db.empty') }}</p>
   </div>
 </template>

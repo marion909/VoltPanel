@@ -130,11 +130,11 @@ onMounted(load)
       </select>
     </header>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="loading" class="text-[13px] text-ink-muted">
       {{ t('common.loading') }}
     </p>
 
-    <p v-else-if="!databases.length" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-else-if="!databases.length" class="text-[13px] text-ink-muted">
       {{ t('db.empty') }}
     </p>
 
@@ -143,10 +143,10 @@ onMounted(load)
       <aside
         class="panel-card p-3"
       >
-        <h2 class="mb-2 text-[12px] font-medium" :style="{ color: 'var(--ink-secondary)' }">
+        <h2 class="mb-2 text-[12px] font-medium text-ink-secondary">
           {{ t('sql.tables') }}
         </h2>
-        <p v-if="!tables.length" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+        <p v-if="!tables.length" class="text-[12px] text-ink-muted">
           {{ t('sql.noTables') }}
         </p>
         <ul class="space-y-0.5">
@@ -159,8 +159,7 @@ onMounted(load)
               {{ table }}
             </button>
             <button
-              class="shrink-0 text-[11px] underline"
-              :style="{ color: 'var(--ink-muted)' }"
+              class="shrink-0 text-[11px] underline text-ink-muted"
               @click="describe(table)"
             >
               {{ t('sql.structure') }}
@@ -184,15 +183,14 @@ onMounted(load)
             <button
               type="submit"
               :disabled="running"
-              class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-              :style="{ background: 'var(--accent)' }"
+              class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
             >
               {{ running ? t('sql.running') : t('sql.run') }}
             </button>
-            <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <span class="text-[11px] text-ink-muted">
               {{ t('sql.shortcut') }}
             </span>
-            <span v-if="current" class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <span v-if="current" class="text-[11px] text-ink-muted">
               {{ t('sql.against', { name: current.name }) }}
             </span>
           </div>
@@ -208,7 +206,7 @@ onMounted(load)
         </p>
 
         <div v-if="result">
-          <p class="mb-2 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <p class="mb-2 text-[12px] text-ink-secondary">
             <template v-if="result.has_result_set">
               {{ t('sql.rows', { count: result.rows.length, ms: result.duration_ms }) }}
             </template>
@@ -216,7 +214,7 @@ onMounted(load)
               {{ t('sql.affected', { count: result.rows_affected, ms: result.duration_ms }) }}
             </template>
           </p>
-          <p v-if="result.warning" class="mb-2 text-[12px]" :style="{ color: 'var(--status-warning)' }">
+          <p v-if="result.warning" class="mb-2 text-[12px] text-status-warning">
             {{ result.warning }}
           </p>
 
@@ -225,8 +223,8 @@ onMounted(load)
             class="panel-card overflow-x-auto"
           >
             <table class="w-full text-left text-[12px]">
-              <thead class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
-                <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+              <thead class="text-[11px] text-ink-muted">
+                <tr class="border-b border-line-hairline">
                   <th
                     v-for="col in result.columns"
                     :key="col"
@@ -240,8 +238,7 @@ onMounted(load)
                 <tr
                   v-for="(row, i) in result.rows"
                   :key="i"
-                  class="border-b last:border-0"
-                  :style="{ borderColor: 'var(--line-hairline)' }"
+                  class="border-b last:border-0 border-line-hairline"
                 >
                   <!-- null ist nicht der leere Text. Der Unterschied ist beim
                        Lesen einer Tabelle regelmäßig genau der Punkt. -->
@@ -256,22 +253,20 @@ onMounted(load)
 
           <p
             v-else-if="result.has_result_set"
-            class="text-[12px]"
-            :style="{ color: 'var(--ink-muted)' }"
+            class="text-[12px] text-ink-muted"
           >
             {{ t('sql.noRows') }}
           </p>
         </div>
 
         <div v-if="history.length" class="mt-5">
-          <h2 class="mb-1 text-[12px] font-medium" :style="{ color: 'var(--ink-secondary)' }">
+          <h2 class="mb-1 text-[12px] font-medium text-ink-secondary">
             {{ t('sql.history') }}
           </h2>
           <ul class="space-y-0.5">
             <li v-for="(entry, i) in history" :key="i">
               <button
-                class="block w-full truncate text-left font-mono text-[11px] hover:underline"
-                :style="{ color: 'var(--ink-muted)' }"
+                class="block w-full truncate text-left font-mono text-[11px] hover:underline text-ink-muted"
                 :title="entry"
                 @click="statement = entry"
               >

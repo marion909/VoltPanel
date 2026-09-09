@@ -3,7 +3,9 @@ import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { formatBytes } from '../format'
+import { askConfirm } from '../stores/confirm'
 import QuotaBar from '../components/QuotaBar.vue'
+import SkeletonCards from '../components/SkeletonCards.vue'
 
 const tenants = ref([])
 const plans = ref([])
@@ -147,7 +149,7 @@ async function toggleSuspend(tenant) {
 }
 
 async function removeTenant(tenant) {
-  if (!confirm(t('tenants.confirmDelete', { name: tenant.name }))) return
+  if (!(await askConfirm(t('tenants.confirmDelete', { name: tenant.name })))) return
   try {
     await api.del(`/tenants/${tenant.id}`)
     await load()
@@ -182,7 +184,7 @@ async function createPlan() {
 }
 
 async function removePlan(plan) {
-  if (!confirm(t('plans.confirmDelete', { name: plan.name }))) return
+  if (!(await askConfirm(t('plans.confirmDelete', { name: plan.name })))) return
   try {
     await api.del(`/plans/${plan.id}`)
     await load()
@@ -228,8 +230,7 @@ onMounted(load)
         </button>
 
         <button
-          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
           @click="tab === 'tenants' ? (showTenantForm = !showTenantForm) : (showPlanForm = !showPlanForm)"
         >
           {{ tab === 'tenants' ? t('tenants.new') : t('plans.new') }}
@@ -237,7 +238,7 @@ onMounted(load)
       </div>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
 
@@ -249,14 +250,14 @@ onMounted(load)
         @submit.prevent="createTenant"
       >
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('tenants.name') }}
           </span>
           <input v-model="tenantForm.name" required placeholder="Kunde Meier"
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('plans.tab') }}
           </span>
           <select v-model="tenantForm.plan_id" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle">
@@ -266,16 +267,13 @@ onMounted(load)
         </label>
         <div class="flex items-end">
           <button type="submit" :disabled="busy"
-                  class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                  :style="{ background: 'var(--accent)' }">
+                  class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
             {{ busy ? t('common.loading') : t('sites.create') }}
           </button>
         </div>
       </form>
 
-      <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-        {{ t('common.loading') }}
-      </p>
+      <SkeletonCards v-if="loading" :count="4" cols="lg:grid-cols-2" height="h-40" />
 
       <div v-else class="grid gap-3 lg:grid-cols-2">
         <article
@@ -298,7 +296,7 @@ onMounted(load)
                   {{ t('tenants.suspended') }}
                 </span>
               </div>
-              <div class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ tenant.slug }}</div>
+              <div class="text-[11px] text-ink-muted">{{ tenant.slug }}</div>
             </div>
 
             <select
@@ -329,8 +327,8 @@ onMounted(load)
             ohne den Zugriffspfad des Betreibers — und herein kommt nur, wer zu
             diesem Mandanten gehört.
           -->
-          <div class="mt-3 border-t pt-3" :style="{ borderColor: 'var(--border-ring)' }">
-            <label class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+          <div class="mt-3 border-t pt-3 border-border-ring">
+            <label class="mb-1 block text-[11px] text-ink-secondary">
               {{ t('tenants.loginDomain') }}
             </label>
             <div class="flex gap-2">
@@ -361,19 +359,18 @@ onMounted(load)
             </div>
             <p
               v-if="domainMsg[tenant.id]"
-              class="mt-1 text-[11px]"
-              :style="{ color: 'var(--ink-muted)' }"
+              class="mt-1 text-[11px] text-ink-muted"
             >
               {{ domainMsg[tenant.id] }}
             </p>
           </div>
 
           <footer class="mt-3 flex gap-3 text-[11px]">
-            <button class="underline" :style="{ color: 'var(--ink-secondary)' }"
+            <button class="underline text-ink-secondary"
                     @click="toggleSuspend(tenant)">
               {{ tenant.status === 'active' ? t('tenants.suspend') : t('tenants.resume') }}
             </button>
-            <button class="underline" :style="{ color: 'var(--status-critical)' }"
+            <button class="underline text-status-critical"
                     @click="removeTenant(tenant)">
               {{ t('sites.delete') }}
             </button>
@@ -422,7 +419,7 @@ onMounted(load)
         @submit.prevent="createPlan"
       >
         <label class="block sm:col-span-2">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('tenants.name') }}
           </span>
           <input v-model="planForm.name" required placeholder="Klein"
@@ -430,7 +427,7 @@ onMounted(load)
         </label>
 
         <label v-for="field in planFields" :key="field.key" class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t(field.label) }}
           </span>
           <input v-model.number="planForm[field.key]" type="number" min="0"
@@ -443,13 +440,12 @@ onMounted(load)
             {{ t('plans.isDefault') }}
           </label>
           <button type="submit" :disabled="busy"
-                  class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                  :style="{ background: 'var(--accent)' }">
+                  class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
             {{ busy ? t('common.loading') : t('sites.create') }}
           </button>
         </div>
 
-        <p class="text-[11px] sm:col-span-4" :style="{ color: 'var(--ink-muted)' }">
+        <p class="text-[11px] sm:col-span-4 text-ink-muted">
           {{ t('plans.zeroHint') }}
         </p>
       </form>
@@ -459,8 +455,8 @@ onMounted(load)
         class="panel-card overflow-hidden"
       >
         <table class="w-full text-left text-[13px]">
-          <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-            <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+          <thead class="text-[12px] text-ink-muted">
+            <tr class="border-b border-line-hairline">
               <th class="px-4 py-2.5 font-normal">{{ t('tenants.name') }}</th>
               <th class="px-4 py-2.5 text-right font-normal">{{ t('sites.title') }}</th>
               <th class="px-4 py-2.5 text-right font-normal">{{ t('db.title') }}</th>
@@ -474,13 +470,11 @@ onMounted(load)
             <tr
               v-for="plan in plans"
               :key="plan.id"
-              class="border-b last:border-0"
-              :style="{ borderColor: 'var(--line-hairline)' }"
+              class="border-b last:border-0 border-line-hairline"
             >
               <td class="px-4 py-2.5 font-medium">
                 {{ plan.name }}
-                <span v-if="plan.is_default" class="ml-1.5 text-[10px] uppercase"
-                      :style="{ color: 'var(--status-good)' }">
+                <span v-if="plan.is_default" class="ml-1.5 text-[10px] uppercase text-status-good">
                   {{ t('plans.default') }}
                 </span>
               </td>
@@ -490,7 +484,7 @@ onMounted(load)
               <td class="px-4 py-2.5 text-right">{{ limitText(plan.disk_quota_mb, true) }}</td>
               <td class="px-4 py-2.5 text-right">{{ limitText(plan.traffic_quota_mb, true) }}</td>
               <td class="px-4 py-2.5 text-right">
-                <button class="text-[12px] underline" :style="{ color: 'var(--status-critical)' }"
+                <button class="text-[12px] underline text-status-critical"
                         @click="removePlan(plan)">
                   {{ t('sites.delete') }}
                 </button>
@@ -500,7 +494,7 @@ onMounted(load)
         </table>
       </div>
 
-      <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">{{ t('plans.empty') }}</p>
+      <p v-else class="text-[13px] text-ink-muted">{{ t('plans.empty') }}</p>
     </template>
   </div>
 </template>

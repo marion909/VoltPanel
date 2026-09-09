@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { formatDateTime } from '../format'
+import { askConfirm } from '../stores/confirm'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const jobs = ref([])
 const sites = ref([])
@@ -70,7 +72,7 @@ async function toggle(job) {
 }
 
 async function remove(job) {
-  if (!confirm(t('cron.confirmDelete', { name: job.name }))) return
+  if (!(await askConfirm(t('cron.confirmDelete', { name: job.name })))) return
   try {
     await api.del(`/cronjobs/${job.id}`)
     await load()
@@ -101,15 +103,14 @@ onMounted(load)
     <header class="mb-5 flex items-center justify-between gap-3">
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('cron.title') }}</h1>
       <button
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
         @click="showForm = !showForm"
       >
         {{ showForm ? t('common.cancel') : t('cron.new') }}
       </button>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
 
@@ -119,7 +120,7 @@ onMounted(load)
       @submit.prevent="create"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('cron.name') }}
         </span>
         <input v-model="form.name" required placeholder="Laravel Scheduler"
@@ -127,32 +128,32 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('files.site') }}
         </span>
         <select v-model="form.site_id" required
                 class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle">
           <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.domain }}</option>
         </select>
-        <span class="mt-1 block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <span class="mt-1 block text-[11px] text-ink-muted">
           {{ t('cron.siteHint') }}
         </span>
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('cron.schedule') }}
         </span>
         <input v-model="form.schedule" required placeholder="*/5 * * * *"
                pattern="\S+\s+\S+\s+\S+\s+\S+\s+\S+" :title="t('cron.scheduleHint')"
                class="tabular w-full rounded-md border px-3 py-2 font-mono text-[13px]" :style="inputStyle" />
-        <span class="mt-1 block text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <span class="mt-1 block text-[11px] text-ink-muted">
           {{ t('cron.scheduleHint') }}
         </span>
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('cron.command') }}
         </span>
         <input v-model="form.command" required placeholder="/usr/bin/php8.3 /var/www/example.at/artisan schedule:run"
@@ -161,24 +162,21 @@ onMounted(load)
 
       <div class="sm:col-span-2">
         <button type="submit" :disabled="busy"
-                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }">
+                class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
           {{ busy ? t('common.loading') : t('sites.create') }}
         </button>
       </div>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonRows v-if="loading" :cols="6" />
 
     <div
       v-else-if="jobs.length"
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t('cron.name') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('cron.schedule') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('cron.runAs') }}</th>
@@ -189,18 +187,18 @@ onMounted(load)
         </thead>
         <tbody>
           <template v-for="job in jobs" :key="job.id">
-            <tr class="border-b last:border-0" :style="{ borderColor: 'var(--line-hairline)' }">
+            <tr class="border-b last:border-0 border-line-hairline">
               <td class="px-4 py-2.5 font-medium">
                 {{ job.name }}
-                <div class="truncate font-mono text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+                <div class="truncate font-mono text-[11px] text-ink-muted">
                   {{ job.command }}
                 </div>
               </td>
               <td class="tabular px-4 py-2.5 font-mono text-[12px]">{{ job.schedule }}</td>
-              <td class="px-4 py-2.5 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+              <td class="px-4 py-2.5 text-[12px] text-ink-secondary">
                 {{ job.run_as }}
               </td>
-              <td class="tabular px-4 py-2.5 text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+              <td class="tabular px-4 py-2.5 text-[12px] text-ink-muted">
                 {{ job.last_run_at ? formatDateTime(job.last_run_at) : t('cron.never') }}
                 <span
                   v-if="job.last_exit_code !== null && job.last_exit_code !== undefined"
@@ -224,10 +222,10 @@ onMounted(load)
                 </button>
               </td>
               <td class="px-4 py-2.5 text-right whitespace-nowrap text-[12px]">
-                <button class="underline" :style="{ color: 'var(--ink-secondary)' }" @click="showLog(job)">
+                <button class="underline text-ink-secondary" @click="showLog(job)">
                   {{ t('cron.log') }}
                 </button>
-                <button class="ml-3 underline" :style="{ color: 'var(--status-critical)' }"
+                <button class="ml-3 underline text-status-critical"
                         @click="remove(job)">
                   {{ t('sites.delete') }}
                 </button>
@@ -236,8 +234,7 @@ onMounted(load)
 
             <tr v-if="logFor === job.id" :style="{ background: 'var(--surface-sunken)' }">
               <td colspan="6" class="px-4 py-3">
-                <pre class="max-h-64 overflow-auto font-mono text-[11px] leading-relaxed"
-                     :style="{ color: 'var(--ink-secondary)' }">{{ logText }}</pre>
+                <pre class="max-h-64 overflow-auto font-mono text-[11px] leading-relaxed text-ink-secondary">{{ logText }}</pre>
               </td>
             </tr>
           </template>
@@ -245,6 +242,6 @@ onMounted(load)
       </table>
     </div>
 
-    <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">{{ t('cron.empty') }}</p>
+    <p v-else class="text-[13px] text-ink-muted">{{ t('cron.empty') }}</p>
   </div>
 </template>

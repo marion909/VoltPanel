@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { formatDateTime } from '../format'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const entries = ref([])
 const loading = ref(true)
@@ -23,18 +24,16 @@ onMounted(async () => {
   <div class="fade-in px-8 py-6">
     <h1 class="mb-5 text-[18px] font-semibold tracking-tight">{{ t('audit.title') }}</h1>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }">{{ error }}</p>
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical">{{ error }}</p>
+    <SkeletonRows v-if="loading" :cols="5" />
 
     <div
       v-else-if="entries.length"
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t('audit.time') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('audit.actor') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('audit.action') }}</th>
@@ -46,15 +45,14 @@ onMounted(async () => {
           <tr
             v-for="entry in entries"
             :key="entry.id"
-            class="border-b last:border-0"
-            :style="{ borderColor: 'var(--line-hairline)' }"
+            class="border-b last:border-0 border-line-hairline"
           >
-            <td class="tabular px-4 py-2 whitespace-nowrap" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="tabular px-4 py-2 whitespace-nowrap text-ink-secondary">
               {{ formatDateTime(entry.created_at) }}
             </td>
             <td class="px-4 py-2">{{ entry.actor || '—' }}</td>
             <td class="px-4 py-2 font-medium">{{ entry.action }}</td>
-            <td class="px-4 py-2" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="px-4 py-2 text-ink-secondary">
               {{ entry.target_id || '—' }}
             </td>
             <td class="px-4 py-2">
@@ -75,6 +73,6 @@ onMounted(async () => {
       </table>
     </div>
 
-    <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">{{ t('audit.empty') }}</p>
+    <p v-else class="text-[13px] text-ink-muted">{{ t('audit.empty') }}</p>
   </div>
 </template>

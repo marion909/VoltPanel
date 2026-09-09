@@ -108,8 +108,7 @@ async function disableTOTP() {
       <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="changePassword">
         <label class="block">
           <span
-            class="mb-1 block text-[12px]"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="mb-1 block text-[12px] text-ink-secondary"
           >
             {{ t("settings.currentPassword") }}
           </span>
@@ -124,8 +123,7 @@ async function disableTOTP() {
         </label>
         <label class="block">
           <span
-            class="mb-1 block text-[12px]"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="mb-1 block text-[12px] text-ink-secondary"
           >
             {{ t("settings.newPassword") }}
           </span>
@@ -141,22 +139,19 @@ async function disableTOTP() {
         <div class="sm:col-span-2">
           <button
             type="submit"
-            class="rounded-md px-3 py-2 text-[13px] font-medium text-white"
-            :style="{ background: 'var(--accent)' }"
+            class="rounded-md px-3 py-2 text-[13px] font-medium text-white bg-accent"
           >
             {{ t("common.save") }}
           </button>
           <span
             v-if="pwMessage"
-            class="ml-3 text-[12px]"
-            :style="{ color: 'var(--status-good)' }"
+            class="ml-3 text-[12px] text-status-good"
           >
             {{ pwMessage }}
           </span>
           <span
             v-if="pwError"
-            class="ml-3 text-[12px]"
-            :style="{ color: 'var(--status-critical)' }"
+            class="ml-3 text-[12px] text-status-critical"
           >
             {{ pwError }}
           </span>
@@ -168,7 +163,7 @@ async function disableTOTP() {
       class="panel-card mb-4 p-5"
     >
       <h2 class="mb-1 text-[14px] font-medium">{{ t("settings.twofa") }}</h2>
-      <p class="mb-3 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+      <p class="mb-3 text-[12px] text-ink-secondary">
         {{
           session.user.totp_enabled
             ? t("settings.twofaOn")
@@ -178,8 +173,7 @@ async function disableTOTP() {
 
       <div v-if="!session.user.totp_enabled && !totpSecret">
         <button
-          class="rounded-md border px-3 py-2 text-[13px]"
-          :style="{ borderColor: 'var(--line-axis)' }"
+          class="rounded-md border px-3 py-2 text-[13px] border-line-axis"
           @click="setupTOTP"
         >
           {{ t("settings.twofaSetup") }}
@@ -196,14 +190,12 @@ async function disableTOTP() {
         />
         <div>
           <p
-            class="mb-2 max-w-xs text-[12px]"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="mb-2 max-w-xs text-[12px] text-ink-secondary"
           >
             {{ t("settings.twofaScan") }}
           </p>
           <code
-            class="tabular mb-3 block text-[11px] break-all"
-            :style="{ color: 'var(--ink-muted)' }"
+            class="tabular mb-3 block text-[11px] break-all text-ink-muted"
           >
             {{ totpSecret }}
           </code>
@@ -217,8 +209,7 @@ async function disableTOTP() {
               :style="inputStyle"
             />
             <button
-              class="rounded-md px-3 py-2 text-[13px] font-medium text-white"
-              :style="{ background: 'var(--accent)' }"
+              class="rounded-md px-3 py-2 text-[13px] font-medium text-white bg-accent"
               @click="enableTOTP"
             >
               {{ t("settings.twofaEnable") }}
@@ -250,8 +241,7 @@ async function disableTOTP() {
 
       <p
         v-if="totpError"
-        class="mt-2 text-[12px]"
-        :style="{ color: 'var(--status-critical)' }"
+        class="mt-2 text-[12px] text-status-critical"
       >
         {{ totpError }}
       </p>

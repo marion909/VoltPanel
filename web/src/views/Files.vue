@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { formatBytes, formatDateTime } from '../format'
+import { askConfirm } from '../stores/confirm'
 
 const sites = ref([])
 const siteId = ref(null)
@@ -157,7 +158,7 @@ async function remove(entry) {
   const question = entry.is_dir
     ? t('files.confirmDeleteDir', { name: entry.name })
     : t('files.confirmDelete', { name: entry.name })
-  if (!confirm(question)) return
+  if (!(await askConfirm(question))) return
   try {
     await api.post(`/sites/${siteId.value}/files/delete`, {
       path: entry.path,
@@ -261,8 +262,7 @@ watch(path, load)
         </button>
 
         <input ref="fileInput" type="file" multiple class="hidden" @change="upload" />
-        <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }"
+        <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60 bg-accent"
                 :disabled="uploading || !siteId"
                 @click="fileInput.click()">
           {{ uploading ? t('files.uploading') : t('files.upload') }}
@@ -283,11 +283,11 @@ watch(path, load)
       </template>
     </nav>
 
-    <p v-if="error" class="mb-3 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-3 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
-    <p v-if="notice" class="mb-3 text-[13px]" :style="{ color: 'var(--status-good)' }">{{ notice }}</p>
-    <p v-if="!sites.length && !loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="notice" class="mb-3 text-[13px] text-status-good">{{ notice }}</p>
+    <p v-if="!sites.length && !loading" class="text-[13px] text-ink-muted">
       {{ t('files.chooseSite') }}
     </p>
 
@@ -296,12 +296,10 @@ watch(path, load)
       v-if="editor"
       class="panel-card mb-4"
     >
-      <header class="flex items-center justify-between gap-3 border-b px-4 py-2.5"
-              :style="{ borderColor: 'var(--line-hairline)' }">
+      <header class="flex items-center justify-between gap-3 border-b px-4 py-2.5 border-line-hairline">
         <span class="tabular text-[13px] font-medium">{{ editor.path }}</span>
         <div class="flex gap-2">
-          <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white"
-                  :style="{ background: 'var(--accent)' }" @click="save">
+          <button class="rounded-md px-3 py-1.5 text-[12px] font-medium text-white bg-accent" @click="save">
             {{ t('files.save') }}
           </button>
           <button class="rounded-md border px-3 py-1.5 text-[12px]"
@@ -324,8 +322,8 @@ watch(path, load)
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t('db.name') }}</th>
             <th class="px-4 py-2.5 text-right font-normal">{{ t('files.size') }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t('files.permissions') }}</th>
@@ -338,8 +336,7 @@ watch(path, load)
           <tr
             v-for="entry in sorted"
             :key="entry.path"
-            class="border-b last:border-0"
-            :style="{ borderColor: 'var(--line-hairline)' }"
+            class="border-b last:border-0 border-line-hairline"
           >
             <td class="px-4 py-2">
               <button class="flex items-center gap-2 text-left hover:underline" @click="open(entry)">
@@ -354,36 +351,34 @@ watch(path, load)
                 {{ entry.name }}
               </button>
             </td>
-            <td class="tabular px-4 py-2 text-right" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="tabular px-4 py-2 text-right text-ink-secondary">
               {{ entry.is_dir ? '—' : formatBytes(entry.size) }}
             </td>
-            <td class="tabular px-4 py-2 text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+            <td class="tabular px-4 py-2 text-[12px] text-ink-muted">
               {{ entry.mode }}
             </td>
-            <td class="px-4 py-2 text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+            <td class="px-4 py-2 text-[12px] text-ink-muted">
               {{ entry.owner }}
             </td>
-            <td class="tabular px-4 py-2 text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+            <td class="tabular px-4 py-2 text-[12px] text-ink-muted">
               {{ formatDateTime(entry.mod_time) }}
             </td>
             <td class="px-4 py-2 text-right whitespace-nowrap text-[12px]">
-              <button v-if="!entry.is_dir" class="underline" :style="{ color: 'var(--ink-secondary)' }"
+              <button v-if="!entry.is_dir" class="underline text-ink-secondary"
                       @click="download(entry)">
                 {{ t('files.download') }}
               </button>
-              <button v-if="isArchive(entry.name)" class="ml-3 underline"
-                      :style="{ color: 'var(--ink-secondary)' }" @click="extract(entry)">
+              <button v-if="isArchive(entry.name)" class="ml-3 underline text-ink-secondary" @click="extract(entry)">
                 {{ t('files.extract') }}
               </button>
-              <button v-if="entry.is_dir" class="ml-3 underline"
-                      :style="{ color: 'var(--ink-secondary)' }" @click="archive(entry)">
+              <button v-if="entry.is_dir" class="ml-3 underline text-ink-secondary" @click="archive(entry)">
                 {{ t('files.archive') }}
               </button>
-              <button class="ml-3 underline" :style="{ color: 'var(--ink-secondary)' }"
+              <button class="ml-3 underline text-ink-secondary"
                       @click="rename(entry)">
                 {{ t('files.rename') }}
               </button>
-              <button class="ml-3 underline" :style="{ color: 'var(--status-critical)' }"
+              <button class="ml-3 underline text-status-critical"
                       @click="remove(entry)">
                 {{ t('files.delete') }}
               </button>
@@ -393,7 +388,7 @@ watch(path, load)
       </table>
     </div>
 
-    <p v-else-if="!loading && siteId" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-else-if="!loading && siteId" class="text-[13px] text-ink-muted">
       {{ t('files.empty') }}
     </p>
   </div>

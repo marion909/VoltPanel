@@ -3,7 +3,9 @@ import { ref, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api";
 import { t } from "../i18n";
+import { askConfirm } from "../stores/confirm";
 import AppStoreDialog from "../components/AppStoreDialog.vue";
+import SkeletonRows from "../components/SkeletonRows.vue";
 
 const sites = ref([]);
 const loading = ref(true);
@@ -86,7 +88,7 @@ async function rebuild(site) {
 }
 
 async function remove(site) {
-  if (!confirm(t("sites.confirmDelete", { domain: site.domain }))) return;
+  if (!(await askConfirm(t("sites.confirmDelete", { domain: site.domain })))) return;
   try {
     await api.del(`/sites/${site.id}`);
     await load();
@@ -115,8 +117,7 @@ const inputStyle = {
       </h1>
       <div class="flex gap-2">
         <button
-          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
           @click="showForm = !showForm"
         >
           {{ showForm ? t("common.cancel") : t("sites.new") }}
@@ -128,8 +129,7 @@ const inputStyle = {
 
     <p
       v-if="error"
-      class="mb-4 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-4 text-[13px] text-status-critical"
       role="alert"
     >
       {{ error }}
@@ -142,8 +142,7 @@ const inputStyle = {
     >
       <label class="block">
         <span
-          class="mb-1 block text-[12px]"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="mb-1 block text-[12px] text-ink-secondary"
         >
           {{ t("sites.domain") }}
         </span>
@@ -158,8 +157,7 @@ const inputStyle = {
 
       <label class="block">
         <span
-          class="mb-1 block text-[12px]"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="mb-1 block text-[12px] text-ink-secondary"
         >
           {{ t("sites.type") }}
         </span>
@@ -176,8 +174,7 @@ const inputStyle = {
 
       <label v-if="form.type === 'php'" class="block">
         <span
-          class="mb-1 block text-[12px]"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="mb-1 block text-[12px] text-ink-secondary"
         >
           {{ t("sites.php") }}
         </span>
@@ -192,8 +189,7 @@ const inputStyle = {
 
       <label v-if="form.type === 'proxy'" class="block">
         <span
-          class="mb-1 block text-[12px]"
-          :style="{ color: 'var(--ink-secondary)' }"
+          class="mb-1 block text-[12px] text-ink-secondary"
           >{{ t("sites.proxyTarget") }}</span
         >
         <input
@@ -209,29 +205,22 @@ const inputStyle = {
         <button
           type="submit"
           :disabled="busy"
-          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         >
           {{ busy ? t("common.loading") : t("sites.create") }}
         </button>
       </div>
     </form>
 
-    <p
-      v-if="loading"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
-    >
-      {{ t("common.loading") }}
-    </p>
+    <SkeletonRows v-if="loading" :cols="6" />
 
     <div
       v-else-if="sites.length"
       class="panel-card overflow-hidden"
     >
       <table class="w-full text-left text-[13px]">
-        <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[12px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-4 py-2.5 font-normal">{{ t("sites.domain") }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t("sites.type") }}</th>
             <th class="px-4 py-2.5 font-normal">{{ t("sites.php") }}</th>
@@ -246,8 +235,7 @@ const inputStyle = {
           <tr
             v-for="site in sites"
             :key="site.id"
-            class="border-b last:border-0"
-            :style="{ borderColor: 'var(--line-hairline)' }"
+            class="border-b last:border-0 border-line-hairline"
           >
             <td class="px-4 py-2.5">
               <RouterLink
@@ -257,12 +245,11 @@ const inputStyle = {
                 {{ site.domain }}
               </RouterLink>
             </td>
-            <td class="px-4 py-2.5" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="px-4 py-2.5 text-ink-secondary">
               {{ site.type }}
             </td>
             <td
-              class="px-4 py-2.5 tabular"
-              :style="{ color: 'var(--ink-secondary)' }"
+              class="px-4 py-2.5 tabular text-ink-secondary"
             >
               {{ site.php_version || "—" }}
             </td>
@@ -300,27 +287,24 @@ const inputStyle = {
                 {{ site.ssl_enabled ? t("common.yes") : t("common.no") }}
               </span>
             </td>
-            <td class="px-4 py-2.5" :style="{ color: 'var(--ink-secondary)' }">
+            <td class="px-4 py-2.5 text-ink-secondary">
               {{ site.status }}
             </td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
               <RouterLink
                 :to="`/frontend/sites/${site.id}`"
-                class="text-[12px] underline"
-                :style="{ color: 'var(--ink-secondary)' }"
+                class="text-[12px] underline text-ink-secondary"
               >
                 {{ t("site.settings") }}
               </RouterLink>
               <button
-                class="ml-3 text-[12px] underline"
-                :style="{ color: 'var(--ink-secondary)' }"
+                class="ml-3 text-[12px] underline text-ink-secondary"
                 @click="rebuild(site)"
               >
                 {{ t("sites.rebuild") }}
               </button>
               <button
-                class="ml-3 text-[12px] underline"
-                :style="{ color: 'var(--status-critical)' }"
+                class="ml-3 text-[12px] underline text-status-critical"
                 @click="remove(site)"
               >
                 {{ t("sites.delete") }}
@@ -331,7 +315,7 @@ const inputStyle = {
       </table>
     </div>
 
-    <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-else class="text-[13px] text-ink-muted">
       {{ t("sites.empty") }}
     </p>
   </div>

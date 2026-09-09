@@ -59,13 +59,13 @@ async function installieren() {
         {{ busy ? t('feature.installing') : t('feature.install') }}
       </button>
     </div>
-    <p v-if="busy" class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="busy" class="mt-1 text-[11px] text-ink-muted">
       {{ t('feature.installHint') }}
     </p>
-    <p v-if="result" class="mt-1 text-[11px]" :style="{ color: 'var(--status-good)' }">
+    <p v-if="result" class="mt-1 text-[11px] text-status-good">
       {{ result }}
     </p>
-    <p v-if="error" class="mt-1 text-[11px]" :style="{ color: 'var(--status-critical)' }">
+    <p v-if="error" class="mt-1 text-[11px] text-status-critical">
       {{ error }}
     </p>
   </div>

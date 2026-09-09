@@ -99,8 +99,7 @@ onMounted(load)
 
     <p
       v-if="error"
-      class="mb-3 text-[12px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-3 text-[12px] text-status-critical"
       role="alert"
     >
       {{ error }}
@@ -123,7 +122,7 @@ onMounted(load)
           </span>
         </div>
 
-        <p v-if="fw.hinweis" class="mb-3 text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+        <p v-if="fw.hinweis" class="mb-3 text-[11px] text-ink-secondary">
           {{ fw.hinweis }}
         </p>
 
@@ -131,8 +130,7 @@ onMounted(load)
           <li
             v-for="(r, i) in fw.rules"
             :key="i"
-            class="font-mono text-[11px]"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="font-mono text-[11px] text-ink-secondary"
           >
             {{ r.raw }}
           </li>
@@ -145,7 +143,7 @@ onMounted(load)
         -->
         <div v-if="fw.writable" class="flex flex-wrap items-end gap-2">
           <label class="block">
-            <span class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[11px] text-ink-secondary">
               {{ t('fw.action') }}
             </span>
             <select v-model="form.action" class="rounded-md border px-2 py-1 text-[12px]"
@@ -155,21 +153,21 @@ onMounted(load)
             </select>
           </label>
           <label class="block">
-            <span class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[11px] text-ink-secondary">
               {{ t('fw.port') }}
             </span>
             <input v-model.number="form.port" type="number" min="1" max="65535"
                    class="w-24 rounded-md border px-2 py-1 text-[12px]" :style="inputStyle" />
           </label>
           <label class="block">
-            <span class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[11px] text-ink-secondary">
               {{ t('fw.portTo') }}
             </span>
             <input v-model.number="form.port_to" type="number" min="0" max="65535"
                    class="w-24 rounded-md border px-2 py-1 text-[12px]" :style="inputStyle" />
           </label>
           <label class="block">
-            <span class="mb-1 block text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="mb-1 block text-[11px] text-ink-secondary">
               {{ t('fw.proto') }}
             </span>
             <select v-model="form.proto" class="rounded-md border px-2 py-1 text-[12px]"
@@ -226,7 +224,7 @@ onMounted(load)
           <span>
             {{ scan.enabled ? t('fw.scanOn', { level: scan.level }) : t('fw.scanOff') }}
           </span>
-          <code v-if="scan.log_path" class="font-mono" :style="{ color: 'var(--ink-muted)' }">
+          <code v-if="scan.log_path" class="font-mono text-ink-muted">
             {{ scan.log_path }}
           </code>
           <span v-if="scan.enabled" :style="{ color: 'var(--ink-muted)' }">
@@ -261,7 +259,7 @@ onMounted(load)
           </button>
         </div>
 
-        <p class="mt-2 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="mt-2 text-[11px] text-ink-muted">
           {{ t('fw.scanHint') }}
         </p>
       </template>
@@ -301,8 +299,7 @@ onMounted(load)
             <li v-for="ip in jail.banned" :key="ip" class="flex items-center gap-2 text-[11px]">
               <code class="font-mono">{{ ip }}</code>
               <button
-                class="underline"
-                :style="{ color: 'var(--ink-secondary)' }"
+                class="underline text-ink-secondary"
                 :disabled="busy"
                 @click="entsperren(jail.name, ip)"
               >

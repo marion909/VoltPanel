@@ -39,6 +39,27 @@ export function formatDateTime(timestamp) {
   })
 }
 
+// Eine Ampel-Schwelle, an einer Stelle statt dreimal unabhängig verdrahtet
+// (RingGauge, QuotaBar, Dashboard-Speicherbalken hatten bisher je ihre
+// eigene Kopie derselben 75/90-Grenze) — ändert sich die Schwelle künftig,
+// reicht eine Änderung hier.
+const STATUS_CRITICAL_AT = 90
+const STATUS_WARNING_AT = 75
+
+export function statusForPercent(percent) {
+  if (percent >= STATUS_CRITICAL_AT) return 'var(--status-critical)'
+  if (percent >= STATUS_WARNING_AT) return 'var(--status-warning)'
+  return 'var(--status-good)'
+}
+
+// Dieselbe Schwelle als Übersetzungsschlüssel, für Stellen wie RingGauge,
+// die den Zustand zusätzlich als Wort ausgeben (Farbe steht nie allein).
+export function statusKeyForPercent(percent) {
+  if (percent >= STATUS_CRITICAL_AT) return 'kritisch'
+  if (percent >= STATUS_WARNING_AT) return 'hoch'
+  return 'normal'
+}
+
 // formatUptime bricht Sekunden auf die zwei größten sinnvollen Einheiten
 // herunter — "12 T 4 h" statt "1054832 s".
 export function formatUptime(seconds) {

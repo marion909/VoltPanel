@@ -42,7 +42,7 @@ onMounted(load)
   >
     <h2 class="mb-1 text-[14px] font-medium">{{ t('panelCert.title') }}</h2>
 
-    <p v-if="!state.domain" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="!state.domain" class="text-[12px] text-ink-muted">
       {{ t('panelCert.noDomain') }}
     </p>
 
@@ -64,24 +64,23 @@ onMounted(load)
 
       <!-- Der Hinweis steht hier, weil die Prüfung von außen kommt: schlägt sie
            fehl, sieht man erst hinterher, woran es lag. -->
-      <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+      <p class="mb-3 text-[11px] text-ink-muted">
         {{ t('panelCert.hint') }}
       </p>
 
       <button
         :disabled="busy"
-        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         @click="issue"
       >
         {{ busy ? t('panelCert.issuing') : t('panelCert.issue') }}
       </button>
     </template>
 
-    <p v-if="notice" class="mt-3 text-[12px]" :style="{ color: 'var(--status-good)' }" role="status">
+    <p v-if="notice" class="mt-3 text-[12px] text-status-good" role="status">
       {{ notice }}
     </p>
-    <p v-if="error" class="mt-3 text-[12px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mt-3 text-[12px] text-status-critical" role="alert">
       {{ error }}
     </p>
   </section>

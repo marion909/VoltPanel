@@ -106,14 +106,13 @@ const showTable = ref(false)
             :style="{ background: line.color }"
             aria-hidden="true"
           />
-          <span class="text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="text-[12px] text-ink-secondary">
             {{ t(line.labelKey) }}
           </span>
         </div>
 
         <button
-          class="text-[11px] underline"
-          :style="{ color: 'var(--ink-muted)' }"
+          class="text-[11px] underline text-ink-muted"
           @click="showTable = !showTable"
         >
           {{ showTable ? t('dash.hideTable') : t('dash.table') }}
@@ -121,8 +120,7 @@ const showTable = ref(false)
       </div>
     </header>
 
-    <p v-if="points.length < 2" class="px-4 pt-6 pb-8 text-center text-[13px]"
-       :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="points.length < 2" class="px-4 pt-6 pb-8 text-center text-[13px] text-ink-muted">
       {{ t('dash.noData') }}
     </p>
 
@@ -247,8 +245,7 @@ const showTable = ref(false)
           <tr
             v-for="p in points.slice().reverse()"
             :key="p.timestamp"
-            class="border-t"
-            :style="{ borderColor: 'var(--line-hairline)' }"
+            class="border-t border-line-hairline"
           >
             <td class="py-1">{{ formatClock(p.timestamp) }}</td>
             <td class="py-1 text-right">{{ formatRate(p.net_rx_per_sec) }}</td>

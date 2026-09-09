@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 import { formatBytes } from '../format'
+import { askConfirm } from '../stores/confirm'
 
 const processes = ref([])
 const loading = ref(true)
@@ -40,7 +41,7 @@ async function load() {
 }
 
 async function stop(proc, signal) {
-  if (!confirm(t('proc.confirmStop', { pid: proc.pid, command: proc.command.slice(0, 60) }))) return
+  if (!(await askConfirm(t('proc.confirmStop', { pid: proc.pid, command: proc.command.slice(0, 60) })))) return
   busy.value = proc.pid
   try {
     await api.post('/system/processes/stop', { pid: proc.pid, signal })
@@ -66,7 +67,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-[14px] font-medium">{{ t('proc.title') }}</h2>
-        <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">{{ t('proc.hint') }}</p>
+        <p class="text-[11px] text-ink-muted">{{ t('proc.hint') }}</p>
       </div>
       <input
         v-model="filter"
@@ -80,11 +81,11 @@ onBeforeUnmount(() => clearInterval(timer))
       />
     </div>
 
-    <p v-if="error" class="mb-3 text-[13px]" :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-3 text-[13px] text-status-critical" role="alert">
       {{ error }}
     </p>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+    <p v-if="loading" class="text-[13px] text-ink-muted">
       {{ t('common.loading') }}
     </p>
 
@@ -93,8 +94,8 @@ onBeforeUnmount(() => clearInterval(timer))
       class="panel-card overflow-x-auto"
     >
       <table class="w-full text-left text-[12px]">
-        <thead class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
-          <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+        <thead class="text-[11px] text-ink-muted">
+          <tr class="border-b border-line-hairline">
             <th class="px-3 py-2 text-right font-normal">PID</th>
             <th class="px-3 py-2 font-normal">{{ t('proc.user') }}</th>
             <th class="px-3 py-2 text-right font-normal">CPU</th>
@@ -107,11 +108,10 @@ onBeforeUnmount(() => clearInterval(timer))
           <tr
             v-for="proc in visible"
             :key="proc.pid"
-            class="border-b last:border-0"
-            :style="{ borderColor: 'var(--line-hairline)' }"
+            class="border-b last:border-0 border-line-hairline"
           >
             <td class="tabular px-3 py-1.5 text-right">{{ proc.pid }}</td>
-            <td class="px-3 py-1.5" :style="{ color: 'var(--ink-secondary)' }">{{ proc.user }}</td>
+            <td class="px-3 py-1.5 text-ink-secondary">{{ proc.user }}</td>
             <td class="tabular px-3 py-1.5 text-right">{{ proc.cpu_percent.toFixed(1) }}&thinsp;%</td>
             <td class="tabular px-3 py-1.5 text-right">{{ formatBytes(proc.mem_bytes) }}</td>
             <td class="max-w-md truncate px-3 py-1.5 font-mono" :title="proc.command">
@@ -120,16 +120,14 @@ onBeforeUnmount(() => clearInterval(timer))
             <td class="px-3 py-1.5 text-right whitespace-nowrap">
               <template v-if="canStop(proc)">
                 <button
-                  class="underline disabled:opacity-50"
-                  :style="{ color: 'var(--ink-secondary)' }"
+                  class="underline disabled:opacity-50 text-ink-secondary"
                   :disabled="busy === proc.pid"
                   @click="stop(proc, 'TERM')"
                 >
                   {{ t('proc.stop') }}
                 </button>
                 <button
-                  class="ml-3 underline disabled:opacity-50"
-                  :style="{ color: 'var(--status-critical)' }"
+                  class="ml-3 underline disabled:opacity-50 text-status-critical"
                   :disabled="busy === proc.pid"
                   @click="stop(proc, 'KILL')"
                 >
@@ -143,6 +141,6 @@ onBeforeUnmount(() => clearInterval(timer))
       </table>
     </div>
 
-    <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">{{ t('proc.empty') }}</p>
+    <p v-else class="text-[13px] text-ink-muted">{{ t('proc.empty') }}</p>
   </div>
 </template>

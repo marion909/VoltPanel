@@ -161,6 +161,10 @@ const messages = {
     'nav.services': 'Dienste',
     'nav.audit': 'Protokoll',
     'nav.settings': 'Einstellungen',
+    'nav.group.hosting': 'Hosting',
+    'nav.group.mail': 'Mail',
+    'nav.group.system': 'System',
+    'nav.group.admin': 'Verwaltung',
     'site.overview': 'Übersicht',
     'site.settings': 'Einstellungen',
     'site.php': 'PHP',
@@ -485,6 +489,8 @@ const messages = {
     'cron.siteHint': 'Der Job läuft unter dem Systembenutzer dieser Website.',
     'cron.noOutput': 'Noch keine Ausgabe — der Job ist vermutlich noch nicht gelaufen.',
     'nav.logout': 'Abmelden',
+    'nav.open': 'Menü öffnen',
+    'nav.close': 'Menü schließen',
 
     'login.title': 'Anmelden',
     'login.email': 'E-Mail',
@@ -598,6 +604,8 @@ const messages = {
     'common.create': 'Anlegen',
     'common.delete': 'Löschen',
     'common.cancel': 'Abbrechen',
+    'common.confirm': 'Bestätigen',
+    'common.confirmTitle': 'Bist du sicher?',
     'common.close': 'Schließen',
     'common.loading': 'Wird geladen …',
     'common.error': 'Fehler',
@@ -766,6 +774,10 @@ const messages = {
     'nav.services': 'Services',
     'nav.audit': 'Audit log',
     'nav.settings': 'Settings',
+    'nav.group.hosting': 'Hosting',
+    'nav.group.mail': 'Mail',
+    'nav.group.system': 'System',
+    'nav.group.admin': 'Administration',
     'site.overview': 'Overview',
     'site.settings': 'Settings',
     'site.php': 'PHP',
@@ -1090,6 +1102,8 @@ const messages = {
     'cron.siteHint': 'The job runs as the system user of this website.',
     'cron.noOutput': 'No output yet — the job has probably not run.',
     'nav.logout': 'Sign out',
+    'nav.open': 'Open menu',
+    'nav.close': 'Close menu',
 
     'login.title': 'Sign in',
     'login.email': 'Email',
@@ -1203,6 +1217,8 @@ const messages = {
     'common.create': 'Create',
     'common.delete': 'Delete',
     'common.cancel': 'Cancel',
+    'common.confirm': 'Confirm',
+    'common.confirmTitle': 'Are you sure?',
     'common.close': 'Close',
     'common.loading': 'Loading …',
     'common.error': 'Error',
@@ -1226,9 +1242,21 @@ export function setLocale(locale) {
 }
 
 // t gibt bei fehlender Übersetzung den Schlüssel zurück — eine fehlende Zeile
-// fällt so auf, statt leer zu bleiben.
+// fällt so auf, statt leer zu bleiben. Im Entwicklungsmodus zusätzlich eine
+// Konsolenwarnung: ohne dieses Signal bleibt eine hartcodierte Zeile (die
+// z. B. nur in messages.de steht) unbemerkt, bis jemand zufällig auf
+// Englisch durch die App klickt — das ist import.meta.env.DEV vorbehalten,
+// im Produktions-Build entfällt der Check ganz (per Bundler wegoptimiert).
 export function t(key, params) {
-  let text = messages[i18n.locale]?.[key] ?? messages.de[key] ?? key
+  const own = messages[i18n.locale]?.[key]
+  if (import.meta.env.DEV && own === undefined) {
+    if (messages.de[key] !== undefined) {
+      console.warn(`[i18n] "${key}" fehlt in "${i18n.locale}", zeigt den deutschen Text`)
+    } else {
+      console.warn(`[i18n] "${key}" ist in keiner Sprache definiert, zeigt den Schlüssel selbst`)
+    }
+  }
+  let text = own ?? messages.de[key] ?? key
   if (params) {
     for (const [name, value] of Object.entries(params)) {
       text = text.replace(`{${name}}`, value)

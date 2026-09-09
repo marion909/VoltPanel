@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
-import { formatBytes, formatUptime } from '../format'
+import { formatBytes, formatUptime, statusForPercent } from '../format'
 import RingGauge from '../components/RingGauge.vue'
 import TrafficChart from '../components/TrafficChart.vue'
 import QuotaBar from '../components/QuotaBar.vue'
@@ -81,23 +81,18 @@ function quotaUsed(resource) {
   return entry ? entry.used : null
 }
 
-function diskTone(percent) {
-  if (percent >= 90) return 'var(--status-critical)'
-  if (percent >= 75) return 'var(--status-warning)'
-  return 'var(--status-good)'
-}
 </script>
 
 <template>
   <div class="fade-in px-8 py-6">
     <header class="mb-5 flex flex-wrap items-baseline justify-between gap-2">
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('nav.dashboard') }}</h1>
-      <p v-if="system.hostname" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+      <p v-if="system.hostname" class="text-[12px] text-ink-muted">
         {{ system.hostname }} · {{ system.platform }} · {{ system.arch }}
       </p>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px]" :style="{ color: 'var(--status-critical)' }">
+    <p v-if="error" class="mb-4 text-[13px] text-status-critical">
       {{ t('common.error') }}: {{ error }}
     </p>
 
@@ -127,24 +122,24 @@ function diskTone(percent) {
 
       <section class="panel-card px-5 py-5">
         <h2 class="mb-4 text-[14px] font-medium">{{ t('dash.disk') }}</h2>
-        <p v-if="!(latest.disks || []).length" class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+        <p v-if="!(latest.disks || []).length" class="text-[12px] text-ink-muted">
           {{ t('dash.noData') }}
         </p>
         <div v-else class="flex flex-col gap-3.5">
           <div v-for="disk in latest.disks" :key="disk.mountpoint">
             <div class="flex items-baseline justify-between gap-2">
               <span class="truncate text-[12px] font-medium">{{ disk.mountpoint }}</span>
-              <span class="tabular text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+              <span class="tabular text-[12px] text-ink-muted">
                 {{ disk.percent.toFixed(0) }}%
               </span>
             </div>
-            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full" :style="{ background: 'var(--surface-sunken)' }">
+            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-sunken">
               <div
                 class="h-full rounded-full"
-                :style="{ width: `${Math.min(disk.percent, 100)}%`, background: diskTone(disk.percent) }"
+                :style="{ width: `${Math.min(disk.percent, 100)}%`, background: statusForPercent(disk.percent) }"
               />
             </div>
-            <div class="tabular mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <div class="tabular mt-1 text-[11px] text-ink-muted">
               {{ formatBytes(disk.used) }} / {{ formatBytes(disk.total) }} · {{ disk.fstype }}
             </div>
           </div>
@@ -168,14 +163,14 @@ function diskTone(percent) {
         :style="{ borderLeft: i > 0 ? '1px solid var(--line-hairline)' : 'none' }"
       >
         <div class="min-w-0">
-          <div class="text-[12px]" :style="{ color: 'var(--ink-secondary)' }">{{ tile.label }}</div>
+          <div class="text-[12px] text-ink-secondary">{{ tile.label }}</div>
           <div class="mt-1 text-[22px] leading-tight font-semibold">{{ tile.value ?? '—' }}</div>
-          <div v-if="tile.hint" class="mt-0.5 text-[11px]" :style="{ color: 'var(--status-warning)' }">
+          <div v-if="tile.hint" class="mt-0.5 text-[11px] text-status-warning">
             {{ tile.hint }}
           </div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-          class="shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5" :style="{ color: 'var(--ink-muted)' }" aria-hidden="true">
+          class="shrink-0 opacity-40 transition-transform group-hover:translate-x-0.5 text-ink-muted" aria-hidden="true">
           <path d="M9 6l6 6-6 6" />
         </svg>
       </RouterLink>
@@ -188,7 +183,7 @@ function diskTone(percent) {
         <header class="mb-3 flex items-baseline justify-between gap-2">
           <h2 class="text-[13px] font-medium">{{ t('quota.title') }}</h2>
         </header>
-        <p class="mb-3 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="mb-3 text-[11px] text-ink-muted">
           {{ quota.plan_id ? `${t('quota.plan')}: ${quota.plan_name}` : t('quota.noPlan') }}
         </p>
         <div class="flex flex-col gap-3">

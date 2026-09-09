@@ -2,7 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import { askConfirm } from '../stores/confirm'
 import InstallHint from '../components/InstallHint.vue'
+import SkeletonCards from '../components/SkeletonCards.vue'
 
 const apps = ref([])
 const sites = ref([])
@@ -185,7 +187,7 @@ function saveEnv(app) {
 }
 
 async function removeApp(app) {
-  if (!confirm(t('apps.confirmDelete', { name: app.domain }))) return
+  if (!(await askConfirm(t('apps.confirmDelete', { name: app.domain })))) return
   busy.value = true
   try {
     await api.del(`/apps/${app.id}`)
@@ -212,7 +214,7 @@ async function nodeInstallieren() {
 }
 
 async function nodeEntfernen(v) {
-  if (!confirm(t('apps.nodeConfirmDelete', { v: v.version || v.major }))) return
+  if (!(await askConfirm(t('apps.nodeConfirmDelete', { v: v.version || v.major })))) return
   nodeBusy.value = true
   error.value = ''
   try {
@@ -253,7 +255,7 @@ function imagesGesamt() {
 }
 
 async function imageEntfernen(img) {
-  if (!confirm(t('apps.imagesConfirmDelete', { ref: img.ref }))) return
+  if (!(await askConfirm(t('apps.imagesConfirmDelete', { ref: img.ref })))) return
   imageBusy.value = true
   error.value = ''
   try {
@@ -288,8 +290,7 @@ onMounted(load)
       <h1 class="text-[18px] font-semibold tracking-tight">{{ t('apps.title') }}</h1>
       <button
         v-if="freieSites.length"
-        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-        :style="{ background: 'var(--accent)' }"
+        class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
         @click="showForm = !showForm"
       >
         {{ t('apps.new') }}
@@ -298,8 +299,7 @@ onMounted(load)
 
     <p
       v-if="error"
-      class="mb-4 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-4 text-[13px] text-status-critical"
       role="alert"
     >
       {{ error }}
@@ -350,8 +350,7 @@ onMounted(load)
     -->
     <div class="panel-card mb-5 p-4">
       <button
-        class="flex w-full items-center justify-between text-[12px]"
-        :style="{ color: 'var(--ink-secondary)' }"
+        class="flex w-full items-center justify-between text-[12px] text-ink-secondary"
         @click="showNodes = !showNodes"
       >
         <span>
@@ -373,8 +372,7 @@ onMounted(load)
           <code class="font-mono">node{{ n.major }}</code>
           <span :style="{ color: 'var(--ink-muted)' }">{{ n.version }}</span>
           <button
-            class="underline"
-            :style="{ color: 'var(--status-critical)' }"
+            class="underline text-status-critical"
             :disabled="nodeBusy"
             @click="nodeEntfernen(n)"
           >
@@ -398,7 +396,7 @@ onMounted(load)
             {{ nodeBusy ? t('apps.nodeInstalling') : t('apps.nodeInstall') }}
           </button>
         </div>
-        <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="text-[11px] text-ink-muted">
           {{ t('apps.nodeHint') }}
         </p>
       </div>
@@ -414,8 +412,7 @@ onMounted(load)
       class="panel-card mb-5 p-4"
     >
       <button
-        class="flex w-full items-center justify-between text-[12px]"
-        :style="{ color: 'var(--ink-secondary)' }"
+        class="flex w-full items-center justify-between text-[12px] text-ink-secondary"
         @click="showImages = !showImages"
       >
         <span>{{ t('apps.images') }} — {{ images.length }}, {{ bytes(imagesGesamt()) }}</span>
@@ -439,8 +436,7 @@ onMounted(load)
           <template v-else>
             <span :style="{ color: 'var(--ink-muted)' }">{{ t('apps.imagesUnused') }}</span>
             <button
-              class="underline"
-              :style="{ color: 'var(--status-critical)' }"
+              class="underline text-status-critical"
               :disabled="imageBusy"
               @click="imageEntfernen(img)"
             >
@@ -448,7 +444,7 @@ onMounted(load)
             </button>
           </template>
         </div>
-        <p class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+        <p class="text-[11px] text-ink-muted">
           {{ t('apps.imagesHint') }}
         </p>
       </div>
@@ -460,7 +456,7 @@ onMounted(load)
       @submit.prevent="createApp"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('apps.site') }}
         </span>
         <select
@@ -474,7 +470,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('apps.kind') }}
         </span>
         <select v-model="form.kind" class="w-full rounded-md border px-3 py-2 text-[13px]"
@@ -486,7 +482,7 @@ onMounted(load)
 
       <template v-if="form.kind === 'native'">
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.runtime') }}
           </span>
           <select
@@ -501,7 +497,7 @@ onMounted(load)
         </label>
 
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.args') }}
           </span>
           <input
@@ -515,7 +511,7 @@ onMounted(load)
 
       <template v-else>
         <label class="block sm:col-span-2">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.image') }}
           </span>
           <input v-model="form.image" required placeholder="nginx:1.27-alpine"
@@ -524,7 +520,7 @@ onMounted(load)
         </label>
 
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.containerPort') }}
           </span>
           <input v-model.number="form.container_port" type="number" min="1" max="65535"
@@ -532,7 +528,7 @@ onMounted(load)
         </label>
 
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.memory') }}
           </span>
           <input v-model.number="form.memory_mb" type="number" min="0"
@@ -540,14 +536,14 @@ onMounted(load)
         </label>
 
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('apps.cpus') }}
           </span>
           <input v-model="form.cpus" placeholder="0.5"
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
 
-        <p class="text-[11px] sm:col-span-3" :style="{ color: 'var(--ink-muted)' }">
+        <p class="text-[11px] sm:col-span-3 text-ink-muted">
           {{ t('apps.containerNote') }}
         </p>
       </template>
@@ -556,21 +552,17 @@ onMounted(load)
         <button
           type="submit"
           :disabled="busy"
-          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent"
         >
           {{ busy ? t('common.loading') : t('common.create') }}
         </button>
       </div>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonCards v-if="loading" :count="4" cols="lg:grid-cols-2" height="h-28" />
     <p
       v-else-if="!apps.length"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       {{ t('apps.empty') }}
     </p>
@@ -591,11 +583,11 @@ onMounted(load)
               ></span>
               <span class="truncate text-[14px] font-medium">{{ app.domain }}</span>
             </div>
-            <div class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+            <div class="text-[11px] text-ink-muted">
               {{ app.unit }} &middot; 127.0.0.1:{{ app.port }}
             </div>
           </div>
-          <span class="shrink-0 font-mono text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="shrink-0 font-mono text-[11px] text-ink-secondary">
             <template v-if="app.kind === 'docker'">{{ app.image }}</template>
             <template v-else>{{ app.runtime }} {{ (app.args || []).join(' ') }}</template>
           </span>
@@ -608,7 +600,7 @@ onMounted(load)
         <div v-if="statFor(app)" class="mb-3">
           <div class="flex items-baseline justify-between text-[11px]">
             <span :style="{ color: 'var(--ink-secondary)' }">{{ t('apps.usage') }}</span>
-            <span class="font-mono" :style="{ color: 'var(--ink-secondary)' }">
+            <span class="font-mono text-ink-secondary">
               {{ statFor(app).cpu_perc.toFixed(1) }}% CPU &middot;
               {{ bytes(statFor(app).mem_used) }}
               <template v-if="statFor(app).mem_max">
@@ -617,8 +609,7 @@ onMounted(load)
             </span>
           </div>
           <div
-            class="mt-1 h-1 w-full overflow-hidden rounded-full"
-            :style="{ background: 'var(--surface-sunken)' }"
+            class="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-sunken"
             role="img"
             :aria-label="statFor(app).mem_perc.toFixed(0) + '%'"
           >
@@ -633,7 +624,7 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="text-[11px]" :style="{ color: 'var(--ink-secondary)' }">
+        <div class="text-[11px] text-ink-secondary">
           {{ t('apps.env') }}:
           <template v-if="app.env_keys && app.env_keys.length">
             {{ app.env_keys.join(', ') }}
@@ -657,12 +648,11 @@ onMounted(load)
             :style="inputStyle"
             @input="envDraft[app.id] = $event.target.value"
           ></textarea>
-          <p class="mt-1 text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <p class="mt-1 text-[11px] text-ink-muted">
             {{ t('apps.envReplaces') }}
           </p>
           <button
-            class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-            :style="{ background: 'var(--accent)' }"
+            class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60 bg-accent"
             :disabled="busy"
             @click="saveEnv(app)"
           >
@@ -678,8 +668,7 @@ onMounted(load)
 
         <footer class="mt-3 flex flex-wrap gap-3 text-[11px]">
           <button
-            class="underline"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="underline text-ink-secondary"
             :disabled="busy"
             @click="envOpen[app.id] = !envOpen[app.id]"
           >
@@ -687,23 +676,20 @@ onMounted(load)
           </button>
           <button
             v-if="app.kind === 'docker'"
-            class="underline"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="underline text-ink-secondary"
             @click="logsLaden(app)"
           >
             {{ t('apps.logs') }}
           </button>
           <button
-            class="underline"
-            :style="{ color: 'var(--ink-secondary)' }"
+            class="underline text-ink-secondary"
             :disabled="busy"
             @click="saveApp(app, { enabled: !app.enabled })"
           >
             {{ app.enabled ? t('apps.disable') : t('apps.enable') }}
           </button>
           <button
-            class="underline"
-            :style="{ color: 'var(--status-critical)' }"
+            class="underline text-status-critical"
             :disabled="busy"
             @click="removeApp(app)"
           >

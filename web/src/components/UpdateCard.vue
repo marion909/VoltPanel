@@ -4,6 +4,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { hasRole } from "../stores/session";
 import { update, checkUpdate } from "../stores/update";
+import { askConfirm } from "../stores/confirm";
 
 // running: das Update läuft. waiting: die Dienste starten neu, wir warten auf
 // das Panel. Getrennt, weil in der zweiten Phase jeder Fehler normal ist —
@@ -29,7 +30,7 @@ onUnmounted(() => {
 });
 
 async function start() {
-  if (!window.confirm(t("update.confirm"))) return;
+  if (!(await askConfirm(t("update.confirm"), { danger: false }))) return;
 
   error.value = "";
   done.value = "";
@@ -98,8 +99,7 @@ function reload() {
     <div class="mb-3 flex items-center justify-between">
       <h2 class="text-[14px] font-medium">{{ t("update.title") }}</h2>
       <button
-        class="rounded px-2.5 py-1 text-[12px] transition-colors disabled:opacity-50"
-        :style="{ color: 'var(--ink-muted)' }"
+        class="rounded px-2.5 py-1 text-[12px] transition-colors disabled:opacity-50 text-ink-muted"
         :disabled="update.checking || running || waiting"
         @click="checkUpdate(true)"
       >
@@ -118,22 +118,19 @@ function reload() {
          dann der ruhende Zustand. -->
     <p
       v-if="waiting"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       {{ t("update.waiting") }}
     </p>
     <p
       v-else-if="running"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       {{ t("update.running") }}
     </p>
     <p
       v-else-if="done"
-      class="text-[13px]"
-      :style="{ color: 'var(--status-good)' }"
+      class="text-[13px] text-status-good"
     >
       {{ t("update.done", { v: done }) }}
       <span v-if="reloading" :style="{ color: 'var(--ink-muted)' }">
@@ -142,8 +139,7 @@ function reload() {
     </p>
     <p
       v-else-if="error"
-      class="text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="text-[13px] text-status-critical"
     >
       {{ error }}
     </p>
@@ -154,24 +150,21 @@ function reload() {
     -->
     <p
       v-else-if="update.no_key"
-      class="text-[13px]"
-      :style="{ color: 'var(--status-warning)' }"
+      class="text-[13px] text-status-warning"
     >
       {{ t("update.nokey") }}
       <span :style="{ color: 'var(--ink-muted)' }">{{ t("update.nokeyHint") }}</span>
     </p>
     <p
       v-else-if="update.error"
-      class="text-[13px]"
-      :style="{ color: 'var(--status-warning)' }"
+      class="text-[13px] text-status-warning"
     >
       {{ t("update.unreachable") }}
       <span :style="{ color: 'var(--ink-muted)' }">{{ update.error }}</span>
     </p>
     <p
       v-else-if="!update.available"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
+      class="text-[13px] text-ink-muted"
     >
       {{ t("update.uptodate") }}
     </p>
@@ -183,8 +176,7 @@ function reload() {
 
       <div v-if="update.notes" class="mb-3">
         <h3
-          class="mb-1 text-[12px] font-medium"
-          :style="{ color: 'var(--ink-muted)' }"
+          class="mb-1 text-[12px] font-medium text-ink-muted"
         >
           {{ t("update.notes") }}
         </h3>
@@ -203,13 +195,12 @@ function reload() {
       <div class="flex items-center gap-3">
         <button
           v-if="isAdmin"
-          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 bg-accent"
           @click="start"
         >
           {{ t("update.start") }}
         </button>
-        <span v-else class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+        <span v-else class="text-[12px] text-ink-muted">
           {{ t("update.adminonly") }}
         </span>
         <a
@@ -217,8 +208,7 @@ function reload() {
           :href="update.url"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-[12px] underline"
-          :style="{ color: 'var(--ink-muted)' }"
+          class="text-[12px] underline text-ink-muted"
           >Release-Seite</a
         >
       </div>

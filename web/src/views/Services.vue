@@ -6,6 +6,7 @@ import { isAdmin } from "../stores/session";
 import PHPExtensions from "../components/PHPExtensions.vue";
 import ProcessList from "../components/ProcessList.vue";
 import FirewallPanel from "../components/FirewallPanel.vue";
+import SkeletonCards from "../components/SkeletonCards.vue";
 
 const services = ref([]);
 const loading = ref(true);
@@ -53,19 +54,12 @@ onMounted(load);
 
     <p
       v-if="error"
-      class="mb-4 text-[13px]"
-      :style="{ color: 'var(--status-critical)' }"
+      class="mb-4 text-[13px] text-status-critical"
       role="alert"
     >
       {{ error }}
     </p>
-    <p
-      v-if="loading"
-      class="text-[13px]"
-      :style="{ color: 'var(--ink-muted)' }"
-    >
-      {{ t("common.loading") }}
-    </p>
+    <SkeletonCards v-if="loading" :count="6" height="h-20" />
 
     <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div
@@ -79,8 +73,7 @@ onMounted(load);
               {{ service.name }}
             </div>
             <div
-              class="truncate text-[11px]"
-              :style="{ color: 'var(--ink-muted)' }"
+              class="truncate text-[11px] text-ink-muted"
             >
               {{ service.description }}
             </div>
@@ -105,7 +98,7 @@ onMounted(load);
         </div>
 
         <div class="mt-3 flex items-center justify-between gap-2">
-          <span class="text-[11px]" :style="{ color: 'var(--ink-muted)' }">
+          <span class="text-[11px] text-ink-muted">
             {{ t("services.autostart") }}:
             {{ service.enabled ? t("common.yes") : t("common.no") }}
           </span>

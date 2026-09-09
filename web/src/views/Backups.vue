@@ -4,6 +4,8 @@ import { api } from '../api'
 import { t } from '../i18n'
 import { formatBytes } from '../format'
 import { isAdmin } from '../stores/session'
+import { askConfirm } from '../stores/confirm'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const archives = ref([])
 const entries = ref([])
@@ -106,7 +108,7 @@ async function test(target) {
 }
 
 async function remove(target) {
-  if (!confirm(t('backup.confirmDelete', { name: target.name }))) return
+  if (!(await askConfirm(t('backup.confirmDelete', { name: target.name })))) return
   try {
     await api.del(`/backup-targets/${target.id}`)
     await load()
@@ -160,15 +162,13 @@ onMounted(load)
         <button
           v-if="isAdmin()"
           :disabled="busy === 'create'"
-          class="rounded-md border px-3 py-1.5 text-[13px] disabled:opacity-60"
-          :style="{ borderColor: 'var(--line-axis)' }"
+          class="rounded-md border px-3 py-1.5 text-[13px] disabled:opacity-60 border-line-axis"
           @click="create"
         >
           {{ busy === 'create' ? t('backup.creating') : t('backup.create') }}
         </button>
         <button
-          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-          :style="{ background: 'var(--accent)' }"
+          class="rounded-md px-3 py-1.5 text-[13px] font-medium text-white bg-accent"
           @click="showForm ? (showForm = false) : startNew()"
         >
           {{ showForm ? t('common.cancel') : t('backup.newTarget') }}
@@ -176,11 +176,10 @@ onMounted(load)
       </div>
     </header>
 
-    <p v-if="error" class="mb-4 text-[13px] whitespace-pre-line"
-       :style="{ color: 'var(--status-critical)' }" role="alert">
+    <p v-if="error" class="mb-4 text-[13px] whitespace-pre-line text-status-critical" role="alert">
       {{ error }}
     </p>
-    <p v-if="notice" class="mb-4 text-[13px]" :style="{ color: 'var(--status-good)' }">
+    <p v-if="notice" class="mb-4 text-[13px] text-status-good">
       {{ notice }}
     </p>
 
@@ -190,7 +189,7 @@ onMounted(load)
       @submit.prevent="save"
     >
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('backup.name') }}
         </span>
         <input v-model="form.name" required
@@ -198,7 +197,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('backup.kind') }}
         </span>
         <select v-model="form.kind"
@@ -211,14 +210,14 @@ onMounted(load)
 
       <template v-if="istS3">
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('backup.region') }}
           </span>
           <input v-model="form.region" required placeholder="eu-central-1"
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('backup.endpoint') }}
           </span>
           <input v-model="form.endpoint"
@@ -226,7 +225,7 @@ onMounted(load)
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('backup.bucket') }}
           </span>
           <input v-model="form.bucket" required
@@ -236,14 +235,14 @@ onMounted(load)
 
       <template v-else>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('backup.host') }}
           </span>
           <input v-model="form.host" required placeholder="sicherung.example.at"
                  class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
         </label>
         <label class="block">
-          <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+          <span class="mb-1 block text-[12px] text-ink-secondary">
             {{ t('backup.port') }}
           </span>
           <input v-model="form.port" type="number" min="1" max="65535"
@@ -252,7 +251,7 @@ onMounted(load)
       </template>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ istS3 ? t('backup.accessKey') : t('ftp.username') }}
         </span>
         <input v-model="form.username"
@@ -260,7 +259,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ istS3 ? t('backup.secretKey') : t('db.password') }}
         </span>
         <input v-model="form.secret" type="password" autocomplete="new-password"
@@ -269,7 +268,7 @@ onMounted(load)
       </label>
 
       <label class="block">
-        <span class="mb-1 block text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+        <span class="mb-1 block text-[12px] text-ink-secondary">
           {{ t('backup.basePath') }}
         </span>
         <input v-model="form.base_path" placeholder="volt"
@@ -297,29 +296,25 @@ onMounted(load)
         </label>
 
         <button type="submit" :disabled="busy === 'save'"
-                class="ml-auto rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60"
-                :style="{ background: 'var(--accent)' }">
+                class="ml-auto rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60 bg-accent">
           {{ t('common.save') }}
         </button>
       </div>
 
-      <p v-if="!istS3 && !form.use_tls" class="text-[12px] sm:col-span-2 lg:col-span-3"
-         :style="{ color: 'var(--status-warning)' }">
+      <p v-if="!istS3 && !form.use_tls" class="text-[12px] sm:col-span-2 lg:col-span-3 text-status-warning">
         {{ t('backup.noTlsWarning') }}
       </p>
     </form>
 
-    <p v-if="loading" class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
-      {{ t('common.loading') }}
-    </p>
+    <SkeletonRows v-if="loading" :cols="4" :rows="4" />
 
     <template v-else>
       <!-- Ziele -->
       <h2 class="mb-2 text-[14px] font-medium">{{ t('backup.targets') }}</h2>
       <div v-if="targets.length" class="panel-card mb-6 overflow-hidden">
         <table class="w-full text-left text-[13px]">
-          <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-            <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+          <thead class="text-[12px] text-ink-muted">
+            <tr class="border-b border-line-hairline">
               <th class="px-4 py-2.5 font-normal">{{ t('backup.name') }}</th>
               <th class="px-4 py-2.5 font-normal">{{ t('backup.kind') }}</th>
               <th class="px-4 py-2.5 font-normal">{{ t('backup.lastRun') }}</th>
@@ -328,15 +323,14 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="target in targets" :key="target.id"
-                class="border-b last:border-0" :style="{ borderColor: 'var(--line-hairline)' }">
+                class="border-b last:border-0 border-line-hairline">
               <td class="px-4 py-2.5">
                 <span class="font-medium">{{ target.name }}</span>
-                <span v-if="!target.enabled" class="ml-2 text-[11px]"
-                      :style="{ color: 'var(--ink-muted)' }">
+                <span v-if="!target.enabled" class="ml-2 text-[11px] text-ink-muted">
                   {{ t('ftp.status_disabled') }}
                 </span>
               </td>
-              <td class="px-4 py-2.5 font-mono text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+              <td class="px-4 py-2.5 font-mono text-[12px] text-ink-secondary">
                 {{ target.kind === 'ftp'
                     ? `${target.host}:${target.port}`
                     : `${target.bucket}.${target.endpoint}` }}
@@ -354,15 +348,15 @@ onMounted(load)
                 <span v-else :style="{ color: 'var(--ink-muted)' }">{{ t('backup.never') }}</span>
               </td>
               <td class="px-4 py-2.5 text-right whitespace-nowrap">
-                <button class="text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+                <button class="text-[12px] underline text-ink-secondary"
                         :disabled="busy === `test-${target.id}`" @click="test(target)">
                   {{ busy === `test-${target.id}` ? t('backup.testing') : t('backup.test') }}
                 </button>
-                <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--ink-secondary)' }"
+                <button class="ml-3 text-[12px] underline text-ink-secondary"
                         @click="startEdit(target)">
                   {{ t('common.edit') }}
                 </button>
-                <button class="ml-3 text-[12px] underline" :style="{ color: 'var(--status-critical)' }"
+                <button class="ml-3 text-[12px] underline text-status-critical"
                         @click="remove(target)">
                   {{ t('sites.delete') }}
                 </button>
@@ -371,7 +365,7 @@ onMounted(load)
           </tbody>
         </table>
       </div>
-      <p v-else class="mb-6 text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+      <p v-else class="mb-6 text-[13px] text-ink-muted">
         {{ t('backup.noTargets') }}
       </p>
 
@@ -380,8 +374,8 @@ onMounted(load)
         <h2 class="mb-2 text-[14px] font-medium">{{ t('backup.archives') }}</h2>
         <div v-if="archives.length" class="panel-card overflow-hidden">
           <table class="w-full text-left text-[13px]">
-            <thead class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
-              <tr class="border-b" :style="{ borderColor: 'var(--line-hairline)' }">
+            <thead class="text-[12px] text-ink-muted">
+              <tr class="border-b border-line-hairline">
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.archive') }}</th>
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.size') }}</th>
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.date') }}</th>
@@ -390,15 +384,14 @@ onMounted(load)
             </thead>
             <tbody>
               <tr v-for="archive in archives" :key="archive.name"
-                  class="border-b last:border-0" :style="{ borderColor: 'var(--line-hairline)' }">
+                  class="border-b last:border-0 border-line-hairline">
                 <td class="px-4 py-2.5 font-mono text-[12px]">{{ archive.name }}</td>
                 <td class="tabular px-4 py-2.5">{{ formatBytes(archive.size_bytes) }}</td>
-                <td class="px-4 py-2.5 text-[12px]" :style="{ color: 'var(--ink-secondary)' }">
+                <td class="px-4 py-2.5 text-[12px] text-ink-secondary">
                   {{ zeit(archive.mod_time) }}
                 </td>
                 <td class="px-4 py-2.5 text-right">
-                  <span v-if="busy === `upload-${archive.name}`" class="text-[12px]"
-                        :style="{ color: 'var(--ink-muted)' }">
+                  <span v-if="busy === `upload-${archive.name}`" class="text-[12px] text-ink-muted">
                     {{ t('backup.uploading') }}
                   </span>
                   <select
@@ -413,7 +406,7 @@ onMounted(load)
                       {{ target.name }}
                     </option>
                   </select>
-                  <span v-else class="text-[12px]" :style="{ color: 'var(--ink-muted)' }">
+                  <span v-else class="text-[12px] text-ink-muted">
                     {{ t('backup.noTargets') }}
                   </span>
                 </td>
@@ -421,7 +414,7 @@ onMounted(load)
             </tbody>
           </table>
         </div>
-        <p v-else class="text-[13px]" :style="{ color: 'var(--ink-muted)' }">
+        <p v-else class="text-[13px] text-ink-muted">
           {{ t('backup.noArchives') }}
         </p>
       </template>

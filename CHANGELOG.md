@@ -15,6 +15,27 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.131 — 2026-09-09
+
+- Die neun Funde aus design.md umgesetzt: 23 Aufrufe von confirm()/
+  window.confirm() durch einen eigenen ConfirmDialog ersetzt (roter Button
+  für destruktive, grüner für neutrale Aktionen, Fokus/Escape); die
+  Sidebar bekommt Abschnitte (Hosting/Mail/System/Verwaltung) und wird
+  unterhalb von lg: zur Off-Canvas-Schublade mit Hamburger-Button; die
+  Ladezustände der 12 Listenansichten zeigen jetzt Skeleton-Platzhalter
+  statt nur "Wird geladen …"; ein globaler :focus-visible-Ring (outline,
+  nicht Tailwinds Ring — der würde in jeder overflow-hidden-Tabellenkarte
+  abgeschnitten) gilt jetzt für die ganze App statt nur die Login-Seite;
+  die 75/90-Ampel-Schwelle steht einmal in statusForPercent()/
+  statusKeyForPercent() statt dreimal unabhängig verdrahtet in RingGauge,
+  QuotaBar und Dashboard; FTP hat ein eigenes Icon statt sich eines mit
+  "Dateien" zu teilen; t() warnt im Entwicklungsmodus vor fehlenden
+  Übersetzungsschlüsseln. Größter Einzelpunkt: die Farbrollen aus
+  style.css hängen jetzt zusätzlich als Tailwind-@theme-Tokens, ~474 der
+  568 einfachen :style-Farbbindungen sind auf die entstandenen
+  Utility-Klassen (text-ink-muted, bg-surface-card, …) umgestellt —
+  dynamische Ampel-Farben bleiben bewusst :style
+
 ## v0.4.130 — 2026-09-08
 
 - Die Oberfläche folgte keinem erkennbaren visuellen Vorbild — Sidebar,
