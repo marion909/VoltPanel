@@ -79,7 +79,7 @@ func (s *QuotaService) CollectTraffic(ctx context.Context) (int, []error) {
 			// Fortschreiben des Cursors nach einem separat schon
 			// gebuchten Byte-Zuwachs fehl, läse der nächste Lauf denselben
 			// Log-Bereich erneut und zählte dieselben Bytes doppelt ein.
-			if err := s.store.AddSiteTrafficAndCursor(ctx, siteID, f.Bytes, period,
+			if err := s.store.AddSiteTrafficAndCursor(ctx, siteID, f.Bytes, f.Requests, period,
 				f.Offset, f.Inode); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", f.Domain, err))
 				continue

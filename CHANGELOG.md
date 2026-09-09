@@ -15,6 +15,23 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.133 — 2026-09-09
+
+- Der Frontend-Tab an aaPanels Website-Ansicht angelehnt und in "Webseiten"
+  umbenannt. Websites-Tabelle bekommt Reiter nach Typ (Alle/Statisch/PHP/
+  Proxy), einen Öffnen-Link neben der Domain, den system_user darunter,
+  SSL als Resttage statt nur ja/nein (grün/orange/rot ab 30/14 Tagen) und
+  eine Anfragen-Spalte. Neu im Backend dafür: der Agent zählte Anfragen je
+  Site beim Parsen der Access-Logs schon immer, verwarf die Zahl aber
+  wieder — jetzt läuft traffic_requests im selben Rhythmus wie
+  traffic_bytes mit. Außerdem ein Sichern-Knopf je Zeile (nutzt
+  CreateOptions.SiteDomains, das serverseitig schon existierte, nur ohne
+  UI) — mit Hinweistext, dass das Archiv weiterhin die ganze
+  Panel-Datenbank enthält, kein isoliertes Einzel-Site-Archiv.
+  Bewusst weggelassen: eine WAF-Spalte (kein VoltPanel-Äquivalent, eigenes
+  Vorhaben) und native Go/Python-Site-Typen (laufen nur über das
+  Docker-App-System, nicht als eigener Vhost-Typ).
+
 ## v0.4.132 — 2026-09-09
 
 - Der Mail-Tab an aaPanels Mail-Domain/Mailboxes-Ansicht angelehnt: drei

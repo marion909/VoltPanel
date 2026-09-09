@@ -22,7 +22,7 @@ func ValidDomain(d string) bool {
 
 const siteCols = `id, tenant_id, domain, aliases, type, system_user, root_path,
 	document_root, php_version, proxy_target, ssl_enabled, force_https, hsts,
-	status, disk_bytes, disk_files, disk_measured_at, traffic_bytes, traffic_period,
+	status, disk_bytes, disk_files, disk_measured_at, traffic_bytes, traffic_requests, traffic_period,
 	settings, created_at, updated_at`
 
 func (s *Store) CreateSite(ctx context.Context, sc Scope, site *Site) error {
@@ -191,16 +191,18 @@ func (s *Store) SetTrafficCursor(ctx context.Context, siteID, offset int64, inod
 // beginnt der Zähler wieder bei null. Nur für den Fall gedacht, in dem
 // wirklich beides zusammengehört (Bytes > 0); ändert sich nur der Lesestand,
 // bleibt SetTrafficCursor allein zuständig.
-func (s *Store) AddSiteTrafficAndCursor(ctx context.Context, siteID, bytes int64, period string,
+func (s *Store) AddSiteTrafficAndCursor(ctx context.Context, siteID, bytes, requests int64, period string,
 	offset int64, inode uint64) error {
 
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE sites
-		SET traffic_bytes  = CASE WHEN traffic_period = ? THEN traffic_bytes + ? ELSE ? END,
-		    traffic_period = ?,
-		    traffic_offset = ?,
-		    traffic_inode  = ?
-		WHERE id = ?`, period, bytes, bytes, period, offset, int64(inode), siteID)
+		SET traffic_bytes    = CASE WHEN traffic_period = ? THEN traffic_bytes + ? ELSE ? END,
+		    traffic_requests = CASE WHEN traffic_period = ? THEN traffic_requests + ? ELSE ? END,
+		    traffic_period   = ?,
+		    traffic_offset   = ?,
+		    traffic_inode    = ?
+		WHERE id = ?`, period, bytes, bytes, period, requests, requests,
+		period, offset, int64(inode), siteID)
 	return err
 }
 
@@ -315,7 +317,7 @@ func scanSite(sc scanner) (*Site, error) {
 		&site.RootPath, &site.DocumentRoot, &site.PHPVersion, &site.ProxyTarget,
 		&ssl, &force, &hsts, &site.Status,
 		&site.DiskBytes, &site.DiskFiles, &site.DiskMeasuredAt,
-		&site.TrafficBytes, &site.TrafficPeriod, &settings,
+		&site.TrafficBytes, &site.TrafficRequests, &site.TrafficPeriod, &settings,
 		&site.CreatedAt, &site.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound

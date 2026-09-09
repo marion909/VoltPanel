@@ -132,11 +132,12 @@ type Site struct {
 
 	// Gemessener Verbrauch. Wird vom Quota-Job aktualisiert, nicht bei
 	// jeder Anfrage neu berechnet.
-	DiskBytes      int64  `json:"disk_bytes"`
-	DiskFiles      int64  `json:"disk_files"`
-	DiskMeasuredAt *int64 `json:"disk_measured_at"`
-	TrafficBytes   int64  `json:"traffic_bytes"`
-	TrafficPeriod  string `json:"traffic_period"`
+	DiskBytes       int64  `json:"disk_bytes"`
+	DiskFiles       int64  `json:"disk_files"`
+	DiskMeasuredAt  *int64 `json:"disk_measured_at"`
+	TrafficBytes    int64  `json:"traffic_bytes"`
+	TrafficRequests int64  `json:"traffic_requests"`
+	TrafficPeriod   string `json:"traffic_period"`
 
 	// Settings sind die Vhost-Zusätze: Weiterleitungen, IP-Regeln,
 	// Passwortschutz, eigene Direktiven.
