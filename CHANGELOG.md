@@ -15,6 +15,22 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.135 — 2026-09-09
+
+- Der Dateimanager an aaPanel angelehnt, ohne dessen serverweiten
+  Wurzelzugriff zu übernehmen: mehrere Tabs, aber jeder bleibt an eine
+  Site gebunden (die Mandantentrennung aus files.go bleibt unangetastet).
+  Neu: Mehrfachauswahl mit Sammel-Archivieren/-Verschieben/-Löschen,
+  Kopieren und Rechte-Ändern endlich als Knöpfe (beides gab es im Backend
+  schon lange, nur nie in der Oberfläche), sortierbare Spalten, eine
+  Namenssuche im aktuellen Verzeichnis, Raster- neben der Listenansicht,
+  Rechte/Eigentümer jetzt oktal statt als rwx-Zeichenkette, Drag&Drop zum
+  Hochladen, ein Terminal-Knopf (nutzt die vorhandene Site-Konsole) und
+  lokal gespeicherte Favoriten je Pfad.
+  Bewusst weggelassen (laut Rückfrage): Papierkorb, Remote-Download
+  (SSRF-Risiko) und rekursive Dateiinhaltssuche — nur Namenssuche im
+  aktuellen Verzeichnis.
+
 ## v0.4.134 — 2026-09-09
 
 - Neuer "Domains"-Bereich nach aaPanels Vorbild: ein Reiter für DNS-Zonen

@@ -65,6 +65,23 @@ export function statusKeyForPercent(percent) {
   return 'normal'
 }
 
+// permsToOctal liest Gos rwx-Darstellung ("-rw-r--r--") in die gewohnte
+// oktale Schreibweise ("644") um — für die Anzeige und als Vorgabewert beim
+// Ändern der Rechte. setuid/setgid/sticky (s/t) zählen dabei als "x".
+export function permsToOctal(mode) {
+  const bits = String(mode || '').slice(-9)
+  if (bits.length !== 9) return '644'
+  let out = ''
+  for (let i = 0; i < 9; i += 3) {
+    const group = bits.slice(i, i + 3)
+    const r = group[0] !== '-' ? 4 : 0
+    const w = group[1] !== '-' ? 2 : 0
+    const x = group[2] !== '-' && group[2] !== 'S' && group[2] !== 'T' ? 1 : 0
+    out += String(r + w + x)
+  }
+  return out
+}
+
 // formatUptime bricht Sekunden auf die zwei größten sinnvollen Einheiten
 // herunter — "12 T 4 h" statt "1054832 s".
 export function formatUptime(seconds) {
