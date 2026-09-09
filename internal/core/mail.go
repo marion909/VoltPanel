@@ -100,7 +100,7 @@ func (s *MailService) CreateDomain(ctx context.Context, sc store.Scope,
 
 // SetDomain ändert, was an einer Domäne einstellbar ist.
 func (s *MailService) SetDomain(ctx context.Context, sc store.Scope, id int64,
-	active *bool, catchAll *string) (*store.MailDomain, error) {
+	active *bool, catchAll *string, defaultQuotaMB *int64) (*store.MailDomain, error) {
 
 	d, err := s.store.GetMailDomain(ctx, sc, id)
 	if err != nil {
@@ -108,6 +108,12 @@ func (s *MailService) SetDomain(ctx context.Context, sc store.Scope, id int64,
 	}
 	if active != nil {
 		d.Active = *active
+	}
+	if defaultQuotaMB != nil {
+		if *defaultQuotaMB < 0 {
+			return nil, errors.New("eine quota-vorgabe ist nicht negativ")
+		}
+		d.DefaultQuotaMB = *defaultQuotaMB
 	}
 	if catchAll != nil {
 		ziel := strings.TrimSpace(*catchAll)
@@ -151,6 +157,56 @@ func (s *MailService) DeleteDomain(ctx context.Context, sc store.Scope, id int64
 // --- Postfächer ------------------------------------------------------------
 
 // CreateMailbox legt ein Postfach an.
+// MailboxView ist ein Postfach mit dem tatsächlichen Speicherverbrauch aus
+// Dovecots eigener Quota-Buchführung dazu — nützlich für die Anzeige, aber
+// nicht Teil dessen, was der Store speichert: der Verbrauch ändert sich mit
+// jeder Mail, das Kontingent nicht.
+type MailboxView struct {
+	*store.Mailbox
+	UsedBytes  int64 `json:"used_bytes"`
+	UsageKnown bool  `json:"usage_known"`
+}
+
+// ListMailboxesWithUsage liefert die Postfächer im Scope samt tatsächlichem
+// Speicherverbrauch (ein Agent-Aufruf für alle statt einem je Postfach).
+//
+// Ist Dovecot gerade nicht erreichbar oder scheitert die Abfrage, bleiben die
+// Postfächer trotzdem sichtbar — nur ohne Verbrauch (UsageKnown: false),
+// statt die ganze Liste an einem einzelnen Agent-Fehler scheitern zu lassen.
+func (s *MailService) ListMailboxesWithUsage(ctx context.Context, sc store.Scope, domainID int64) ([]MailboxView, error) {
+	boxes, err := s.store.ListMailboxes(ctx, sc, domainID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MailboxView, len(boxes))
+	for i, b := range boxes {
+		out[i] = MailboxView{Mailbox: b}
+	}
+	if len(boxes) == 0 {
+		return out, nil
+	}
+
+	addresses := make([]string, len(boxes))
+	for i, b := range boxes {
+		addresses[i] = b.Address
+	}
+	usage, err := s.agent.MailboxUsage(ctx, addresses)
+	if err != nil {
+		s.log.Warn("postfach-verbrauch nicht abrufbar", "err", err)
+		return out, nil
+	}
+	byAddress := make(map[string]agent.MailboxUsage, len(usage))
+	for _, u := range usage {
+		byAddress[u.Address] = u
+	}
+	for i := range out {
+		if u, ok := byAddress[out[i].Address]; ok {
+			out[i].UsedBytes, out[i].UsageKnown = u.UsedBytes, u.Known
+		}
+	}
+	return out, nil
+}
+
 func (s *MailService) CreateMailbox(ctx context.Context, sc store.Scope,
 	domainID int64, localPart, password string, quotaMB int64) (*store.Mailbox, error) {
 

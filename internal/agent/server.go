@@ -406,7 +406,8 @@ func (s *Server) dispatch(ctx context.Context, req *Request) *Response {
 func isMutating(op Op) bool {
 	switch op {
 	case OpPing, OpSystemInfo, OpDiskUsage, OpServiceList, OpServiceStatus,
-		OpNginxTest, OpPHPVersions, OpFileRead, OpFileList, OpFileTailLog, OpUserExists:
+		OpNginxTest, OpPHPVersions, OpFileRead, OpFileList, OpFileTailLog, OpUserExists,
+		OpMailboxUsage:
 		return false
 	}
 	return true

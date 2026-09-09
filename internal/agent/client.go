@@ -802,6 +802,13 @@ func (c *Client) ApplyMail(ctx context.Context, p MailApplyParams) (string, erro
 	return res.Text, err
 }
 
+// MailboxUsage fragt den Speicherverbrauch mehrerer Postfächer auf einmal ab.
+func (c *Client) MailboxUsage(ctx context.Context, addresses []string) ([]MailboxUsage, error) {
+	var res []MailboxUsage
+	err := c.Call(ctx, OpMailboxUsage, MailboxUsageParams{Addresses: addresses}, &res)
+	return res, err
+}
+
 // InstallFeature holt die Pakete einer Fähigkeit nach.
 func (c *Client) InstallFeature(ctx context.Context, feature string) (string, error) {
 	// Paketinstallationen dauern länger als die Vorgabe des Clients.

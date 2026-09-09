@@ -242,6 +242,7 @@ func (s *Server) setupRoutes() {
 	auth.POST("/mail/domains", s.handleCreateMailDomain)
 	auth.PATCH("/mail/domains/:id", s.handleUpdateMailDomain)
 	auth.DELETE("/mail/domains/:id", s.handleDeleteMailDomain)
+	auth.POST("/mail/domains/:id/blacklist-check", s.handleCheckMailBlacklist)
 	auth.GET("/mail/domains/:id/dkim", s.handleDKIM)
 	auth.POST("/mail/domains/:id/dkim", s.handleEnableDKIM)
 	auth.POST("/mail/domains/:id/dns", s.handlePublishDNS)

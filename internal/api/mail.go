@@ -107,14 +107,15 @@ func (s *Server) handleUpdateMailDomain(c echo.Context) error {
 		return err
 	}
 	var req struct {
-		Active   *bool   `json:"active"`
-		CatchAll *string `json:"catch_all"`
+		Active         *bool   `json:"active"`
+		CatchAll       *string `json:"catch_all"`
+		DefaultQuotaMB *int64  `json:"default_quota_mb"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
 	}
 	ctx := c.Request().Context()
-	d, err := s.mail.SetDomain(ctx, s.scopeFor(c), id, req.Active, req.CatchAll)
+	d, err := s.mail.SetDomain(ctx, s.scopeFor(c), id, req.Active, req.CatchAll, req.DefaultQuotaMB)
 	if err != nil {
 		return storeError(err)
 	}
@@ -134,6 +135,22 @@ func (s *Server) handleDeleteMailDomain(c echo.Context) error {
 	}
 	s.audit(ctx, currentUser(c), "mail.domain.delete", "id", c.Param("id"), "ok", c.RealIP(), nil)
 	return c.JSON(http.StatusOK, map[string]string{"hinweis": hinweis})
+}
+
+// handleCheckMailBlacklist fragt dbl.spamhaus.org für eine Domäne neu ab.
+func (s *Server) handleCheckMailBlacklist(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.Request().Context()
+	d, err := s.mail.CheckBlacklist(ctx, s.scopeFor(c), id)
+	if err != nil {
+		return storeError(err)
+	}
+	s.audit(ctx, currentUser(c), "mail.domain.blacklist_check", "domain", d.Domain, "ok", c.RealIP(),
+		map[string]string{"status": d.BlacklistStatus})
+	return c.JSON(http.StatusOK, d)
 }
 
 // handleEnableDKIM erzeugt einen Signaturschlüssel für eine Domäne.
@@ -206,7 +223,7 @@ func (s *Server) handleDKIM(c echo.Context) error {
 
 func (s *Server) handleListMailboxes(c echo.Context) error {
 	domainID, _ := queryID(c, "domain_id")
-	list, err := s.store.ListMailboxes(c.Request().Context(), s.scopeFor(c), domainID)
+	list, err := s.mail.ListMailboxesWithUsage(c.Request().Context(), s.scopeFor(c), domainID)
 	if err != nil {
 		return storeError(err)
 	}

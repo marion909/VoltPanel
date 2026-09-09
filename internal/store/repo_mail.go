@@ -55,8 +55,16 @@ type MailDomain struct {
 	// unterschreibt Mail im Namen dieser Domäne.
 	DKIMPrivate string `json:"-"`
 	DKIMPublic  string `json:"dkim_public"`
-	CreatedAt   int64  `json:"created_at"`
-	UpdatedAt   int64  `json:"updated_at"`
+	// BlacklistStatus ist das Ergebnis der letzten Domain-Blacklist-Abfrage
+	// (dbl.spamhaus.org): "gelistet", "sauber" oder leer, wenn noch nie
+	// geprüft. Kein Live-Feld — siehe MailService.CheckBlacklist.
+	BlacklistStatus    string `json:"blacklist_status"`
+	BlacklistCheckedAt int64  `json:"blacklist_checked_at"`
+	// DefaultQuotaMB belegt nur das Anlegefeld für ein neues Postfach vor —
+	// 0 heißt "kein Vorgabewert", nicht "0 MB erlaubt".
+	DefaultQuotaMB int64 `json:"default_quota_mb"`
+	CreatedAt      int64 `json:"created_at"`
+	UpdatedAt      int64 `json:"updated_at"`
 }
 
 // Mailbox ist ein Postfach.
@@ -88,7 +96,8 @@ type MailAlias struct {
 
 const (
 	mailDomainCols = `id, tenant_id, domain, active, catch_all,
-		dkim_selector, dkim_private, dkim_public, created_at, updated_at`
+		dkim_selector, dkim_private, dkim_public,
+		blacklist_status, blacklist_checked_at, default_quota_mb, created_at, updated_at`
 	mailboxCols = `id, tenant_id, domain_id, local_part, address, password_enc,
 		quota_mb, active, created_at, updated_at`
 	mailAliasCols = `id, tenant_id, domain_id, source, destination, active,
@@ -241,14 +250,31 @@ func (s *Store) UpdateMailDomain(ctx context.Context, sc Scope, d *MailDomain) e
 
 	res, err := s.db.ExecContext(ctx, `UPDATE mail_domains SET
 		domain = ?, active = ?, catch_all = ?, dkim_selector = ?,
-		dkim_private = ?, dkim_public = ?, updated_at = ?
+		dkim_private = ?, dkim_public = ?, default_quota_mb = ?, updated_at = ?
 		WHERE id = ? AND tenant_id = ?`,
 		d.Domain, boolToInt(d.Active), d.CatchAll, d.DKIMSelector,
-		d.DKIMPrivate, d.DKIMPublic, d.UpdatedAt, d.ID, d.TenantID)
+		d.DKIMPrivate, d.DKIMPublic, d.DefaultQuotaMB, d.UpdatedAt, d.ID, d.TenantID)
 	if err != nil {
 		return mailConflict(err, "die domäne "+d.Domain+" ist auf diesem server schon vergeben")
 	}
 	return affected(res, nil)
+}
+
+// UpdateMailDomainBlacklist trägt das Ergebnis einer Blacklist-Abfrage ein.
+//
+// Eigene, enge Methode statt UpdateMailDomain: dort müsste jeder Aufrufer
+// erst DKIM/Catch-All mitschleppen, nur um zwei Spalten zu ändern, die mit
+// beidem nichts zu tun haben — und validateMailDomain würde Felder prüfen,
+// die hier gar nicht zur Debatte stehen.
+func (s *Store) UpdateMailDomainBlacklist(ctx context.Context, sc Scope, id int64, status string, checkedAt int64) error {
+	d, err := s.GetMailDomain(ctx, sc, id)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE mail_domains SET blacklist_status = ?, blacklist_checked_at = ? WHERE id = ? AND tenant_id = ?`,
+		status, checkedAt, d.ID, d.TenantID)
+	return affected(res, err)
 }
 
 // DeleteMailDomain entfernt eine Domäne samt allem, was daran hängt.
@@ -501,7 +527,8 @@ func scanMailDomain(row scanner) (*MailDomain, error) {
 	var d MailDomain
 	var active int
 	err := row.Scan(&d.ID, &d.TenantID, &d.Domain, &active, &d.CatchAll,
-		&d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &d.CreatedAt, &d.UpdatedAt)
+		&d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic,
+		&d.BlacklistStatus, &d.BlacklistCheckedAt, &d.DefaultQuotaMB, &d.CreatedAt, &d.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

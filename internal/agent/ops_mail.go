@@ -218,6 +218,74 @@ func (s *Server) opMailStatus(_ context.Context, _ json.RawMessage) (any, error)
 	return res, nil
 }
 
+// MailboxUsageParams fragt den Speicherverbrauch mehrerer Postfächer ab.
+type MailboxUsageParams struct {
+	Addresses []string `json:"addresses"`
+}
+
+// MailboxUsage ist der Verbrauch eines einzelnen Postfachs.
+type MailboxUsage struct {
+	Address   string `json:"address"`
+	UsedBytes int64  `json:"used_bytes"`
+	// Known ist false, wenn doveadm keine auswertbare Antwort lieferte
+	// (Postfach noch nie benutzt, unerwartetes Format) — dann ist UsedBytes 0,
+	// das heißt aber "unbekannt", nicht "leer".
+	Known bool `json:"known"`
+}
+
+// opMailboxUsage fragt Dovecots eigene Quota-Buchführung ab (doveadm quota
+// get), statt jedes Maildir selbst mit du zu durchlaufen — dieselbe Quelle,
+// aus der Dovecot selbst die Grenze durchsetzt, und schnell genug für jedes
+// Laden der Postfach-Liste.
+//
+// Ein einzelnes Postfach, das sich nicht auswerten lässt, reißt die übrigen
+// nicht mit — es bekommt nur Known: false statt den ganzen Aufruf scheitern
+// zu lassen.
+func (s *Server) opMailboxUsage(ctx context.Context, raw json.RawMessage) (any, error) {
+	p, err := decode[MailboxUsageParams](raw, OpMailboxUsage)
+	if err != nil {
+		return nil, err
+	}
+	if !fileExists(allowedBinaries["doveadm"]) {
+		return nil, opErr(OpMailboxUsage, "dovecot ist auf diesem server nicht installiert")
+	}
+
+	out := make([]MailboxUsage, 0, len(p.Addresses))
+	for _, addr := range p.Addresses {
+		u := MailboxUsage{Address: addr}
+		if bytes, ok := doveadmQuotaBytes(ctx, addr); ok {
+			u.UsedBytes, u.Known = bytes, true
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+// doveadmQuotaBytes liest die STORAGE-Zeile aus `doveadm quota get -f json`.
+// Dovecots JSON-Formatter liefert ein Array von Objekten, ein Eintrag je
+// Quota-Typ (u. a. "STORAGE" und "MESSAGE"); die Werte stehen in KiB.
+func doveadmQuotaBytes(ctx context.Context, address string) (int64, bool) {
+	out, err := run(ctx, shortTimeout, "doveadm", "-f", "json", "quota", "get", "-u", address)
+	if err != nil {
+		return 0, false
+	}
+	var zeilen []map[string]any
+	if err := json.Unmarshal([]byte(out), &zeilen); err != nil {
+		return 0, false
+	}
+	for _, z := range zeilen {
+		if !strings.EqualFold(fmt.Sprint(z["type"]), "STORAGE") {
+			continue
+		}
+		kib, ok := z["value"].(float64)
+		if !ok {
+			return 0, false
+		}
+		return int64(kib) * 1024, true
+	}
+	return 0, false
+}
+
 // zaehleEintraege zählt die Zeilen einer Map, ohne Kopf und Leerzeilen.
 func zaehleEintraege(inhalt string) int {
 	var n int

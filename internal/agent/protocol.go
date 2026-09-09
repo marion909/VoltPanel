@@ -142,6 +142,11 @@ const (
 	// (autoconfig.<domain> / autodiscover.<domain>) liefert sie danach
 	// unverändert aus — hier entsteht nur der Inhalt, nicht die Config.
 	OpMailAutoconfig Op = "mail.autoconfig"
+	// OpMailboxUsage fragt Dovecots eigene Quota-Buchführung ab (doveadm quota
+	// get) statt eines eigenen du über die Maildirs — dieselbe Quelle, aus der
+	// Dovecot selbst die Grenze durchsetzt, und ohne jedes Postfach im
+	// Dateisystem einzeln zu durchlaufen.
+	OpMailboxUsage Op = "mail.mailbox_usage"
 
 	// OpFeatureInstall holt nach, was das Panel verwaltet — aus einer festen
 	// Liste, nie mit einem Paketnamen aus der Anfrage. OpFeatureUninstall

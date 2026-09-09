@@ -15,6 +15,22 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.132 — 2026-09-09
+
+- Der Mail-Tab an aaPanels Mail-Domain/Mailboxes-Ansicht angelehnt: drei
+  Reiter (Domänen, Postfächer, Weitere Einstellungen) statt einer einzigen
+  Liste. Neu im Backend dafür: eine echte Domain-Blacklist-Abfrage
+  (dbl.spamhaus.org, je Domäne mit Zeitstempel und Refresh-Knopf statt bei
+  jedem Laden neu), echter Speicherverbrauch je Postfach (doveadm quota
+  get, ein gebündelter Agent-Aufruf für die ganze Liste) und eine
+  Vorgabe-Postfachgröße je Domäne. Die Domänen-Tabelle zeigt jetzt
+  Blacklist-Status, aggregiertes Kontingent, Postfachanzahl,
+  Vorgabe-Größe, Catch-All, TLS- und Webmail-Status auf einen Blick; die
+  Postfächer-Tabelle läuft domänenübergreifend mit Filter und Suche.
+  Bewusst weggelassen: der Mail-Marketing-Reiter (anderes Produkt),
+  Sammel-Anlage/Import/Export von Postfächern und ein "Admin"-Postfachtyp
+  (keine Entsprechung im Rollenmodell).
+
 ## v0.4.131 — 2026-09-09
 
 - Die neun Funde aus design.md umgesetzt: 23 Aufrufe von confirm()/

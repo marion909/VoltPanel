@@ -182,7 +182,7 @@ func TestCatchAllNurAufEigenePostfaecher(t *testing.T) {
 	domA := ersteDomain(t, env, alice)
 
 	fremd := "wer-anders@example.com"
-	if _, err := svc.SetDomain(ctx, scA, domA, nil, &fremd); err == nil {
+	if _, err := svc.SetDomain(ctx, scA, domA, nil, &fremd, nil); err == nil {
 		t.Error("ein catch-all auf eine fremde adresse wurde angenommen")
 	}
 
@@ -194,7 +194,7 @@ func TestCatchAllNurAufEigenePostfaecher(t *testing.T) {
 	// Fehlermeldung: das Schreiben scheitert auf einem Rechner ohne
 	// Mailspeicher, die Zeile steht trotzdem.
 	eigen := "post@alice.example.at"
-	_, _ = svc.SetDomain(ctx, scA, domA, nil, &eigen)
+	_, _ = svc.SetDomain(ctx, scA, domA, nil, &eigen, nil)
 
 	dom, err := env.store.GetMailDomain(ctx, scA, domA)
 	if err != nil {
@@ -379,7 +379,7 @@ func TestDKIMKommtInDenSollzustand(t *testing.T) {
 
 	// Eine abgeschaltete Domäne unterschreibt nicht mehr.
 	aus := false
-	if _, err := svc.SetDomain(ctx, scA, domA, &aus, nil); err != nil {
+	if _, err := svc.SetDomain(ctx, scA, domA, &aus, nil, nil); err != nil {
 		t.Logf("schreiben scheiterte (erwartbar): %v", err)
 	}
 	p, err = svc.collect(ctx)
