@@ -2,9 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
+import { formatDateTime } from '../format'
 import { askConfirm } from '../stores/confirm'
 import InstallHint from '../components/InstallHint.vue'
-import SkeletonCards from '../components/SkeletonCards.vue'
+import SkeletonRows from '../components/SkeletonRows.vue'
 
 const apps = ref([])
 const sites = ref([])
@@ -559,7 +560,7 @@ onMounted(load)
       </div>
     </form>
 
-    <SkeletonCards v-if="loading" :count="4" cols="lg:grid-cols-2" height="h-28" />
+    <SkeletonRows v-if="loading" :cols="6" />
     <p
       v-else-if="!apps.length"
       class="text-[13px] text-ink-muted"
@@ -567,136 +568,111 @@ onMounted(load)
       {{ t('apps.empty') }}
     </p>
 
-    <div v-else class="grid gap-3 lg:grid-cols-2">
-      <article
-        v-for="app in apps"
-        :key="app.id"
-        class="panel-card p-4"
-      >
-        <header class="mb-3 flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <span
-                class="h-1.5 w-1.5 shrink-0 rounded-full"
-                :style="{ background: app.active ? 'var(--status-good)' : 'var(--ink-muted)' }"
-                :title="app.active ? t('apps.running') : t('apps.stopped')"
-              ></span>
-              <span class="truncate text-[14px] font-medium">{{ app.domain }}</span>
-            </div>
-            <div class="text-[11px] text-ink-muted">
-              {{ app.unit }} &middot; 127.0.0.1:{{ app.port }}
-            </div>
-          </div>
-          <span class="shrink-0 font-mono text-[11px] text-ink-secondary">
-            <template v-if="app.kind === 'docker'">{{ app.image }}</template>
-            <template v-else>{{ app.runtime }} {{ (app.args || []).join(' ') }}</template>
-          </span>
-        </header>
-
-        <!--
-          Die Auslastung steht nur da, wenn wirklich etwas läuft. Ein Balken
-          mit Null darin sähe aus wie eine Messung und wäre keine.
-        -->
-        <div v-if="statFor(app)" class="mb-3">
-          <div class="flex items-baseline justify-between text-[11px]">
-            <span :style="{ color: 'var(--ink-secondary)' }">{{ t('apps.usage') }}</span>
-            <span class="font-mono text-ink-secondary">
-              {{ statFor(app).cpu_perc.toFixed(1) }}% CPU &middot;
-              {{ bytes(statFor(app).mem_used) }}
-              <template v-if="statFor(app).mem_max">
-                / {{ bytes(statFor(app).mem_max) }}
-              </template>
-            </span>
-          </div>
-          <div
-            class="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-sunken"
-            role="img"
-            :aria-label="statFor(app).mem_perc.toFixed(0) + '%'"
-          >
-            <div
-              class="h-full rounded-full"
-              :style="{
-                width: Math.min(100, statFor(app).mem_perc) + '%',
-                background:
-                  statFor(app).mem_perc > 90 ? 'var(--status-critical)' : 'var(--series-1)',
-              }"
-            ></div>
-          </div>
-        </div>
-
-        <div class="text-[11px] text-ink-secondary">
-          {{ t('apps.env') }}:
-          <template v-if="app.env_keys && app.env_keys.length">
-            {{ app.env_keys.join(', ') }}
-          </template>
-          <template v-else>{{ t('apps.envNone') }}</template>
-        </div>
-
-        <!--
-          Die Werte stehen hier nicht. Das Panel gibt sie nach dem Speichern
-          nicht mehr heraus — in einer App-Umgebung stehen regelmäßig
-          Datenbankpasswörter. Was hier eingetragen wird, ersetzt die ganze
-          Umgebung; das steht auch daneben, sonst löscht jemand versehentlich
-          die Hälfte.
-        -->
-        <div v-if="envOpen[app.id]" class="mt-2">
-          <textarea
-            :value="envDraft[app.id] ?? ''"
-            rows="4"
-            placeholder="DATABASE_URL=postgres://…&#10;API_TOKEN=…"
-            class="w-full rounded-md border px-3 py-2 font-mono text-[12px]"
-            :style="inputStyle"
-            @input="envDraft[app.id] = $event.target.value"
-          ></textarea>
-          <p class="mt-1 text-[11px] text-ink-muted">
-            {{ t('apps.envReplaces') }}
-          </p>
-          <button
-            class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60 bg-accent"
-            :disabled="busy"
-            @click="saveEnv(app)"
-          >
-            {{ t('common.save') }}
-          </button>
-        </div>
-
-        <pre
-          v-if="logs[app.id] !== undefined"
-          class="mt-2 max-h-64 overflow-auto rounded-md p-2 font-mono text-[11px]"
-          :style="{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }"
-        >{{ logs[app.id] }}</pre>
-
-        <footer class="mt-3 flex flex-wrap gap-3 text-[11px]">
-          <button
-            class="underline text-ink-secondary"
-            :disabled="busy"
-            @click="envOpen[app.id] = !envOpen[app.id]"
-          >
-            {{ t('apps.editEnv') }}
-          </button>
-          <button
-            v-if="app.kind === 'docker'"
-            class="underline text-ink-secondary"
-            @click="logsLaden(app)"
-          >
-            {{ t('apps.logs') }}
-          </button>
-          <button
-            class="underline text-ink-secondary"
-            :disabled="busy"
-            @click="saveApp(app, { enabled: !app.enabled })"
-          >
-            {{ app.enabled ? t('apps.disable') : t('apps.enable') }}
-          </button>
-          <button
-            class="underline text-status-critical"
-            :disabled="busy"
-            @click="removeApp(app)"
-          >
-            {{ t('common.delete') }}
-          </button>
-        </footer>
-      </article>
+    <div v-else class="panel-card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[13px]">
+          <thead class="text-[12px] text-ink-muted">
+            <tr class="border-b border-line-hairline">
+              <th class="px-4 py-2.5 font-normal">{{ t('apps.name') }}</th>
+              <th class="px-4 py-2.5 font-normal">{{ t('common.status') }}</th>
+              <th class="px-4 py-2.5 font-normal">{{ t('apps.image') }}</th>
+              <th class="px-4 py-2.5 font-normal">{{ t('apps.port') }}</th>
+              <th class="px-4 py-2.5 font-normal">{{ t('apps.usage') }}</th>
+              <th class="px-4 py-2.5 font-normal">{{ t('backup.date') }}</th>
+              <th class="px-4 py-2.5 text-right font-normal">{{ t('common.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="app in apps" :key="app.id">
+              <tr class="border-b last:border-0 border-line-hairline">
+                <td class="px-4 py-2.5">
+                  <div class="font-medium">{{ app.domain }}</div>
+                  <div class="text-[11px] text-ink-muted">{{ app.unit }}</div>
+                </td>
+                <td class="px-4 py-2.5">
+                  <span class="inline-flex items-center gap-1.5" :style="{ color: app.active ? 'var(--status-good)' : 'var(--ink-muted)' }">
+                    <span class="h-1.5 w-1.5 shrink-0 rounded-full" :style="{ background: app.active ? 'var(--status-good)' : 'var(--line-axis)' }"></span>
+                    {{ app.active ? t('apps.running') : t('apps.stopped') }}
+                  </span>
+                </td>
+                <td class="max-w-[220px] truncate px-4 py-2.5 font-mono text-[12px] text-ink-secondary">
+                  <template v-if="app.kind === 'docker'">{{ app.image }}</template>
+                  <template v-else>{{ app.runtime }} {{ (app.args || []).join(' ') }}</template>
+                </td>
+                <td class="px-4 py-2.5">
+                  <span
+                    class="whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-[11px]"
+                    :style="{ background: 'color-mix(in srgb, var(--status-good) 16%, transparent)', color: 'var(--status-good)' }"
+                  >
+                    127.0.0.1:{{ app.port }}<template v-if="app.kind === 'docker'"> &#8594; {{ app.container_port }}</template>
+                  </span>
+                </td>
+                <td class="px-4 py-2.5 text-[12px] text-ink-secondary">
+                  <template v-if="statFor(app)">
+                    {{ statFor(app).cpu_perc.toFixed(1) }}% CPU &middot; {{ bytes(statFor(app).mem_used) }}
+                  </template>
+                  <span v-else class="text-ink-muted">&mdash;</span>
+                </td>
+                <td class="px-4 py-2.5 text-[12px] text-ink-secondary">
+                  {{ formatDateTime(app.created_at) }}
+                </td>
+                <td class="px-4 py-2.5 text-right text-[12px]">
+                  <button class="underline text-ink-secondary" :disabled="busy" @click="envOpen[app.id] = !envOpen[app.id]">
+                    {{ t('apps.editEnv') }}
+                  </button>
+                  <button v-if="app.kind === 'docker'" class="ml-3 underline text-ink-secondary" @click="logsLaden(app)">
+                    {{ t('apps.logs') }}
+                  </button>
+                  <button class="ml-3 underline text-ink-secondary" :disabled="busy" @click="saveApp(app, { enabled: !app.enabled })">
+                    {{ app.enabled ? t('apps.disable') : t('apps.enable') }}
+                  </button>
+                  <button class="ml-3 underline text-status-critical" :disabled="busy" @click="removeApp(app)">
+                    {{ t('common.delete') }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="envOpen[app.id] || logs[app.id] !== undefined" class="border-b last:border-0 border-line-hairline">
+                <td colspan="7" class="px-4 py-3" :style="{ background: 'var(--surface-sunken)' }">
+                  <!--
+                    Die Werte stehen hier nicht. Das Panel gibt sie nach dem
+                    Speichern nicht mehr heraus — in einer App-Umgebung stehen
+                    regelmäßig Datenbankpasswörter. Was hier eingetragen wird,
+                    ersetzt die ganze Umgebung; das steht auch daneben, sonst
+                    löscht jemand versehentlich die Hälfte.
+                  -->
+                  <div v-if="envOpen[app.id]" class="mb-3">
+                    <div class="mb-1 text-[11px] text-ink-secondary">
+                      {{ t('apps.env') }}:
+                      <template v-if="app.env_keys && app.env_keys.length">{{ app.env_keys.join(', ') }}</template>
+                      <template v-else>{{ t('apps.envNone') }}</template>
+                    </div>
+                    <textarea
+                      :value="envDraft[app.id] ?? ''"
+                      rows="4"
+                      placeholder="DATABASE_URL=postgres://…&#10;API_TOKEN=…"
+                      class="w-full rounded-md border px-3 py-2 font-mono text-[12px]"
+                      :style="inputStyle"
+                      @input="envDraft[app.id] = $event.target.value"
+                    ></textarea>
+                    <p class="mt-1 text-[11px] text-ink-muted">{{ t('apps.envReplaces') }}</p>
+                    <button
+                      class="mt-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60 bg-accent"
+                      :disabled="busy" @click="saveEnv(app)"
+                    >
+                      {{ t('common.save') }}
+                    </button>
+                  </div>
+                  <pre
+                    v-if="logs[app.id] !== undefined"
+                    class="max-h-64 overflow-auto rounded-md p-2 font-mono text-[11px]"
+                    :style="{ background: 'var(--surface-page)', color: 'var(--ink-secondary)' }"
+                  >{{ logs[app.id] }}</pre>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>

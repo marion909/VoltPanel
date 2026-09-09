@@ -15,6 +15,19 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.137 — 2026-09-09
+
+- Der Apps-Tab unter Webseiten war die letzte Ansicht, die noch eine
+  Karten-Rasterung statt der überall sonst üblichen Tabelle zeigte —
+  jetzt an aaPanels Container-Manager angelehnt: Status als grüner Punkt
+  mit "läuft"/"läuft nicht", der Port als grüne Pille (127.0.0.1:PORT
+  → Container-Port bei Docker-Apps), Image/Laufzeit, Auslastung und
+  Erstellt-Datum als eigene Spalten. Umgebung-bearbeiten und Logs klappen
+  wie bei den Mail-Domänen als volle Zeile darunter auf statt inline in
+  einer Karte zu stehen. IDs/IP-Spalten wie bei aaPanel gibt es bewusst
+  nicht — Apps sind in VoltPanel an eine Site gebunden, nicht am rohen
+  Container, und dafür gibt es hier keine Entsprechung.
+
 ## v0.4.136 — 2026-09-09
 
 - Zwei Meldungen aus dem laufenden Betrieb behoben: In der Domains-Ansicht
