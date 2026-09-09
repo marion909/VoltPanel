@@ -50,9 +50,9 @@ func (s *Store) CreateTenant(ctx context.Context, sc Scope, t *Tenant) error {
 
 	t.CreatedAt, t.UpdatedAt = now(), now()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO tenants (name, slug, plan_id, status, cloudflare_token, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Slug, t.PlanID, t.Status, t.CloudflareToken, t.CreatedAt, t.UpdatedAt)
+		INSERT INTO tenants (name, slug, plan_id, status, cloudflare_token, hetzner_token, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Slug, t.PlanID, t.Status, t.CloudflareToken, t.HetznerToken, t.CreatedAt, t.UpdatedAt)
 	if err != nil {
 		if isUnique(err) {
 			return fmt.Errorf("%w: tenant %q", ErrConflict, t.Slug)
@@ -70,7 +70,7 @@ func (s *Store) GetTenant(ctx context.Context, sc Scope, id int64) (*Tenant, err
 		return nil, err
 	}
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, created_at, updated_at
+		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, hetzner_token, created_at, updated_at
 		FROM tenants WHERE id = ?`, id)
 	return scanTenant(row)
 }
@@ -79,7 +79,7 @@ func (s *Store) ListTenants(ctx context.Context, sc Scope) ([]*Tenant, error) {
 	if err := sc.valid(); err != nil {
 		return nil, err
 	}
-	q := `SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, created_at, updated_at FROM tenants`
+	q := `SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, hetzner_token, created_at, updated_at FROM tenants`
 	var args []any
 	if !sc.IsSystem() {
 		q += ` WHERE id = ?`
@@ -111,8 +111,8 @@ func (s *Store) UpdateTenant(ctx context.Context, sc Scope, t *Tenant) error {
 	t.UpdatedAt = now()
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE tenants SET name = ?, plan_id = ?, status = ?, login_domain = ?,
-			cloudflare_token = ?, updated_at = ? WHERE id = ?`,
-		t.Name, t.PlanID, t.Status, t.LoginDomain, t.CloudflareToken, t.UpdatedAt, t.ID)
+			cloudflare_token = ?, hetzner_token = ?, updated_at = ? WHERE id = ?`,
+		t.Name, t.PlanID, t.Status, t.LoginDomain, t.CloudflareToken, t.HetznerToken, t.UpdatedAt, t.ID)
 	return affected(res, err)
 }
 
@@ -130,7 +130,7 @@ func (s *Store) DeleteTenant(ctx context.Context, sc Scope, id int64) error {
 func scanTenant(sc scanner) (*Tenant, error) {
 	var t Tenant
 	err := sc.Scan(&t.ID, &t.Name, &t.Slug, &t.PlanID, &t.Status, &t.LoginDomain,
-		&t.CloudflareToken, &t.CreatedAt, &t.UpdatedAt)
+		&t.CloudflareToken, &t.HetznerToken, &t.CreatedAt, &t.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

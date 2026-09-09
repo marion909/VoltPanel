@@ -275,6 +275,7 @@ func (s *ExportService) rekeySecrets(b *TenantBundle, box *authn.SecretBox,
 	}
 
 	umschluesseln("tenant.cloudflare_token", &b.Tenant.CloudflareToken)
+	umschluesseln("tenant.hetzner_token", &b.Tenant.HetznerToken)
 	for _, u := range b.Users {
 		umschluesseln(fmt.Sprintf("user.%d.totp", u.ID), &u.TOTPSecret)
 	}

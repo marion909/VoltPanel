@@ -5,7 +5,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { askConfirm } from "../stores/confirm";
 import { isAdmin } from "../stores/session";
-import { formatBytes } from "../format";
+import { formatBytes, daysLeft } from "../format";
 import AppStoreDialog from "../components/AppStoreDialog.vue";
 import SkeletonRows from "../components/SkeletonRows.vue";
 
@@ -71,10 +71,6 @@ const certBySite = computed(() => {
   }
   return out;
 });
-
-function daysLeft(notAfter) {
-  return Math.max(0, Math.ceil((notAfter * 1000 - Date.now()) / 86400000));
-}
 
 // Reiter nach Site-Typ — reine Anzeigefilterung über den vorhandenen
 // site.type, kein zusätzlicher Serveraufruf.

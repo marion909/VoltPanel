@@ -198,6 +198,124 @@ func (c *cloudflareClient) setzeA(ctx context.Context, zone, name, ip string) er
 	return err
 }
 
+// --- generische Record-Verwaltung (dnsProvider) -----------------------------
+//
+// Die obigen Methoden (zoneID, txtRecords, aRecords, setzeA, setzeTXT) bleiben
+// unverändert für die Mail-DNS-Automatik. Was folgt, bedient stattdessen die
+// Domains-Seite: alle Zonen, alle Typen, frei editierbar.
+
+// ListZones liefert alle Zonen, die dieser Token sehen kann.
+func (c *cloudflareClient) ListZones(ctx context.Context) ([]DNSZone, error) {
+	roh, err := c.ruf(ctx, http.MethodGet, "/zones?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	var zonen []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(roh, &zonen); err != nil {
+		return nil, err
+	}
+	out := make([]DNSZone, 0, len(zonen))
+	for _, z := range zonen {
+		out = append(out, DNSZone{ID: z.ID, Name: z.Name, Provider: "cloudflare"})
+	}
+	return out, nil
+}
+
+// ListRecords liefert alle Einträge einer Zone, unabhängig vom Typ.
+func (c *cloudflareClient) ListRecords(ctx context.Context, zoneID string) ([]DNSRecord, error) {
+	roh, err := c.ruf(ctx, http.MethodGet, "/zones/"+zoneID+"/dns_records?per_page=100", nil)
+	if err != nil {
+		return nil, err
+	}
+	var recs []struct {
+		Type     string `json:"type"`
+		Name     string `json:"name"`
+		Content  string `json:"content"`
+		TTL      int    `json:"ttl"`
+		Priority *int   `json:"priority,omitempty"`
+	}
+	if err := json.Unmarshal(roh, &recs); err != nil {
+		return nil, err
+	}
+	out := make([]DNSRecord, 0, len(recs))
+	for _, r := range recs {
+		out = append(out, DNSRecord{Name: r.Name, Type: r.Type, Value: r.Content, TTL: r.TTL, Priority: r.Priority})
+	}
+	return out, nil
+}
+
+// cfNewRecord ist der Anfragekörper zum Anlegen/Ändern — Cloudflares eigenes
+// cfRecord trägt zusätzlich eine ID, die beim Anlegen stört.
+type cfNewRecord struct {
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	TTL      int    `json:"ttl"`
+	Priority *int   `json:"priority,omitempty"`
+}
+
+func (c *cloudflareClient) CreateRecord(ctx context.Context, zoneID string, r DNSRecord) error {
+	ttl := r.TTL
+	if ttl <= 0 {
+		ttl = 1 // 1 heißt bei Cloudflare "automatisch"
+	}
+	_, err := c.ruf(ctx, http.MethodPost, "/zones/"+zoneID+"/dns_records", cfNewRecord{
+		Type: r.Type, Name: r.Name, Content: r.Value, TTL: ttl, Priority: r.Priority,
+	})
+	return err
+}
+
+// recordIDByValue sucht die interne ID eines Eintrags über Name+Typ+Wert —
+// die einzige Möglichkeit, ohne dass die ID durch die ganze API-Schicht bis
+// ins Frontend durchgereicht werden müsste.
+func (c *cloudflareClient) recordIDByValue(ctx context.Context, zoneID, name, recType, value string) (string, error) {
+	roh, err := c.ruf(ctx, http.MethodGet,
+		"/zones/"+zoneID+"/dns_records?type="+url.QueryEscape(recType)+"&name="+url.QueryEscape(name), nil)
+	if err != nil {
+		return "", err
+	}
+	var recs []struct {
+		ID      string `json:"id"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(roh, &recs); err != nil {
+		return "", err
+	}
+	for _, r := range recs {
+		if r.Content == value {
+			return r.ID, nil
+		}
+	}
+	return "", fmt.Errorf("eintrag %s %s=%q nicht gefunden", recType, name, value)
+}
+
+func (c *cloudflareClient) UpdateRecord(ctx context.Context, zoneID, oldValue string, r DNSRecord) error {
+	id, err := c.recordIDByValue(ctx, zoneID, r.Name, r.Type, oldValue)
+	if err != nil {
+		return err
+	}
+	ttl := r.TTL
+	if ttl <= 0 {
+		ttl = 1
+	}
+	_, err = c.ruf(ctx, http.MethodPut, "/zones/"+zoneID+"/dns_records/"+id, cfNewRecord{
+		Type: r.Type, Name: r.Name, Content: r.Value, TTL: ttl, Priority: r.Priority,
+	})
+	return err
+}
+
+func (c *cloudflareClient) DeleteRecord(ctx context.Context, zoneID string, r DNSRecord) error {
+	id, err := c.recordIDByValue(ctx, zoneID, r.Name, r.Type, r.Value)
+	if err != nil {
+		return err
+	}
+	_, err = c.ruf(ctx, http.MethodDelete, "/zones/"+zoneID+"/dns_records/"+id, nil)
+	return err
+}
+
 // setzeTXT legt einen TXT-Eintrag an oder ändert ihn.
 //
 // Geändert wird nur, was diesem Panel gehört — der Aufrufer entscheidet das,

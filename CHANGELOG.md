@@ -15,6 +15,25 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.134 — 2026-09-09
+
+- Neuer "Domains"-Bereich nach aaPanels Vorbild: ein Reiter für DNS-Zonen
+  und -Einträge (anlegen/ändern/löschen, alle gängigen Typen), ein zweiter
+  für alle Zertifikate der Instanz mit Marke, Domain, Resttagen (farbig wie
+  bei den Websites), Auto-Verlängerung, Installationsort, letzter
+  Ausstellung und Verfahren (HTTP-01/DNS-01) — bisher nur verstreut je Site
+  sichtbar. Neu im Backend: Hetzner als zweiter DNS-Provider neben
+  Cloudflare (eigener, verschlüsselt abgelegter Token je Mandant, wie der
+  Cloudflare-Token es schon war), eine generische Record-Verwaltung für
+  beide (Cloudflare bisher nur A/TXT für die Mail-Automatik), sowie
+  "Zertifikat jetzt erneuern" und "Auto-Verlängerung umschalten" als eigene
+  Aktionen statt nur über den Cron-Job. Außerdem bekommt das
+  Cloudflare-Token endlich eine Eingabe im Panel — bisher gab es dafür nur
+  einen nie verdrahteten Endpunkt.
+  Bewusst weggelassen: manueller Zertifikat-Upload (eigenes Cert/Key
+  einfügen) und das Anlegen neuer DNS-Zonen (nur Einträge innerhalb
+  bestehender Zonen, wie aaPanels "Add Resolution" es auch nur tut).
+
 ## v0.4.133 — 2026-09-09
 
 - Der Frontend-Tab an aaPanels Website-Ansicht angelehnt und in "Webseiten"

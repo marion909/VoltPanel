@@ -15,6 +15,11 @@ export function formatBytes(bytes, digits = 1) {
   return `${value.toFixed(digits)} ${units[unit]}`
 }
 
+// daysLeft ist die Restlaufzeit eines Zertifikats bis not_after (Unix-Sekunden).
+export function daysLeft(notAfter) {
+  return Math.max(0, Math.ceil((notAfter * 1000 - Date.now()) / 86400000))
+}
+
 export function formatRate(bytesPerSecond) {
   return `${formatBytes(bytesPerSecond, 1)}/s`
 }

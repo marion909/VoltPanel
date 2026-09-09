@@ -20,6 +20,9 @@ type Tenant struct {
 	// Ob einer hinterlegt ist, sagt HasCloudflareToken.
 	CloudflareToken string `json:"-"`
 
+	// HetznerToken ist der zweite DNS-Provider, sonst identisch behandelt.
+	HetznerToken string `json:"-"`
+
 	CreatedAt int64 `json:"created_at"`
 	UpdatedAt int64 `json:"updated_at"`
 }
@@ -28,13 +31,17 @@ type Tenant struct {
 // Token selbst herauszugeben.
 func (t *Tenant) HasCloudflareToken() bool { return t.CloudflareToken != "" }
 
-// MarshalJSON ergänzt das abgeleitete Feld, ohne das Geheimnis mitzuschicken.
+// HasHetznerToken ist das Gegenstück für den Hetzner-Provider.
+func (t *Tenant) HasHetznerToken() bool { return t.HetznerToken != "" }
+
+// MarshalJSON ergänzt die abgeleiteten Felder, ohne die Geheimnisse mitzuschicken.
 func (t Tenant) MarshalJSON() ([]byte, error) {
 	type alias Tenant // verhindert die Endlosschleife über MarshalJSON
 	return json.Marshal(struct {
 		alias
 		HasCloudflareToken bool `json:"has_cloudflare_token"`
-	}{alias(t), t.CloudflareToken != ""})
+		HasHetznerToken    bool `json:"has_hetzner_token"`
+	}{alias(t), t.CloudflareToken != "", t.HetznerToken != ""})
 }
 
 type Plan struct {

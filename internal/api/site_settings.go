@@ -205,6 +205,101 @@ func (s *Server) handleIssueCert(c echo.Context) error {
 	return c.JSON(http.StatusCreated, cert)
 }
 
+type updateCertRequest struct {
+	AutoRenew *bool `json:"auto_renew"`
+}
+
+// handleUpdateCert ändert bisher nur die Auto-Verlängerung — für alles andere
+// (Domains, Provider) gibt es das Ausstellen/Erneuern.
+func (s *Server) handleUpdateCert(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	var req updateCertRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+
+	ctx, sc := c.Request().Context(), currentScope(c)
+	cert, err := s.store.GetCert(ctx, sc, id)
+	if err != nil {
+		return storeError(err)
+	}
+	if req.AutoRenew != nil {
+		cert.AutoRenew = *req.AutoRenew
+	}
+	if err := s.store.UpdateCert(ctx, sc, cert); err != nil {
+		return storeError(err)
+	}
+
+	s.audit(ctx, currentUser(c), "cert.update", "cert", strings.Join(cert.Domains, ","), "ok", c.RealIP(),
+		map[string]any{"auto_renew": cert.AutoRenew})
+	return c.JSON(http.StatusOK, cert)
+}
+
+// handleRenewCert stößt eine Erneuerung außerhalb des Cron-Rhythmus an — für
+// die "Jetzt erneuern"-Aktion in der Zertifikats-Übersicht.
+func (s *Server) handleRenewCert(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, sc := c.Request().Context(), currentScope(c)
+	cert, err := s.store.GetCert(ctx, sc, id)
+	if err != nil {
+		return storeError(err)
+	}
+
+	renewed, err := s.certs.RenewOne(ctx, sc, cert, "")
+	if err != nil {
+		s.audit(ctx, currentUser(c), "cert.renew", "cert", strings.Join(cert.Domains, ","), "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
+		return storeError(err)
+	}
+
+	s.audit(ctx, currentUser(c), "cert.renew", "cert", strings.Join(cert.Domains, ","), "ok", c.RealIP(), nil)
+	return c.JSON(http.StatusOK, renewed)
+}
+
+type issueStandaloneCertRequest struct {
+	Domains         []string `json:"domains"`
+	Wildcard        bool     `json:"wildcard"`
+	CloudflareToken string   `json:"cloudflare_token"`
+}
+
+// handleIssueStandaloneCert stellt ein Zertifikat aus, das zu keiner Site
+// gehört — z. B. für eine reine Mail- oder Wildcard-Domain.
+func (s *Server) handleIssueStandaloneCert(c echo.Context) error {
+	var req issueStandaloneCertRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+	if len(req.Domains) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "mindestens eine domain angeben")
+	}
+
+	domains := append([]string{}, req.Domains...)
+	if req.Wildcard {
+		domains = append(domains, "*."+domains[0])
+	}
+
+	ctx, user := c.Request().Context(), currentUser(c)
+	cert, err := s.certs.Issue(ctx, currentScope(c), core.IssueOptions{
+		Domains: domains, CloudflareToken: req.CloudflareToken, TenantID: user.TenantID,
+	})
+	if err != nil {
+		s.audit(ctx, user, "cert.issue", "cert", strings.Join(domains, ","), "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
+		return storeError(err)
+	}
+
+	s.audit(ctx, user, "cert.issue", "cert", strings.Join(domains, ","), "ok", c.RealIP(),
+		map[string]any{"domains": cert.Domains, "verfahren": cert.Challenge})
+	return c.JSON(http.StatusCreated, cert)
+}
+
 func (s *Server) handleDeleteCert(c echo.Context) error {
 	id, err := pathID(c)
 	if err != nil {
@@ -255,6 +350,29 @@ func (s *Server) handleSetCloudflareToken(c echo.Context) error {
 		"ok", c.RealIP(), map[string]bool{"hinterlegt": strings.TrimSpace(req.Token) != ""})
 	return c.JSON(http.StatusOK, map[string]bool{
 		"has_cloudflare_token": strings.TrimSpace(req.Token) != "",
+	})
+}
+
+// handleSetHetznerToken ist das Gegenstück für den zweiten DNS-Provider.
+func (s *Server) handleSetHetznerToken(c echo.Context) error {
+	id, err := pathID(c)
+	if err != nil {
+		return err
+	}
+	var req cloudflareRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "anfrage nicht lesbar")
+	}
+
+	ctx := c.Request().Context()
+	if err := s.dns.SetHetznerToken(ctx, currentScope(c), id, req.Token); err != nil {
+		return storeError(err)
+	}
+
+	s.audit(ctx, currentUser(c), "tenant.hetzner_token", "tenant", pathParam(c, "id"),
+		"ok", c.RealIP(), map[string]bool{"hinterlegt": strings.TrimSpace(req.Token) != ""})
+	return c.JSON(http.StatusOK, map[string]bool{
+		"has_hetzner_token": strings.TrimSpace(req.Token) != "",
 	})
 }
 

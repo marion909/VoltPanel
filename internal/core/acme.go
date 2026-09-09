@@ -262,32 +262,44 @@ func (s *CertService) RenewDue(ctx context.Context, tokenFor func(*store.Cert) s
 		if tokenFor != nil {
 			token = tokenFor(cert)
 		}
-		if token == "" {
-			if fromTenant, err := s.CloudflareToken(ctx, sc, cert.TenantID); err == nil {
-				token = fromTenant
-			}
-		}
-		if cert.Challenge == "dns-01" && token == "" {
-			errs = append(errs, fmt.Errorf("%s: dns-01 ohne cloudflare-token nicht erneuerbar",
-				strings.Join(cert.Domains, ", ")))
-			continue
-		}
-
-		_, err := s.Issue(ctx, sc, IssueOptions{
-			Domains: cert.Domains, CloudflareToken: token,
-			SiteID: cert.SiteID, TenantID: cert.TenantID,
-		})
-		if err != nil {
-			// Fehler festhalten, damit das Panel den Grund anzeigen kann.
-			cert.LastError, cert.Status = err.Error(), "failed"
-			_ = s.store.UpdateCert(ctx, sc, cert)
-			errs = append(errs, fmt.Errorf("%s: %w", strings.Join(cert.Domains, ", "), err))
+		if _, err := s.RenewOne(ctx, sc, cert, token); err != nil {
+			errs = append(errs, err)
 			continue
 		}
 		renewed++
 		s.log.Info("zertifikat erneuert", "domains", cert.Domains)
 	}
 	return renewed, errs
+}
+
+// RenewOne erneuert genau ein Zertifikat — von RenewDue je Kandidat benutzt,
+// und von der manuellen "Jetzt erneuern"-Aktion im Panel.
+//
+// tokenOverride darf leer sein; dann wird der Cloudflare-Token des Mandanten
+// verwendet. Schlägt die Erneuerung fehl, hält diese Funktion den Fehler am
+// Zertifikat fest, damit das Panel den Grund anzeigen kann.
+func (s *CertService) RenewOne(ctx context.Context, sc store.Scope, cert *store.Cert, tokenOverride string) (*store.Cert, error) {
+	token := tokenOverride
+	if token == "" {
+		if fromTenant, err := s.CloudflareToken(ctx, sc, cert.TenantID); err == nil {
+			token = fromTenant
+		}
+	}
+	if cert.Challenge == "dns-01" && token == "" {
+		return nil, fmt.Errorf("%s: dns-01 ohne cloudflare-token nicht erneuerbar",
+			strings.Join(cert.Domains, ", "))
+	}
+
+	renewedCert, err := s.Issue(ctx, sc, IssueOptions{
+		Domains: cert.Domains, CloudflareToken: token,
+		SiteID: cert.SiteID, TenantID: cert.TenantID,
+	})
+	if err != nil {
+		cert.LastError, cert.Status = err.Error(), "failed"
+		_ = s.store.UpdateCert(ctx, sc, cert)
+		return nil, fmt.Errorf("%s: %w", strings.Join(cert.Domains, ", "), err)
+	}
+	return renewedCert, nil
 }
 
 func (s *CertService) newClient(cloudflareToken string) (*lego.Client, error) {

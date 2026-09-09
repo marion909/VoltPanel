@@ -7,6 +7,7 @@ import Frontend from './views/Frontend.vue'
 import Sites from './views/Sites.vue'
 import Apps from './views/Apps.vue'
 import Mail from './views/Mail.vue'
+import Domains from './views/Domains.vue'
 import Deploys from './views/Deploys.vue'
 import SiteDetail from './views/SiteDetail.vue'
 import DatabaseArea from './views/DatabaseArea.vue'
@@ -56,6 +57,7 @@ const routes = [
   { path: '/files', name: 'files', component: Files },
   { path: '/ftp', name: 'ftp', component: FTP },
   { path: '/mail', name: 'mail', component: Mail },
+  { path: '/domains', name: 'domains', component: Domains },
   { path: '/cronjobs', name: 'cronjobs', component: Cronjobs },
   { path: '/backups', name: 'backups', component: Backups },
   { path: '/services', name: 'services', component: Services, meta: { minRole: 'admin' } },

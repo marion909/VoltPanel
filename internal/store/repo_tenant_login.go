@@ -84,7 +84,7 @@ func (s *Store) LoginTenantFor(ctx context.Context, host string) (*Tenant, error
 		return nil, ErrNotFound
 	}
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token,
+		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, hetzner_token,
 			created_at, updated_at
 		FROM tenants WHERE login_domain <> '' AND lower(login_domain) = ?`, clean)
 	return scanTenant(row)
@@ -98,7 +98,7 @@ func (s *Store) LoginTenantFor(ctx context.Context, host string) (*Tenant, error
 // die fast immer "gehört zu keinem" lautet, zu viel.
 func (s *Store) LoginDomains(ctx context.Context) ([]*Tenant, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token,
+		SELECT id, name, slug, plan_id, status, login_domain, cloudflare_token, hetzner_token,
 			created_at, updated_at
 		FROM tenants WHERE login_domain <> ''`)
 	if err != nil {

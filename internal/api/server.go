@@ -42,6 +42,7 @@ type Server struct {
 	deploys   *core.DeployService
 	quota     *core.QuotaService
 	certs     *core.CertService
+	dns       *core.DNSService
 	backups   *core.BackupService
 	secrets   *authn.SecretBox
 	log       *slog.Logger
@@ -96,6 +97,8 @@ func New(opts Options) (*Server, error) {
 		e.IPExtractor = echo.ExtractIPDirect()
 	}
 
+	certsSvc := core.NewCertService(opts.Config, opts.Store, opts.Agent, opts.Secrets, opts.Logger)
+
 	s := &Server{
 		echo:      e,
 		cfg:       opts.Config,
@@ -109,7 +112,8 @@ func New(opts Options) (*Server, error) {
 		ftp:       core.NewFTPService(opts.Store, opts.Agent, opts.Config, opts.Secrets),
 		cron:      core.NewCronService(opts.Store, opts.Agent, opts.Config),
 		quota:     core.NewQuotaService(opts.Store, opts.Agent, opts.Config, opts.Logger),
-		certs:     core.NewCertService(opts.Config, opts.Store, opts.Agent, opts.Secrets, opts.Logger),
+		certs:     certsSvc,
+		dns:       core.NewDNSService(opts.Store, opts.Secrets, certsSvc),
 		backups:   core.NewBackupService(opts.Config, opts.Store, opts.Logger, opts.Secrets),
 		log:       opts.Logger,
 		devOrigin: opts.DevOrigin,
@@ -304,7 +308,19 @@ func (s *Server) setupRoutes() {
 	auth.GET("/sites/:id/terminal", s.handleTerminal, s.requireRole(store.RoleAdmin))
 
 	auth.GET("/certs", s.handleListCerts)
+	auth.POST("/certs", s.handleIssueStandaloneCert)
+	auth.PATCH("/certs/:id", s.handleUpdateCert)
+	auth.POST("/certs/:id/renew", s.handleRenewCert)
 	auth.DELETE("/certs/:id", s.handleDeleteCert)
+
+	// Domains: DNS-Zonen/-Einträge über die beim Mandanten hinterlegten
+	// Provider-Tokens (Cloudflare, Hetzner) — dieselbe Berechtigung wie
+	// beim Zertifikat-Ausstellen: jeder Tenant-User im eigenen Scope.
+	auth.GET("/dns/zones", s.handleListDNSZones)
+	auth.GET("/dns/zones/:zoneId/records", s.handleListDNSRecords)
+	auth.POST("/dns/zones/:zoneId/records", s.handleCreateDNSRecord)
+	auth.PUT("/dns/zones/:zoneId/records", s.handleUpdateDNSRecord)
+	auth.DELETE("/dns/zones/:zoneId/records", s.handleDeleteDNSRecord)
 
 	// Dateimanager: immer site-gebunden, nie mit absolutem Pfad.
 	auth.GET("/sites/:id/files", s.handleFileList)
@@ -397,6 +413,7 @@ func (s *Server) setupRoutes() {
 	auth.DELETE("/tenants/:id", s.handleDeleteTenant, s.requireRole(store.RoleAdmin))
 	auth.GET("/tenants/:id/quota", s.handleTenantQuota)
 	auth.PUT("/tenants/:id/cloudflare", s.handleSetCloudflareToken, s.requireRole(store.RoleReseller))
+	auth.PUT("/tenants/:id/hetzner-dns", s.handleSetHetznerToken, s.requireRole(store.RoleReseller))
 	auth.PUT("/tenants/:id/login-domain", s.handleSetLoginDomain, s.requireRole(store.RoleReseller))
 	auth.POST("/tenants/:id/login-domain/cert", s.handleIssueLoginDomainCert,
 		s.requireRole(store.RoleReseller))

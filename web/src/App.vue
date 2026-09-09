@@ -53,6 +53,7 @@ const navGroups = computed(() =>
       group: "nav.group.hosting",
       items: [
         { to: "/frontend", key: "nav.frontend", icon: "globe", active: "/frontend" },
+        { to: "/domains", key: "nav.domains", icon: "shield" },
         { to: "/files", key: "nav.files", icon: "folder" },
         { to: "/databases", key: "nav.databases", icon: "database", active: "/databases" },
         { to: "/ftp", key: "nav.ftp", icon: "transfer" },
@@ -149,6 +150,7 @@ const paths = {
   // unterschiedliche Funktionen sind.
   transfer: "M9 20V4M9 4L5 8M9 4l4 4M15 4v16M15 20l-4-4M15 20l4-4",
   menu: "M4 7h16M4 12h16M4 17h16",
+  shield: "M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7z",
   close: "M6 6l12 12M18 6L6 18",
 };
 </script>

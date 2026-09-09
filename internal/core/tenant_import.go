@@ -536,7 +536,7 @@ func (s *ExportService) importRest(ctx context.Context, sys store.Scope,
 		}
 	}
 
-	// Das Cloudflare-Token des Mandanten.
+	// Die DNS-Provider-Tokens des Mandanten.
 	if klar, ok := bundleSecret(b, box, "tenant.cloudflare_token"); ok {
 		enc, err := s.secrets.Encrypt(klar)
 		if err == nil {
@@ -544,6 +544,17 @@ func (s *ExportService) importRest(ctx context.Context, sys store.Scope,
 				t.CloudflareToken = enc
 				if err := s.store.UpdateTenant(ctx, sys, t); err != nil {
 					res.Warnings = append(res.Warnings, "cloudflare-token: "+err.Error())
+				}
+			}
+		}
+	}
+	if klar, ok := bundleSecret(b, box, "tenant.hetzner_token"); ok {
+		enc, err := s.secrets.Encrypt(klar)
+		if err == nil {
+			if t, err := s.store.GetTenant(ctx, sys, res.TenantID); err == nil {
+				t.HetznerToken = enc
+				if err := s.store.UpdateTenant(ctx, sys, t); err != nil {
+					res.Warnings = append(res.Warnings, "hetzner-token: "+err.Error())
 				}
 			}
 		}
