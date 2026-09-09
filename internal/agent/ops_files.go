@@ -17,7 +17,17 @@ import (
 const maxReadBytes = 8 << 20 // 8 MiB
 
 func (s *Server) opFileWrite(_ context.Context, raw json.RawMessage) (any, error) {
-	p, err := decode[FileWriteParams](raw, OpFileWrite)
+	return s.fileWrite(raw, OpFileWrite, false)
+}
+
+// opFileWriteGroup ist das Gegenstück für Client.WriteFileGroup — siehe
+// OpFileMkdirGroup.
+func (s *Server) opFileWriteGroup(_ context.Context, raw json.RawMessage) (any, error) {
+	return s.fileWrite(raw, OpFileWriteGroup, true)
+}
+
+func (s *Server) fileWrite(raw json.RawMessage, op Op, trustedGroup bool) (any, error) {
+	p, err := decode[FileWriteParams](raw, op)
 	if err != nil {
 		return nil, err
 	}
@@ -34,23 +44,23 @@ func (s *Server) opFileWrite(_ context.Context, raw json.RawMessage) (any, error
 	mode &= 0o777
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, opErr(OpFileWrite, "verzeichnis anlegen: %v", err)
+		return nil, opErr(op, "verzeichnis anlegen: %v", err)
 	}
 	if err := writeFileAtomic(path, []byte(p.Content), mode); err != nil {
-		return nil, opErr(OpFileWrite, "%v", err)
+		return nil, opErr(op, "%v", err)
 	}
 	if p.Owner != "" {
 		if err := checkUsername(p.Owner); err != nil {
 			return nil, err
 		}
-		if p.Group != "" {
+		if p.Group != "" && !trustedGroup {
 			if err := checkFileGroup(p.Group); err != nil {
 				return nil, err
 			}
 		}
 	}
 	if err := applyOwner(path, p.Owner, p.Group, false); err != nil {
-		return nil, opErr(OpFileWrite, "%v", err)
+		return nil, opErr(op, "%v", err)
 	}
 	return TextResult{Text: path}, nil
 }
@@ -111,7 +121,22 @@ func (s *Server) opFileRemove(_ context.Context, raw json.RawMessage) (any, erro
 }
 
 func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error) {
-	p, err := decode[FileMkdirParams](raw, OpFileMkdir)
+	return s.fileMkdir(raw, OpFileMkdir, false)
+}
+
+// opFileMkdirGroup ist wie opFileMkdir, nur ohne die Sperrliste für die
+// Gruppe (checkFileGroup) — für Client.MkdirGroup, das applyWebPermissions
+// beim Anlegen einer Site benutzt, um die Gruppe bewusst auf den Webserver
+// (config.WebGroup, üblich "www-data") zu setzen. Das ist genau die Gruppe,
+// die checkFileGroup sperrt — dort aus gutem Grund für die
+// Datei-Manager-API eines Mandanten, die diesen Op aber nie erreicht: sie
+// schickt nie eine Gruppe mit (siehe FileService.Write/Mkdir in files.go).
+func (s *Server) opFileMkdirGroup(_ context.Context, raw json.RawMessage) (any, error) {
+	return s.fileMkdir(raw, OpFileMkdirGroup, true)
+}
+
+func (s *Server) fileMkdir(raw json.RawMessage, op Op, trustedGroup bool) (any, error) {
+	p, err := decode[FileMkdirParams](raw, op)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +156,7 @@ func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error
 	}
 	perm := mode & 0o777
 	if err := os.MkdirAll(path, perm); err != nil {
-		return nil, opErr(OpFileMkdir, "%v", err)
+		return nil, opErr(op, "%v", err)
 	}
 	// Erst der Eigentümer, dann die Rechte. Die Reihenfolge ist nicht
 	// beliebig: chown löscht setgid wieder — auf manchen Systemen auch bei
@@ -140,14 +165,14 @@ func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error
 		if err := checkUsername(p.Owner); err != nil {
 			return nil, err
 		}
-		if p.Group != "" {
+		if p.Group != "" && !trustedGroup {
 			if err := checkFileGroup(p.Group); err != nil {
 				return nil, err
 			}
 		}
 	}
 	if err := applyOwner(path, p.Owner, p.Group, false); err != nil {
-		return nil, opErr(OpFileMkdir, "%v", err)
+		return nil, opErr(op, "%v", err)
 	}
 
 	// MkdirAll respektiert die umask und kennt kein setgid; beides nachziehen.
@@ -156,7 +181,7 @@ func (s *Server) opFileMkdir(_ context.Context, raw json.RawMessage) (any, error
 		chmod |= os.ModeSetgid
 	}
 	if err := os.Chmod(path, chmod); err != nil {
-		return nil, opErr(OpFileMkdir, "%v", err)
+		return nil, opErr(op, "%v", err)
 	}
 	return TextResult{Text: path}, nil
 }

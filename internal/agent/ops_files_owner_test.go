@@ -49,6 +49,50 @@ func TestOpFileChownLehntReservierteGruppeAb(t *testing.T) {
 	}
 }
 
+// TestOpFileMkdirGroupErlaubtWebserverGruppe hält den Fund fest, der jede neue
+// Site am Anlegen scheitern ließ: SiteService.applyWebPermissions ruft
+// Client.MkdirGroup mit group=www-data (config.WebGroup) auf — genau die
+// Gruppe, die checkFileGroup sperrt. Lief das über denselben Op wie der
+// Datei-Manager eines Mandanten (file.mkdir), schlug jedes Anlegen einer Site
+// mit "www-data ist eine reservierte systemgruppe" fehl. file.mkdir_group ist
+// der eigene, getrennte Op dafür, den ein Mandant nie erreicht (files.go
+// schickt beim eigenen Mkdir nie eine Gruppe mit).
+func TestOpFileMkdirGroupErlaubtWebserverGruppe(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "site", "public")
+	srv := &Server{roots: []string{dir}}
+
+	raw, err := json.Marshal(FileMkdirParams{Path: path, Mode: 0o750, Owner: "site_shop", Group: "www-data"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = srv.opFileMkdirGroup(context.Background(), raw)
+	// Fehlt die Gruppe www-data auf dem Testsystem oder fehlen Rechte zum
+	// Chown, scheitert das eigentliche os.Chown — kein Testfehler. Die
+	// Behauptung ist nur, dass checkFileGroup hier nicht mehr dazwischenkommt.
+	if err != nil && strings.Contains(err.Error(), "reservierte systemgruppe") {
+		t.Fatalf("opFileMkdirGroup lehnt group=www-data weiterhin ab: %v", err)
+	}
+}
+
+// TestOpFileMkdirLehntWeiterhinReservierteGruppeAb ist die Kehrseite: der
+// Datei-Manager-Op eines Mandanten (file.mkdir) bleibt gesperrt — nur der
+// getrennte file.mkdir_group-Op für die interne Site-Provisionierung darf
+// die Webserver-Gruppe setzen.
+func TestOpFileMkdirLehntWeiterhinReservierteGruppeAb(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "site", "public")
+	srv := &Server{roots: []string{dir}}
+
+	raw, err := json.Marshal(FileMkdirParams{Path: path, Mode: 0o750, Owner: "site_shop", Group: "www-data"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.opFileMkdir(context.Background(), raw); err == nil {
+		t.Fatal("opFileMkdir akzeptierte group=www-data")
+	}
+}
+
 // TestApplyOwnerPrueftEigentuemerNichtMehrSelbst hält die Kehrseite des Fixes
 // fest: applyOwner vertraut jetzt seinem Aufrufer für den Eigentümer, statt
 // selbst über checkUsername zu sperren. Ohne diese Änderung scheiterten die

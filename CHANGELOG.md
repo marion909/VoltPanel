@@ -15,6 +15,20 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.138 — 2026-09-09
+
+- Jede neue Site scheiterte beim Anlegen mit "www-data ist eine
+  reservierte systemgruppe": checkFileGroup sperrt diese Gruppe für den
+  Datei-Manager eines Mandanten (file.mkdir/file.write, aus gutem
+  Grund — dort ist owner/group potenziell mandantengesteuert), aber
+  SiteService.applyWebPermissions läuft über denselben Op und setzt
+  bewusst genau diese Gruppe, damit der Webserver die Site überhaupt
+  lesen kann. Neue, getrennte Ops file.mkdir_group/file.write_group ohne
+  die Sperrliste — für Client.MkdirGroup/WriteFileGroup, die ein
+  Mandant nie erreicht (files.go schickt beim eigenen Mkdir/Write nie
+  eine Gruppe mit). Der Datei-Manager-Op selbst bleibt unverändert
+  gesperrt.
+
 ## v0.4.137 — 2026-09-09
 
 - Der Apps-Tab unter Webseiten war die letzte Ansicht, die noch eine

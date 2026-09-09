@@ -68,6 +68,13 @@ const (
 	OpFileList    Op = "file.list"
 	OpFileTailLog Op = "file.tail_log"
 
+	// file.mkdir/write_group sind wie file.mkdir/write, nur ohne die
+	// Sperrliste für die Gruppe — für Client.MkdirGroup/WriteFileGroup, die
+	// bewusst die Webserver-Gruppe setzen. Über die Datei-Manager-API eines
+	// Mandanten unerreichbar: die schickt nie eine Gruppe mit (files.go).
+	OpFileMkdirGroup Op = "file.mkdir_group"
+	OpFileWriteGroup Op = "file.write_group"
+
 	// Dateien: Umbenennen, Kopieren, Rechte, Archive
 	OpFileMove    Op = "file.move"
 	OpFileCopy    Op = "file.copy"
