@@ -132,6 +132,21 @@ async function create() {
   }
 }
 
+function downloadArchive(archive) {
+  window.location.href = api.url(`/backups/${encodeURIComponent(archive.name)}/download`)
+}
+
+async function deleteArchive(archive) {
+  if (!(await askConfirm(t('backup.confirmDeleteArchive', { name: archive.name })))) return
+  error.value = ''
+  try {
+    await api.del(`/backups/${encodeURIComponent(archive.name)}`)
+    await load()
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
 async function upload(archive, targetId) {
   if (!targetId) return
   busy.value = `upload-${archive.name}`
@@ -379,7 +394,8 @@ onMounted(load)
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.archive') }}</th>
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.size') }}</th>
                 <th class="px-4 py-2.5 font-normal">{{ t('backup.date') }}</th>
-                <th class="px-4 py-2.5 text-right font-normal">{{ t('backup.uploadTo') }}</th>
+                <th class="px-4 py-2.5 font-normal">{{ t('backup.uploadTo') }}</th>
+                <th class="px-4 py-2.5 text-right font-normal">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -390,7 +406,7 @@ onMounted(load)
                 <td class="px-4 py-2.5 text-[12px] text-ink-secondary">
                   {{ zeit(archive.mod_time) }}
                 </td>
-                <td class="px-4 py-2.5 text-right">
+                <td class="px-4 py-2.5">
                   <span v-if="busy === `upload-${archive.name}`" class="text-[12px] text-ink-muted">
                     {{ t('backup.uploading') }}
                   </span>
@@ -409,6 +425,14 @@ onMounted(load)
                   <span v-else class="text-[12px] text-ink-muted">
                     {{ t('backup.noTargets') }}
                   </span>
+                </td>
+                <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                  <button class="text-[12px] underline text-ink-secondary" @click="downloadArchive(archive)">
+                    {{ t('files.download') }}
+                  </button>
+                  <button class="ml-3 text-[12px] underline text-status-critical" @click="deleteArchive(archive)">
+                    {{ t('sites.delete') }}
+                  </button>
                 </td>
               </tr>
             </tbody>

@@ -352,3 +352,41 @@ func (s *BackupService) ListArchives() ([]os.FileInfo, error) {
 	}
 	return out, nil
 }
+
+// OpenArchive öffnet ein lokales Archiv zum Ausliefern. Der Aufrufer schließt
+// die Datei. filename kommt aus der Anfrage und wird über archivePath gegen
+// das Backup-Verzeichnis gehalten — dieselbe Prüfung wie beim Hochladen zu
+// einem Ziel (backup_targets.go), aus demselben Grund.
+func (s *BackupService) OpenArchive(filename string) (*os.File, os.FileInfo, error) {
+	local, err := s.archivePath(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	f, err := os.Open(local)
+	if err != nil {
+		return nil, nil, fmt.Errorf("das archiv %q gibt es nicht", filepath.Base(local))
+	}
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	return f, info, nil
+}
+
+// DeleteArchive entfernt ein lokales Archiv unwiderruflich. Hochgeladene
+// Kopien bei einem Ziel bleiben unangetastet — das ist ein eigener Ort mit
+// eigener Aufbewahrung.
+func (s *BackupService) DeleteArchive(filename string) error {
+	local, err := s.archivePath(filename)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(local); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("das archiv %q gibt es nicht", filepath.Base(local))
+		}
+		return err
+	}
+	return nil
+}

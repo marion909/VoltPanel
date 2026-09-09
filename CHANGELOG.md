@@ -15,6 +15,19 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.136 — 2026-09-09
+
+- Zwei Meldungen aus dem laufenden Betrieb behoben: In der Domains-Ansicht
+  zwang ein langer, unumbrochener DNS-Wert (z. B. ein DKIM-TXT-Record) die
+  Einträge-Tabelle so breit, dass die Aktionen-Spalte erst nach Scrollen
+  weit nach rechts erreichbar war — Name und Inhalt sind jetzt mit
+  max-width/Ellipsis gekappt (voller Wert per Tooltip). Bei den Backups
+  gab es für lokale Archive nur ein "Hochladen zu einem Ziel", aber kein
+  Herunterladen oder Löschen — neue Endpunkte
+  GET /backups/:name/download und DELETE /backups/:name (beide
+  admin-gated, Dateiname über denselben archivePath()-Schutz wie beim
+  Hochladen validiert).
+
 ## v0.4.135 — 2026-09-09
 
 - Der Dateimanager an aaPanel angelehnt, ohne dessen serverweiten

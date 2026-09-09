@@ -476,6 +476,7 @@ const messages = {
     'backup.uploaded': 'Nach {name} übertragen: {path}',
     'backup.noArchives': 'Noch keine Archive auf diesem Server.',
     'backup.confirmDelete': 'Ziel {name} entfernen? Bereits übertragene Archive bleiben dort liegen.',
+    'backup.confirmDeleteArchive': 'Archiv {name} unwiderruflich löschen? Bereits hochgeladene Kopien bleiben davon unberührt.',
 
     'sql.title': 'SQL',
     'sql.tables': 'Tabellen',
@@ -1188,6 +1189,7 @@ const messages = {
     'backup.uploaded': 'Transferred to {name}: {path}',
     'backup.noArchives': 'No archives on this server yet.',
     'backup.confirmDelete': 'Remove target {name}? Archives already transferred stay there.',
+    'backup.confirmDeleteArchive': 'Permanently delete archive {name}? Copies already uploaded elsewhere are unaffected.',
 
     'sql.title': 'SQL',
     'sql.tables': 'Tables',

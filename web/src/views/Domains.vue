@@ -396,9 +396,9 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="(rec, i) in records" :key="i" class="border-b last:border-0 border-line-hairline">
-                  <td class="px-4 py-2.5 font-medium">{{ rec.Name }}</td>
+                  <td class="max-w-[160px] truncate px-4 py-2.5 font-medium" :title="rec.Name">{{ rec.Name }}</td>
                   <td class="px-4 py-2.5 text-ink-secondary">{{ rec.Type }}</td>
-                  <td class="px-4 py-2.5 font-mono text-[12px] text-ink-secondary">{{ rec.Value }}</td>
+                  <td class="max-w-[320px] truncate px-4 py-2.5 font-mono text-[12px] text-ink-secondary" :title="rec.Value">{{ rec.Value }}</td>
                   <td class="tabular px-4 py-2.5 text-ink-secondary">{{ rec.TTL || '—' }}</td>
                   <td class="px-4 py-2.5 text-right whitespace-nowrap">
                     <button class="text-[12px] underline text-ink-secondary" @click="startEditRecord(rec)">

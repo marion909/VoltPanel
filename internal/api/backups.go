@@ -1,6 +1,8 @@
 package api
 
 import (
+	"io"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -80,6 +82,46 @@ func (s *Server) handleCreateBackup(c echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]any{
 		"path": res.Path, "size_bytes": res.SizeBytes, "checksum": res.Checksum,
 	})
+}
+
+// handleDownloadBackup streamt ein lokales Archiv.
+//
+// Nur für Administratoren: dieselbe Begründung wie beim Auflisten — das
+// Archiv enthält die Panel-Datenbank aller Mandanten, nicht nur die eines
+// einzelnen.
+func (s *Server) handleDownloadBackup(c echo.Context) error {
+	name := c.Param("name")
+	f, info, err := s.backups.OpenArchive(name)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	defer f.Close()
+
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": info.Name()})
+	h := c.Response().Header()
+	h.Set(echo.HeaderContentDisposition, disposition)
+	h.Set(echo.HeaderContentLength, strconv.FormatInt(info.Size(), 10))
+	h.Set(echo.HeaderContentType, "application/octet-stream")
+	h.Set("X-Content-Type-Options", "nosniff")
+	c.Response().WriteHeader(http.StatusOK)
+
+	if _, err := io.Copy(c.Response(), f); err != nil {
+		s.log.Warn("backup-download abgebrochen", "name", name, "err", err)
+	}
+	return nil
+}
+
+// handleDeleteBackup entfernt ein lokales Archiv unwiderruflich.
+func (s *Server) handleDeleteBackup(c echo.Context) error {
+	name := c.Param("name")
+	ctx, user := c.Request().Context(), currentUser(c)
+	if err := s.backups.DeleteArchive(name); err != nil {
+		s.audit(ctx, user, "backup.delete", "backup", name, "error", c.RealIP(),
+			map[string]string{"fehler": err.Error()})
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	s.audit(ctx, user, "backup.delete", "backup", name, "ok", c.RealIP(), nil)
+	return c.NoContent(http.StatusNoContent)
 }
 
 // --- Ziele -----------------------------------------------------------------

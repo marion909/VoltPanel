@@ -368,6 +368,8 @@ func (s *Server) setupRoutes() {
 
 	auth.GET("/backups", s.handleListBackups)
 	auth.POST("/backups", s.handleCreateBackup, s.requireRole(store.RoleAdmin))
+	auth.GET("/backups/:name/download", s.handleDownloadBackup, s.requireRole(store.RoleAdmin))
+	auth.DELETE("/backups/:name", s.handleDeleteBackup, s.requireRole(store.RoleAdmin))
 	auth.GET("/backup-targets", s.handleListTargets)
 	auth.POST("/backup-targets", s.handleCreateTarget)
 	auth.PATCH("/backup-targets/:id", s.handleUpdateTarget)
