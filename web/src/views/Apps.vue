@@ -46,6 +46,41 @@ const showNodes = ref(false)
 const envDraft = ref({})
 const envOpen = ref({})
 
+// Image/Port/Speicher/CPUs (bzw. Runtime/Argumente) ließen sich bisher nur
+// beim Anlegen setzen — danach half nur Löschen und neu Anlegen. Der Entwurf
+// startet mit den aktuellen Werten der App, nicht leer.
+const editOpen = ref({})
+const editDraft = ref({})
+
+function startEdit(app) {
+  editDraft.value = {
+    ...editDraft.value,
+    [app.id]: {
+      image: app.image || '',
+      container_port: app.container_port || 8080,
+      memory_mb: app.memory_mb || 0,
+      cpus: app.cpus || '',
+      runtime: app.runtime || 'node',
+      argsText: (app.args || []).join(' '),
+    },
+  }
+  editOpen.value = { ...editOpen.value, [app.id]: !editOpen.value[app.id] }
+}
+
+async function saveAppEdit(app) {
+  const d = editDraft.value[app.id]
+  if (!d) return
+  await saveApp(app, {
+    image: d.image,
+    container_port: Number(d.container_port) || 0,
+    memory_mb: Number(d.memory_mb) || 0,
+    cpus: d.cpus,
+    runtime: d.runtime,
+    args: argsFromText(d.argsText),
+  })
+  editOpen.value = { ...editOpen.value, [app.id]: false }
+}
+
 const inputStyle = {
   borderColor: 'var(--line-axis)',
   background: 'var(--surface-page)',
@@ -617,7 +652,10 @@ onMounted(load)
                   {{ formatDateTime(app.created_at) }}
                 </td>
                 <td class="px-4 py-2.5 text-right text-[12px]">
-                  <button class="underline text-ink-secondary" :disabled="busy" @click="envOpen[app.id] = !envOpen[app.id]">
+                  <button class="underline text-ink-secondary" :disabled="busy" @click="startEdit(app)">
+                    {{ t('common.edit') }}
+                  </button>
+                  <button class="ml-3 underline text-ink-secondary" :disabled="busy" @click="envOpen[app.id] = !envOpen[app.id]">
                     {{ t('apps.editEnv') }}
                   </button>
                   <button v-if="app.kind === 'docker'" class="ml-3 underline text-ink-secondary" @click="logsLaden(app)">
@@ -631,8 +669,48 @@ onMounted(load)
                   </button>
                 </td>
               </tr>
-              <tr v-if="envOpen[app.id] || logs[app.id] !== undefined" class="border-b last:border-0 border-line-hairline">
+              <tr v-if="editOpen[app.id] || envOpen[app.id] || logs[app.id] !== undefined" class="border-b last:border-0 border-line-hairline">
                 <td colspan="7" class="px-4 py-3" :style="{ background: 'var(--surface-sunken)' }">
+                  <div v-if="editOpen[app.id]" class="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <template v-if="app.kind === 'docker'">
+                      <label class="block sm:col-span-2">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.image') }}</span>
+                        <input v-model="editDraft[app.id].image" class="w-full rounded-md border px-3 py-2 font-mono text-[12px]" :style="inputStyle" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.containerPort') }}</span>
+                        <input v-model.number="editDraft[app.id].container_port" type="number" min="1" max="65535" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.memory') }}</span>
+                        <input v-model.number="editDraft[app.id].memory_mb" type="number" min="0" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+                      </label>
+                      <label class="block">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.cpus') }}</span>
+                        <input v-model="editDraft[app.id].cpus" placeholder="0.5" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+                      </label>
+                    </template>
+                    <template v-else>
+                      <label class="block">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.runtime') }}</span>
+                        <select v-model="editDraft[app.id].runtime" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle">
+                          <option v-for="r in runtimes" :key="r.name" :value="r.name">{{ r.name }}{{ r.version ? ' ' + r.version : '' }}</option>
+                        </select>
+                      </label>
+                      <label class="block sm:col-span-2">
+                        <span class="mb-1 block text-[12px] text-ink-secondary">{{ t('apps.args') }}</span>
+                        <input v-model="editDraft[app.id].argsText" placeholder="server.js" class="w-full rounded-md border px-3 py-2 text-[13px]" :style="inputStyle" />
+                      </label>
+                    </template>
+                    <div class="flex items-end gap-2">
+                      <button class="rounded-md px-3 py-2 text-[12px] font-medium text-white disabled:opacity-60 bg-accent" :disabled="busy" @click="saveAppEdit(app)">
+                        {{ t('common.save') }}
+                      </button>
+                      <button class="rounded-md border px-3 py-2 text-[12px]" :style="{ borderColor: 'var(--line-axis)', color: 'var(--ink-secondary)' }" @click="editOpen[app.id] = false">
+                        {{ t('common.cancel') }}
+                      </button>
+                    </div>
+                  </div>
                   <!--
                     Die Werte stehen hier nicht. Das Panel gibt sie nach dem
                     Speichern nicht mehr heraus — in einer App-Umgebung stehen

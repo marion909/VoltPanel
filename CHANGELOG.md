@@ -15,6 +15,20 @@ eine Nebenversion etwas verlangen. Was das betrifft, steht unter „Achtung".
 
 Nichts — der letzte Stand ist veröffentlicht.
 
+## v0.4.139 — 2026-09-09
+
+- Eine App ließ sich nach dem Anlegen nicht mehr ändern — Image,
+  Port im Container, Speicher, CPUs (bzw. Laufzeit/Argumente bei einer
+  nativen App) waren nur beim Erstellen sichtbar. Bei einem
+  Docker-Image, dessen tatsächlicher Port nicht zum eingetragenen
+  Container-Port passt (z. B. nginxinc/nginx-unprivileged auf 8080,
+  aber die App war für Port 3000 angelegt), führte das zu 502 vom
+  Vhost, ohne eine Stelle im Panel, das zu berichtigen — nur Löschen
+  und neu Anlegen. Der Server akzeptierte diese Felder über
+  PATCH /apps/:id schon immer, es fehlte nur der Knopf: neuer
+  "Bearbeiten"-Eintrag je App, klappt wie Umgebung/Logs als Zeile
+  darunter auf, vorausgefüllt mit den aktuellen Werten.
+
 ## v0.4.138 — 2026-09-09
 
 - Jede neue Site scheiterte beim Anlegen mit "www-data ist eine
